@@ -6,6 +6,23 @@ import { EX_CATEGORIES, EX_THUMBS, PLACES, SMART_FILTERS } from "@/lib/data";
 import type { Place } from "@/lib/types";
 import type { TripContext } from "@/lib/ai";
 import { fetchInsights, fetchRecommendations } from "@/lib/ai-client";
+import {
+  destinationCoords,
+  isMapsConfigured,
+  mapsConfig,
+  placeCoords,
+  useGeocode,
+} from "@/lib/maps";
+import type { MapMarker, PlaceResult } from "@/lib/maps";
+import {
+  DestinationMarkers,
+  GoogleMap,
+  HotelMarkers,
+  MapInfoCard,
+  MapsApiProvider,
+  PlaceMarkers,
+  PlacesExplorer,
+} from "../maps";
 import { AppNav, Brand } from "../AppNav";
 import {
   Calendar,
@@ -286,51 +303,147 @@ function Insights() {
   );
 }
 
-function MapCanvas() {
+/** Stylized CSS map used when no Google Maps key is configured. */
+function ExploreMapFallback() {
+  const { state, actions } = useTrip();
+  const selIds = state.exSelected.map((x) => x.id);
+  return (
+    <div className="absolute inset-0" style={{ background: "radial-gradient(120% 90% at 78% 22%, #cfe4e0 0%, transparent 46%), linear-gradient(180deg,#eef3ec,#e7efe8)" }}>
+      <div className="absolute right-0 bottom-0 w-[46%] h-[55%] opacity-85" style={{ background: "linear-gradient(160deg,#a9d2d8,#7fbcc6)", clipPath: "polygon(20% 100%,0 40%,40% 18%,100% 0,100% 100%)" }} />
+      <div className="absolute inset-0 opacity-50" style={{ background: "repeating-linear-gradient(58deg, transparent 0 60px, rgba(255,255,255,.7) 60px 62px),repeating-linear-gradient(150deg, transparent 0 78px, rgba(255,255,255,.6) 78px 80px)" }} />
+      <div className="absolute top-3 left-3 font-mono text-[10px] text-[#5d7068] bg-white/80 px-2 py-1 rounded-[7px]">live map · your picks</div>
+      {PLACES.map((p) => {
+        const sel = selIds.includes(p.id);
+        const idx = selIds.indexOf(p.id);
+        return (
+          <button key={p.id} onClick={() => actions.exMapPick(p.id)} className="absolute -translate-x-1/2 -translate-y-1/2 border-none bg-transparent cursor-pointer"
+            style={{ left: p.x, top: p.y, zIndex: sel ? 20 : 5 }}>
+            {sel ? (
+              <div className="w-[26px] h-[26px] grid place-items-center" style={{ borderRadius: "50% 50% 50% 2px", transform: "rotate(45deg)", background: "var(--accent)", boxShadow: "0 4px 10px -2px rgba(0,0,0,.4)", border: state.exMapSel === p.id ? "2px solid #fff" : "2px solid rgba(255,255,255,.85)" }}>
+                <span className="text-white font-bold text-[11px]" style={{ transform: "rotate(-45deg)" }}>{idx + 1}</span>
+              </div>
+            ) : (
+              <div className="w-[9px] h-[9px] rounded-full bg-white border-2 border-muted opacity-70" />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Geocodes the user's accommodations and lifts hotel markers to the parent. */
+function HotelGeocoder({ onMarkers }: { onMarkers: (m: MapMarker[]) => void }) {
+  const { state } = useTrip();
+  const geocode = useGeocode();
+  const accoms = state.destinations.flatMap((d) => d.accoms.map((a) => ({ ...a, destName: d.name })));
+  const key = accoms.map((a) => `${a.id}:${a.address}`).join("|");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const out: MapMarker[] = [];
+      for (const a of accoms) {
+        if (!a.address) continue;
+        const loc = await geocode(a.address);
+        if (loc) out.push({ id: `hotel-${a.id}`, name: a.name || "Stay", kind: "hotel", position: loc, category: a.type, subtitle: a.destName });
+      }
+      if (!cancelled) onMarkers(out);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return null;
+}
+
+function ExploreRealMap() {
+  const { state, actions } = useTrip();
+  const [hotelMarkers, setHotelMarkers] = useState<MapMarker[]>([]);
+  const selIds = state.exSelected.map((x) => x.id);
+  const center = destinationCoords(state.dest.split(",")[0]) ?? mapsConfig.defaultCenter;
+
+  const destMarker: MapMarker = { id: "dest", name: state.dest.split(",")[0], kind: "destination", position: center, category: "Destination" };
+  const placeMarkers: MapMarker[] = selIds
+    .map((id): MapMarker | null => {
+      const p = PLACES.find((pp) => pp.id === id);
+      const c = p ? placeCoords(p.id) : null;
+      if (!p || !c) return null;
+      return { id: p.id, name: p.name, kind: p.type === "restaurant" ? "restaurant" : "attraction", position: c, category: p.cats[0], rating: p.rating };
+    })
+    .filter((m): m is MapMarker => m !== null);
+  const pickMarkers: MapMarker[] = state.mapPicks.map((p) => ({
+    id: p.id,
+    name: p.name,
+    kind: p.category === "Restaurants" || p.category === "Cafés" ? ("restaurant" as const) : ("attraction" as const),
+    position: p.position,
+    category: p.category,
+    rating: p.rating,
+  }));
+
+  const allMarkers = [destMarker, ...hotelMarkers, ...placeMarkers, ...pickMarkers];
+  const selMarker = state.exMapSel ? allMarkers.find((m) => m.id === state.exMapSel) ?? null : null;
+  const selIsCatalog = !!selMarker && PLACES.some((p) => p.id === selMarker.id);
+
+  return (
+    <GoogleMap center={center} zoom={13} className="absolute inset-0 h-full w-full" fallback={<ExploreMapFallback />}>
+      <DestinationMarkers markers={[destMarker]} selectedId={state.exMapSel} onSelect={actions.exMapPick} />
+      <HotelGeocoder onMarkers={setHotelMarkers} />
+      <HotelMarkers markers={hotelMarkers} selectedId={state.exMapSel} onSelect={actions.exMapPick} />
+      <PlaceMarkers markers={[...placeMarkers, ...pickMarkers]} selectedId={state.exMapSel} onSelect={actions.exMapPick} />
+      {selMarker && (
+        <MapInfoCard
+          marker={selMarker}
+          onClose={() => actions.exMapPick(null)}
+          onAdd={selIsCatalog ? (m) => actions.exToggleTrip(m.id) : undefined}
+          added={selIsCatalog ? selIds.includes(selMarker.id) : undefined}
+        />
+      )}
+    </GoogleMap>
+  );
+}
+
+/** Footer shown under the map for a selected catalog place (fallback parity). */
+function MapSelFooter() {
   const { state, actions } = useTrip();
   const selIds = state.exSelected.map((x) => x.id);
   const mapSelPlace = state.exMapSel ? PLACES.find((p) => p.id === state.exMapSel) : null;
-  const isSel = mapSelPlace ? selIds.includes(mapSelPlace.id) : false;
-
+  if (!mapSelPlace) return null;
+  const isSel = selIds.includes(mapSelPlace.id);
   return (
-    <div className="flex-[1_1_420px] min-w-[300px] bg-white border border-line rounded-[18px] overflow-hidden">
-      <div className="relative" style={{ height: "clamp(360px,52vh,560px)", background: "radial-gradient(120% 90% at 78% 22%, #cfe4e0 0%, transparent 46%), linear-gradient(180deg,#eef3ec,#e7efe8)" }}>
-        <div className="absolute right-0 bottom-0 w-[46%] h-[55%] opacity-85" style={{ background: "linear-gradient(160deg,#a9d2d8,#7fbcc6)", clipPath: "polygon(20% 100%,0 40%,40% 18%,100% 0,100% 100%)" }} />
-        <div className="absolute inset-0 opacity-50" style={{ background: "repeating-linear-gradient(58deg, transparent 0 60px, rgba(255,255,255,.7) 60px 62px),repeating-linear-gradient(150deg, transparent 0 78px, rgba(255,255,255,.6) 78px 80px)" }} />
-        <div className="absolute top-3 left-3 font-mono text-[10px] text-[#5d7068] bg-white/80 px-2 py-1 rounded-[7px]">live map · your picks</div>
-        {PLACES.map((p) => {
-          const sel = selIds.includes(p.id);
-          const idx = selIds.indexOf(p.id);
-          return (
-            <button key={p.id} onClick={() => actions.exMapPick(p.id)} className="absolute -translate-x-1/2 -translate-y-1/2 border-none bg-transparent cursor-pointer"
-              style={{ left: p.x, top: p.y, zIndex: sel ? 20 : 5 }}>
-              {sel ? (
-                <div className="w-[26px] h-[26px] grid place-items-center" style={{ borderRadius: "50% 50% 50% 2px", transform: "rotate(45deg)", background: "var(--accent)", boxShadow: "0 4px 10px -2px rgba(0,0,0,.4)", border: state.exMapSel === p.id ? "2px solid #fff" : "2px solid rgba(255,255,255,.85)" }}>
-                  <span className="text-white font-bold text-[11px]" style={{ transform: "rotate(-45deg)" }}>{idx + 1}</span>
-                </div>
-              ) : (
-                <div className="w-[9px] h-[9px] rounded-full bg-white border-2 border-muted opacity-70" />
-              )}
-            </button>
-          );
-        })}
+    <div className="px-3.5 py-3 border-t border-line flex items-center gap-[11px] vp-fade-fast">
+      <div className="w-10 h-10 rounded-[9px] shrink-0" style={{ background: EX_THUMBS[mapSelPlace.img % EX_THUMBS.length] }} />
+      <div className="flex-1 min-w-0">
+        <div className="font-bold text-[13.5px] whitespace-nowrap overflow-hidden text-ellipsis">{mapSelPlace.name}</div>
+        <div className="text-[11.5px] text-muted">{mapSelPlace.cats[0]} · {mapSelPlace.rating.toFixed(1)}★</div>
       </div>
-      {mapSelPlace && (
-        <div className="px-3.5 py-3 border-t border-line flex items-center gap-[11px] vp-fade-fast">
-          <div className="w-10 h-10 rounded-[9px] shrink-0" style={{ background: EX_THUMBS[mapSelPlace.img % EX_THUMBS.length] }} />
-          <div className="flex-1 min-w-0">
-            <div className="font-bold text-[13.5px] whitespace-nowrap overflow-hidden text-ellipsis">{mapSelPlace.name}</div>
-            <div className="text-[11.5px] text-muted">{mapSelPlace.cats[0]} · {mapSelPlace.rating.toFixed(1)}★</div>
-          </div>
-          <button onClick={() => actions.exToggleTrip(mapSelPlace.id)}
-            className="shrink-0 flex items-center gap-1 px-[11px] py-[7px] border-[1.5px] border-accent rounded-[9px] text-[12px] font-bold cursor-pointer"
-            style={{ background: isSel ? "var(--accent)" : "#fff", color: isSel ? "#fff" : "var(--accent)" }}>
-            {isSel ? <Check size={13} strokeWidth={2} /> : <Plus size={13} strokeWidth={2} />}{isSel ? "Added" : "Add"}
-          </button>
-        </div>
-      )}
+      <button onClick={() => actions.exToggleTrip(mapSelPlace.id)}
+        className="shrink-0 flex items-center gap-1 px-[11px] py-[7px] border-[1.5px] border-accent rounded-[9px] text-[12px] font-bold cursor-pointer"
+        style={{ background: isSel ? "var(--accent)" : "#fff", color: isSel ? "#fff" : "var(--accent)" }}>
+        {isSel ? <Check size={13} strokeWidth={2} /> : <Plus size={13} strokeWidth={2} />}{isSel ? "Added" : "Add"}
+      </button>
     </div>
   );
+}
+
+function MapCanvas() {
+  return (
+    <div className="flex-[1_1_420px] min-w-[300px] bg-white border border-line rounded-[18px] overflow-hidden">
+      <div className="relative" style={{ height: "clamp(360px,52vh,560px)" }}>
+        <ExploreRealMap />
+      </div>
+      <MapSelFooter />
+    </div>
+  );
+}
+
+/** Nearby Places browser bound to the current destination. */
+function NearbyExplorer() {
+  const { state, actions } = useTrip();
+  const center = destinationCoords(state.dest.split(",")[0]) ?? mapsConfig.defaultCenter;
+  const addedIds = state.mapPicks.map((p) => p.id);
+  const handleAdd = (p: PlaceResult) => actions.addMapPick(p);
+  return <PlacesExplorer center={center} onAdd={handleAdd} addedIds={addedIds} />;
 }
 
 export function Explore() {
@@ -472,14 +585,25 @@ export function Explore() {
 
         {/* MAP TAB */}
         {state.exTab === "map" && (
-          <div className="flex gap-5 items-start flex-wrap vp-fade-fast">
-            <MapCanvas />
-            <div className="flex-[1_1_280px] min-w-[280px] max-w-[400px] bg-white border border-line rounded-[18px] p-4">
-              <div className="font-display font-bold text-[16px] mb-3">Selected on the map</div>
-              <Counters />
-              <div className="mt-3.5"><SelectedList /></div>
+          <MapsApiProvider>
+            <div className="flex gap-5 items-start flex-wrap vp-fade-fast">
+              <MapCanvas />
+              <div className="flex-[1_1_280px] min-w-[280px] max-w-[400px] flex flex-col gap-4">
+                <div className="bg-white border border-line rounded-[18px] p-4">
+                  <div className="font-display font-bold text-[16px] mb-3">Selected on the map</div>
+                  <Counters />
+                  <div className="mt-3.5"><SelectedList /></div>
+                </div>
+                {isMapsConfigured() && (
+                  <div className="bg-white border border-line rounded-[18px] p-4">
+                    <div className="font-display font-bold text-[16px] mb-1">Explore nearby</div>
+                    <div className="text-[12.5px] text-muted mb-3">Powered by Google Places — add spots straight to your trip.</div>
+                    <NearbyExplorer />
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </MapsApiProvider>
         )}
 
         {/* AI PLANNER TAB */}

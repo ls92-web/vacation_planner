@@ -2,7 +2,10 @@
 
 import { useTrip } from "@/lib/store";
 import { PIN_COLORS, THUMBS } from "@/lib/data";
-import type { PlanTab } from "@/lib/types";
+import type { PlanTab, Stop } from "@/lib/types";
+import { destinationCoords, mapsConfig, stopCoords } from "@/lib/maps";
+import type { LatLng, MapMarker } from "@/lib/maps";
+import { GoogleMap, MapsApiProvider, MapInfoCard, PlaceMarkers, RoutePlanner } from "../maps";
 import { AppNav, Brand } from "../AppNav";
 import { DAY_ICONS, TRAVEL_ICONS } from "../icons";
 import {
@@ -125,49 +128,101 @@ function Schedule() {
   );
 }
 
+/** Stylized CSS map used when no Google Maps key is configured. */
+function DayMapFallback({
+  day,
+  pin,
+  onPick,
+  fmtDist,
+  dest,
+}: {
+  day: { stops: Stop[] };
+  pin: number | null;
+  onPick: (i: number) => void;
+  fmtDist: (d: number) => string;
+  dest: string;
+}) {
+  const routePoints = day.stops.map((st) => `${parseFloat(st.x)},${parseFloat(st.y)}`).join(" ");
+  const pinFor = pin != null ? day.stops[pin] : null;
+  return (
+    <div className="absolute inset-0" style={{ background: "radial-gradient(120% 90% at 78% 22%, #cfe4e0 0%, transparent 46%), linear-gradient(180deg,#eef3ec,#e7efe8)" }}>
+      <div className="absolute right-0 bottom-0 w-[46%] h-[55%] opacity-85" style={{ background: "linear-gradient(160deg,#a9d2d8,#7fbcc6)", clipPath: "polygon(20% 100%,0 40%,40% 18%,100% 0,100% 100%)" }} />
+      <div className="absolute inset-0 opacity-50" style={{ background: "repeating-linear-gradient(58deg, transparent 0 60px, rgba(255,255,255,.7) 60px 63px),repeating-linear-gradient(150deg, transparent 0 78px, rgba(255,255,255,.6) 78px 81px)" }} />
+      <div className="absolute top-3.5 left-3.5 font-mono text-[11px] text-[#5d7068] bg-white/80 px-2.5 py-[5px] rounded-lg">interactive map · {dest}</div>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full pointer-events-none">
+        <polyline points={routePoints} fill="none" stroke="var(--accent)" strokeWidth="0.7" strokeDasharray="2 1.4" strokeLinecap="round" opacity="0.55" />
+      </svg>
+      {day.stops.map((st, i) => {
+        const sel = pin === i;
+        return (
+          <button key={i} onClick={() => onPick(i)} className="absolute border-none bg-transparent cursor-pointer vp-drop" style={{ left: st.x, top: st.y, transform: "translate(-50%,-100%)", zIndex: sel ? 20 : 10 }}>
+            <div className="grid place-items-center" style={{ width: sel ? 34 : 28, height: sel ? 34 : 28, borderRadius: "50% 50% 50% 2px", transform: "rotate(45deg)", background: PIN_COLORS[i % PIN_COLORS.length], boxShadow: "0 5px 12px -3px rgba(0,0,0,.4)" }}>
+              <span className="text-white font-bold text-[12px]" style={{ transform: "rotate(-45deg)" }}>{i + 1}</span>
+            </div>
+          </button>
+        );
+      })}
+      {pinFor && (
+        <div className="absolute w-[230px] bg-white rounded-[14px] overflow-hidden z-40 vp-pop" style={{ left: pinFor.x, top: pinFor.y, transform: "translate(-50%,calc(-100% - 22px))", boxShadow: "0 18px 40px -12px rgba(0,0,0,.32)" }}>
+          <div className="h-[74px] flex items-end p-2" style={{ background: THUMBS[(pin ?? 0) % THUMBS.length] }}>
+            <span className="font-mono text-[9.5px] text-white bg-black/30 px-1.5 py-0.5 rounded-[5px]">[{pinFor.cat.toLowerCase()} photo]</span>
+          </div>
+          <div className="px-3.5 py-3">
+            <div className="font-bold text-[14.5px]">{pinFor.title}</div>
+            <div className="text-[12px] text-muted mt-0.5 flex items-center gap-1"><Clock size={12} strokeWidth={2} />{pinFor.time} · {pinFor.duration}</div>
+            <div className="mt-2 flex gap-1.5 flex-wrap">
+              <span className="text-[11px] font-semibold bg-tint text-accent px-2 py-[3px] rounded-md">{pinFor.cat}</span>
+              <span className="text-[11px] font-semibold bg-[#f7f3ec] text-ink px-2 py-[3px] rounded-md">{fmtDist(pinFor.dist)} from center</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlanMap() {
   const { state, actions } = useTrip();
   const fmtDist = useDist0();
   const DAYS = state.days;
   const day = DAYS[state.day] || DAYS[0];
-  const routePoints = day.stops.map((st) => `${parseFloat(st.x)},${parseFloat(st.y)}`).join(" ");
-  const pinFor = state.pin != null ? day.stops[state.pin] : null;
+
+  // Real-map data: markers + ordered waypoints from the day's stops.
+  const markers: MapMarker[] = day.stops
+    .map((st, i): MapMarker | null => {
+      const pos = stopCoords(st.title);
+      if (!pos) return null;
+      return {
+        id: `stop-${i}`,
+        name: st.title,
+        kind: st.cat.toLowerCase().includes("restaurant") ? "restaurant" : "attraction",
+        position: pos,
+        category: st.cat,
+        subtitle: `${st.time} · ${st.duration}`,
+      };
+    })
+    .filter((m): m is MapMarker => m !== null);
+  const waypoints: LatLng[] = markers.map((m) => m.position);
+  const center = waypoints[0] ?? destinationCoords(state.dest.split(",")[0]) ?? mapsConfig.defaultCenter;
+  const selectedId = state.pin != null ? `stop-${state.pin}` : null;
+  const selectedMarker = markers.find((m) => m.id === selectedId) ?? null;
 
   return (
     <div className="flex-1 flex flex-wrap vp-fade">
       {/* canvas */}
-      <div className="flex-[2_1_480px] relative min-h-[520px]" style={{ background: "radial-gradient(120% 90% at 78% 22%, #cfe4e0 0%, transparent 46%), linear-gradient(180deg,#eef3ec,#e7efe8)" }}>
-        <div className="absolute right-0 bottom-0 w-[46%] h-[55%] opacity-85" style={{ background: "linear-gradient(160deg,#a9d2d8,#7fbcc6)", clipPath: "polygon(20% 100%,0 40%,40% 18%,100% 0,100% 100%)" }} />
-        <div className="absolute inset-0 opacity-50" style={{ background: "repeating-linear-gradient(58deg, transparent 0 60px, rgba(255,255,255,.7) 60px 63px),repeating-linear-gradient(150deg, transparent 0 78px, rgba(255,255,255,.6) 78px 81px)" }} />
-        <div className="absolute top-3.5 left-3.5 font-mono text-[11px] text-[#5d7068] bg-white/80 px-2.5 py-[5px] rounded-lg">interactive map · {state.dest}</div>
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full pointer-events-none">
-          <polyline points={routePoints} fill="none" stroke="var(--accent)" strokeWidth="0.7" strokeDasharray="2 1.4" strokeLinecap="round" opacity="0.55" />
-        </svg>
-        {day.stops.map((st, i) => {
-          const sel = state.pin === i;
-          return (
-            <button key={i} onClick={() => actions.pickPin(i)} className="absolute border-none bg-transparent cursor-pointer vp-drop" style={{ left: st.x, top: st.y, transform: "translate(-50%,-100%)", zIndex: sel ? 20 : 10 }}>
-              <div className="grid place-items-center" style={{ width: sel ? 34 : 28, height: sel ? 34 : 28, borderRadius: "50% 50% 50% 2px", transform: "rotate(45deg)", background: PIN_COLORS[i % PIN_COLORS.length], boxShadow: "0 5px 12px -3px rgba(0,0,0,.4)" }}>
-                <span className="text-white font-bold text-[12px]" style={{ transform: "rotate(-45deg)" }}>{i + 1}</span>
-              </div>
-            </button>
-          );
-        })}
-        {pinFor && (
-          <div className="absolute w-[230px] bg-white rounded-[14px] overflow-hidden z-40 vp-pop" style={{ left: pinFor.x, top: pinFor.y, transform: "translate(-50%,calc(-100% - 22px))", boxShadow: "0 18px 40px -12px rgba(0,0,0,.32)" }}>
-            <div className="h-[74px] flex items-end p-2" style={{ background: THUMBS[(state.pin ?? 0) % THUMBS.length] }}>
-              <span className="font-mono text-[9.5px] text-white bg-black/30 px-1.5 py-0.5 rounded-[5px]">[{pinFor.cat.toLowerCase()} photo]</span>
-            </div>
-            <div className="px-3.5 py-3">
-              <div className="font-bold text-[14.5px]">{pinFor.title}</div>
-              <div className="text-[12px] text-muted mt-0.5 flex items-center gap-1"><Clock size={12} strokeWidth={2} />{pinFor.time} · {pinFor.duration}</div>
-              <div className="mt-2 flex gap-1.5 flex-wrap">
-                <span className="text-[11px] font-semibold bg-tint text-accent px-2 py-[3px] rounded-md">{pinFor.cat}</span>
-                <span className="text-[11px] font-semibold bg-[#f7f3ec] text-ink px-2 py-[3px] rounded-md">{fmtDist(pinFor.dist)} from center</span>
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="flex-[2_1_480px] relative min-h-[520px]">
+        <MapsApiProvider>
+          <GoogleMap
+            center={center}
+            zoom={13}
+            className="absolute inset-0 h-full w-full"
+            fallback={<DayMapFallback day={day} pin={state.pin} onPick={actions.pickPin} fmtDist={fmtDist} dest={state.dest} />}
+          >
+            <PlaceMarkers markers={markers} selectedId={selectedId} onSelect={(id) => actions.pickPin(Number((id ?? "").replace("stop-", "")))} />
+            {selectedMarker && <MapInfoCard marker={selectedMarker} onClose={() => state.pin != null && actions.pickPin(state.pin)} />}
+            {waypoints.length > 1 && <RoutePlanner waypoints={waypoints} units={state.units} />}
+          </GoogleMap>
+        </MapsApiProvider>
       </div>
       {/* side list */}
       <div className="vp-scroll flex-[1_1_320px] overflow-y-auto border-l border-line bg-white p-[18px]" style={{ maxHeight: "calc(100vh - 62px)" }}>

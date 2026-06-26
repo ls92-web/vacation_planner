@@ -89,6 +89,26 @@ body {
 .vp-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .14); border-radius: 9px; }
 .vp-scroll::-webkit-scrollbar-track { background: transparent; }
 
+/* ===== Google Maps markers (elegant teardrop + subtle micro-interaction) ===== */
+.vp-marker {
+  width: 30px;
+  height: 30px;
+  border-radius: 50% 50% 50% 2px;
+  transform: rotate(45deg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease;
+  will-change: transform;
+}
+.vp-marker:hover { transform: rotate(45deg) scale(1.12); }
+.vp-marker[data-selected="true"] { transform: rotate(45deg) scale(1.18); }
+.vp-marker-glyph { transform: rotate(-45deg); display: flex; }
+
+/* Tighten Google's InfoWindow chrome to match the app */
+.gm-style-iw.gm-style-iw-c { padding: 12px 14px !important; border-radius: 14px !important; }
+.gm-style-iw-d { overflow: hidden !important; }
+
 /* Input focus ring used across forms */
 .vp-input:focus {
   border-color: var(--accent);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTrip } from "@/lib/store";
 import {
   ACCOM_TYPES,
@@ -10,6 +11,15 @@ import {
   recommend,
 } from "@/lib/data";
 import type { Accommodation, Destination } from "@/lib/types";
+import {
+  destinationCoords,
+  fetchRoute,
+  formatDistance,
+  formatDuration,
+  isMapsConfigured,
+} from "@/lib/maps";
+import type { LatLng, RouteResult } from "@/lib/maps";
+import { MapSearch, MapsApiProvider } from "../maps";
 import {
   ACCOM_ICONS,
   MODE_ICONS,
@@ -136,23 +146,36 @@ function AccommodationCard({ dest, accom }: { dest: Destination; accom: Accommod
 
       <div className="mt-2.5">
         <label className="text-[11.5px] font-semibold text-muted">Location</label>
-        <div className="mt-[5px] flex items-center gap-2 border border-line rounded-[10px] bg-white pl-[11px] pr-1.5">
-          <span className="text-accent shrink-0 flex"><MapPin size={15} strokeWidth={2} /></span>
-          <input value={accom.address} onChange={(e) => actions.updateAccom(dest.id, accom.id, "address", e.target.value)}
-            placeholder="Search address or place"
-            className="flex-1 min-w-0 border-none outline-none py-[11px] text-[13.5px] bg-transparent text-ink" />
-          <button
-            onClick={(e) => { e.stopPropagation(); actions.flash(accom.address ? `${accom.name || "Stay"} pinned on the map` : "Enter an address to locate it"); }}
-            title="Preview on map"
-            className="shrink-0 flex items-center gap-1.5 px-[11px] py-[7px] border border-line rounded-lg bg-tint text-accent text-[12px] font-bold cursor-pointer hover:border-accent"
-          >
-            <Map size={14} strokeWidth={2} />Map
-          </button>
+        <div className="mt-[5px]">
+          {isMapsConfigured() ? (
+            <MapSearch
+              value={accom.address}
+              onChange={(t) => actions.updateAccom(dest.id, accom.id, "address", t)}
+              onPick={(_loc, label) => {
+                actions.updateAccom(dest.id, accom.id, "address", label);
+                actions.flash(`${accom.name || "Stay"} pinned on the map`);
+              }}
+            />
+          ) : (
+            <div className="flex items-center gap-2 border border-line rounded-[10px] bg-white pl-[11px] pr-1.5">
+              <span className="text-accent shrink-0 flex"><MapPin size={15} strokeWidth={2} /></span>
+              <input value={accom.address} onChange={(e) => actions.updateAccom(dest.id, accom.id, "address", e.target.value)}
+                placeholder="Search address or place"
+                className="flex-1 min-w-0 border-none outline-none py-[11px] text-[13.5px] bg-transparent text-ink" />
+              <button
+                onClick={(e) => { e.stopPropagation(); actions.flash(accom.address ? `${accom.name || "Stay"} pinned on the map` : "Enter an address to locate it"); }}
+                title="Preview on map"
+                className="shrink-0 flex items-center gap-1.5 px-[11px] py-[7px] border border-line rounded-lg bg-tint text-accent text-[12px] font-bold cursor-pointer hover:border-accent"
+              >
+                <Map size={14} strokeWidth={2} />Map
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1.5 mt-[5px] pl-0.5">
           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: accom.address ? "var(--accent)" : "var(--line)" }} />
           <span className="text-[11px] text-muted font-mono">
-            geocoding · {accom.address ? "pinned · tap Map to preview" : "type to locate on map"}
+            geocoding · {accom.address ? "pinned · debounced 300ms" : "type to locate on map"}
           </span>
         </div>
       </div>
@@ -173,6 +196,26 @@ function AccommodationCard({ dest, accom }: { dest: Destination; accom: Accommod
   );
 }
 
+/** Live driving distance/time between two destinations (Routes API), when both geocode. */
+function useLiveDrive(from: LatLng | null, to: LatLng | null, enabled: boolean): RouteResult | null {
+  const [route, setRoute] = useState<RouteResult | null>(null);
+  useEffect(() => {
+    if (!enabled || !from || !to) {
+      setRoute(null);
+      return;
+    }
+    let cancelled = false;
+    fetchRoute(from, to, { travelMode: "DRIVE" }).then((r) => {
+      if (!cancelled) setRoute(r);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, from?.lat, from?.lng, to?.lat, to?.lng]);
+  return route;
+}
+
 function TransportConnector({ from, to, dragKey }: { from: Destination; to: Destination; dragKey: string }) {
   const { state, actions } = useTrip();
   const rec = recommend(from, to);
@@ -180,6 +223,14 @@ function TransportConnector({ from, to, dragKey }: { from: Destination; to: Dest
   const tpl = rec.override && rec.override.mode === chosen ? rec.override : MODE_TEMPLATES[chosen];
   const scenicOn = (chosen === "Drive" || chosen === "Ferry") && tpl.scenic;
   const ModeIcon = MODE_ICONS[chosen];
+
+  // When configured and driving, replace the mock duration/distance with a live Routes result.
+  const fromC = destinationCoords(from.name);
+  const toC = destinationCoords(to.name);
+  const live = useLiveDrive(fromC, toC, isMapsConfigured() && chosen === "Drive" && !!fromC && !!toC);
+  const durationLabel = live ? formatDuration(live.durationSeconds) : tpl.duration;
+  const distanceLabel = live ? formatDistance(live.distanceMeters) : tpl.distance;
+  const summaryLabel = `${durationLabel} · ${tpl.cost}${live ? " · live" : ""}`;
 
   return (
     <div className="flex gap-4" key={dragKey}>
@@ -214,12 +265,12 @@ function TransportConnector({ from, to, dragKey }: { from: Destination; to: Dest
             </div>
             <div className="flex items-baseline gap-2.5 flex-wrap">
               <div className="font-display font-bold text-[18px]">{chosen}</div>
-              <div className="text-[13.5px] text-muted">{tpl.duration} · {tpl.cost}</div>
+              <div className="text-[13.5px] text-muted">{summaryLabel}</div>
             </div>
             <div className="mt-2.5 flex flex-wrap gap-[7px] items-center">
-              <span className={metaChip}><span className="text-accent flex"><Clock size={14} strokeWidth={2} /></span>{tpl.duration}</span>
+              <span className={metaChip}><span className="text-accent flex"><Clock size={14} strokeWidth={2} /></span>{durationLabel}</span>
               <span className={metaChip}><span className="text-accent flex"><CreditCard size={14} strokeWidth={2} /></span>{tpl.cost}</span>
-              {tpl.distance && <span className={metaChip}><span className="text-accent flex"><Route size={14} strokeWidth={2} /></span>{tpl.distance}</span>}
+              {distanceLabel && <span className={metaChip}><span className="text-accent flex"><Route size={14} strokeWidth={2} /></span>{distanceLabel}</span>}
               {scenicOn && (
                 <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-[5px]">
                   <span className="text-muted text-[11px]">Scenic</span>
@@ -470,6 +521,7 @@ export function RouteBuilder() {
   const sub = spanStart && spanEnd ? `${spanStart} – ${spanEnd}` : "Add dates to see your trip span";
 
   return (
+    <MapsApiProvider>
     <div className="vp-scroll min-h-screen relative">
       <div className="max-w-[780px] mx-auto px-[22px] pb-[132px] vp-fade" style={{ paddingTop: "clamp(26px,4vw,46px)" }}>
         {/* brand */}
@@ -573,5 +625,6 @@ export function RouteBuilder() {
         </div>
       </div>
     </div>
+    </MapsApiProvider>
   );
 }

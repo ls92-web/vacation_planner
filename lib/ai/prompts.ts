@@ -6,20 +6,31 @@ export interface TripContext {
   destination: string;
   travelers: string;
   numDays: number;
-  selected?: { name: string; category: string; type: string; priority?: string }[];
+  selected?: { name: string; category: string; type: string; priority?: string; lat?: number; lng?: number }[];
+  /** Places the user discovered via Google Places and added to the trip. */
+  discovered?: { name: string; category: string }[];
 }
 
 function contextBlock(ctx: TripContext): string {
   const places =
     ctx.selected && ctx.selected.length
-      ? ctx.selected.map((p) => `- ${p.name} (${p.category}${p.priority ? `, ${p.priority}` : ""})`).join("\n")
+      ? ctx.selected
+          .map((p) => {
+            const coords = p.lat != null && p.lng != null ? ` @${p.lat.toFixed(4)},${p.lng.toFixed(4)}` : "";
+            return `- ${p.name} (${p.category}${p.priority ? `, ${p.priority}` : ""})${coords}`;
+          })
+          .join("\n")
       : "(none selected yet)";
-  return [
+  const lines = [
     `Destination: ${ctx.destination}`,
     `Travelers: ${ctx.travelers}`,
     `Trip length: ${ctx.numDays} day(s)`,
-    `Selected places:\n${places}`,
-  ].join("\n");
+    `Selected places (with coordinates where known):\n${places}`,
+  ];
+  if (ctx.discovered && ctx.discovered.length) {
+    lines.push(`Also added from the map:\n${ctx.discovered.map((d) => `- ${d.name} (${d.category})`).join("\n")}`);
+  }
+  return lines.join("\n");
 }
 
 export function assistantMessages(ctx: TripContext, history: AIMessage[]): AIMessage[] {
@@ -29,6 +40,9 @@ export function assistantMessages(ctx: TripContext, history: AIMessage[]): AIMes
       "You are Wanderfold, a warm, concise family travel assistant. " +
       "Help plan and adjust a multi-day trip for a family with young kids. " +
       "Be practical: opening hours, walking distance, kid-friendliness, pacing, meals, rainy-day backups, accessibility. " +
+      "You have the selected places with coordinates — use them to reason about distances: recommend attractions and " +
+      "restaurants near each other or near the hotel, suggest efficient routes that reduce backtracking and driving, " +
+      "warn when two places are far apart, and offer closer alternatives. " +
       "Keep replies short and skimmable (a few sentences or a tight bullet list). Never invent prices or hours you are unsure about.\n\n" +
       `Trip context:\n${contextBlock(ctx)}`,
   };

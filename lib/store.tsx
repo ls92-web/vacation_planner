@@ -33,6 +33,8 @@ import type {
 } from "./types";
 import type { AIMessage, TripContext } from "./ai";
 import { fetchItinerary, streamAssistantReply } from "./ai-client";
+import { placeCoords } from "./maps/coords";
+import type { PlaceResult } from "./maps/types";
 
 interface AppState {
   screen: Screen;
@@ -69,6 +71,8 @@ interface AppState {
   toast: string | null;
   scrollId: string | null;
   days: DayPlan[];
+  /** Places discovered via Google Places and added to the trip. */
+  mapPicks: PlaceResult[];
 }
 
 const INITIAL: AppState = {
@@ -106,21 +110,26 @@ const INITIAL: AppState = {
   toast: null,
   scrollId: null,
   days: DAYS,
+  mapPicks: [],
 };
 
-/** Build the trip context the AI service needs from current state. */
+/** Build the trip context the AI service needs from current state (incl. map data). */
 function tripContext(s: AppState): TripContext {
   const selected = s.exSelected
     .map((x) => {
       const p = PLACES.find((pp) => pp.id === x.id);
-      return p ? { name: p.name, category: p.cats[0], type: p.type, priority: x.priority } : null;
+      if (!p) return null;
+      const c = placeCoords(p.id);
+      return { name: p.name, category: p.cats[0], type: p.type, priority: x.priority, lat: c?.lat, lng: c?.lng };
     })
     .filter((v): v is NonNullable<typeof v> => v !== null);
+  const discovered = s.mapPicks.map((p) => ({ name: p.name, category: p.category }));
   return {
     destination: s.dest,
     travelers: `${s.adults} adults · ${s.kids} kids (6 & 9)`,
     numDays: s.days.length,
     selected,
+    discovered: discovered.length ? discovered : undefined,
   };
 }
 
@@ -358,7 +367,13 @@ export function useTripStore() {
       exSetPriority: (id: string, pri: Priority) =>
         set((s) => ({ exSelected: s.exSelected.map((x) => (x.id === id ? { ...x, priority: pri } : x)) })),
       exExpand: (id: string) => set((s) => ({ exExpanded: s.exExpanded === id ? null : id })),
-      exMapPick: (id: string) => set({ exMapSel: id }),
+      exMapPick: (id: string | null) => set({ exMapSel: id }),
+      // Google Places picks
+      addMapPick: (place: PlaceResult) => {
+        setState((s) => (s.mapPicks.some((p) => p.id === place.id) ? s : { ...s, mapPicks: [...s.mapPicks, place] }));
+        flash(`Added ${place.name} to your trip.`);
+      },
+      removeMapPick: (id: string) => set((s) => ({ mapPicks: s.mapPicks.filter((p) => p.id !== id) })),
       // explore selected drag reorder
       exDragStart: (id: string) => (e: React.DragEvent) => {
         set({ exDragId: id });

@@ -49,6 +49,41 @@ cp .env.example .env.local      # then paste your key
 - **Resilient** — without a key (or on any model/network error) each feature silently falls back to the
   built-in heuristic/canned behavior; the UI is never blocked.
 
+## Google Maps Platform
+
+Maps are integrated through a modular service layer built on **`@vis.gl/react-google-maps`**. Like the
+AI layer, it is **fully optional** — without a key the app uses the original stylized fallback map, so
+nothing breaks.
+
+```bash
+# .env.local
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=        # enable Maps JS, Places (New), Routes, Geocoding
+NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=DEMO_MAP_ID
+```
+
+- **Service layer** — [`lib/maps/`](lib/maps): `config` (env, `isMapsConfigured()`), `cache` (TTL +
+  in-flight de-dup), `categories` (Places types + marker styles), `routes-client` + the
+  [`/api/maps/routes`](app/api/maps/routes) **Routes API** proxy, `coords` (seed lat/lng), and `hooks`
+  (`usePlacesSearch`, `useGeocode`, `useAutocomplete` — debounced 300ms).
+- **Reusable components** — [`components/maps/`](components/maps): `<MapsApiProvider>` (lazy-loads the
+  script per map screen), `<GoogleMap>` (smooth re-center, zoom controls, skeleton, error + fallback),
+  `<DestinationMarkers>` / `<HotelMarkers>` / `<PlaceMarkers>` (Advanced Markers, per-kind styling),
+  `<MapInfoCard>`, `<RoutePlanner>` + `<DirectionsOverlay>` (polyline + distance/time),
+  `<PlacesExplorer>`, `<MapSearch>`.
+- **Where it's wired**:
+  - **Itinerary → Map**: real map of the day's stops with markers, info cards, and the route polyline.
+  - **Explore → Map**: destination + selected-place + geocoded hotel markers, info cards with add-to-trip,
+    plus a **Places** panel to browse & add nearby spots.
+  - **Route builder**: address **autocomplete** for accommodations and **live driving distance/time**
+    between destinations.
+  - **AI**: the assistant context now includes place coordinates + map-added places, so it can reason
+    about proximity, nearby recommendations, and efficient routes.
+- **Performance**: script lazy-loads only on map screens; Places/Routes/Geocoding results are cached and
+  de-duplicated; autocomplete is debounced; failures degrade gracefully.
+- **Future-ready**: the `ChatProvider`-style separation and `MAPS_LIBRARIES`/category maps make it easy to
+  add traffic, transit/walking/cycling routes (Routes API `travelMode`), weather/crowd overlays, or
+  AI-generated sightseeing routes without touching screen code.
+
 ## Project structure
 
 ```
@@ -75,6 +110,8 @@ lib/
   store.tsx         # React context store mirroring the prototype's state + actions
   ai-client.ts      # browser helpers that call the /api/ai routes (with fallback)
   ai/               # shared AI service (OpenRouter): client, provider, prompts, service
+  maps/             # Google Maps service: config, hooks, cache, routes, coords, categories
+components/maps/     # GoogleMap, markers, InfoCard, RoutePlanner, PlacesExplorer, MapSearch, …
 ```
 
 ## Develop
