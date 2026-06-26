@@ -1,7 +1,7 @@
 "use client";
 
 import { useTrip } from "@/lib/store";
-import { DAYS, PIN_COLORS, THUMBS } from "@/lib/data";
+import { PIN_COLORS, THUMBS } from "@/lib/data";
 import type { PlanTab } from "@/lib/types";
 import { AppNav, Brand } from "../AppNav";
 import { DAY_ICONS, TRAVEL_ICONS } from "../icons";
@@ -30,6 +30,7 @@ function useDist0() {
 function Schedule() {
   const { state, actions } = useTrip();
   const fmtDist = useDist0();
+  const DAYS = state.days;
   const day = DAYS[state.day] || DAYS[0];
   const km = state.units === "km";
   const totalStops = DAYS.reduce((a, d) => a + d.stops.length, 0);
@@ -127,6 +128,7 @@ function Schedule() {
 function PlanMap() {
   const { state, actions } = useTrip();
   const fmtDist = useDist0();
+  const DAYS = state.days;
   const day = DAYS[state.day] || DAYS[0];
   const routePoints = day.stops.map((st) => `${parseFloat(st.x)},${parseFloat(st.y)}`).join(" ");
   const pinFor = state.pin != null ? day.stops[state.pin] : null;
@@ -203,6 +205,7 @@ function Assistant() {
       <div className="vp-scroll flex-1 overflow-y-auto" style={{ padding: "24px clamp(16px,3vw,24px)" }}>
         {state.chat.map((m, i) => {
           const user = m.role === "user";
+          if (!user && !m.text) return null; // hide the empty placeholder while the reply streams in
           return (
             <div key={i} className="flex gap-[11px] mb-4 vp-fade-fast" style={{ flexDirection: user ? "row-reverse" : "row" }}>
               <div className="w-8 h-8 rounded-[10px] shrink-0 grid place-items-center text-white" style={{ background: user ? "#9a8f84" : "var(--accent)" }}>

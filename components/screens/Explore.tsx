@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTrip } from "@/lib/store";
 import { EX_CATEGORIES, EX_THUMBS, PLACES, SMART_FILTERS } from "@/lib/data";
 import type { Place } from "@/lib/types";
+import type { TripContext } from "@/lib/ai";
+import { fetchInsights, fetchRecommendations } from "@/lib/ai-client";
 import { AppNav, Brand } from "../AppNav";
 import {
   Calendar,
@@ -30,10 +33,51 @@ function useDist() {
   return (d: number) => (km ? `${d.toFixed(1)} km` : `${(d * 0.621).toFixed(1)} mi`);
 }
 
+/** Build the AI trip context from the current selection. */
+function useTripContext(): TripContext {
+  const { state } = useTrip();
+  return {
+    destination: state.dest,
+    travelers: `${state.adults} adults · ${state.kids} kids (6 & 9)`,
+    numDays: state.days.length,
+    selected: state.exSelected
+      .map((x) => {
+        const p = PLACES.find((pp) => pp.id === x.id);
+        return p ? { name: p.name, category: p.cats[0], type: p.type, priority: x.priority } : null;
+      })
+      .filter((v): v is NonNullable<typeof v> => v !== null),
+  };
+}
+
+/** Local heuristic insights — used until/unless the AI service returns its own. */
+function computeLocalInsights(selPlaces: Place[]): string[] {
+  const cAttractions = selPlaces.filter((p) => p.type === "attraction" && !p.cats.includes("Hidden Gems")).length;
+  const insights: string[] = [];
+  if (!selPlaces.length) {
+    insights.push("Add the places you love and I will handle the order, timings and travel between them later.");
+    insights.push("Tip: tap a category or a smart filter to narrow the list — try Family Friendly.");
+    return insights;
+  }
+  let pair: [Place, Place] | null = null;
+  for (let i = 0; i < selPlaces.length && !pair; i++)
+    for (let j = i + 1; j < selPlaces.length; j++) {
+      if (Math.abs(selPlaces[i].dist - selPlaces[j].dist) < 0.7) { pair = [selPlaces[i], selPlaces[j]]; break; }
+    }
+  if (pair) insights.push(`${pair[0].name} and ${pair[1].name} are only a few minutes apart — I will plan them together.`);
+  const closed = selPlaces.find((p) => p.closedMon);
+  if (closed) insights.push(`${closed.name} is closed on Mondays — I will avoid scheduling it then.`);
+  const lastR = [...selPlaces].reverse().find((p) => p.type === "restaurant");
+  if (lastR) insights.push(`Adding ${lastR.name} fits nicely between your afternoon activities.`);
+  if (cAttractions > 4) insights.push("That's a lot of activity for one day — I can rebalance these across your trip when I build the schedule.");
+  const last = selPlaces[selPlaces.length - 1];
+  if (last && insights.length < 3) insights.push(`Most travelers spend about ${last.duration || "an hour"} at ${last.name}.`);
+  return insights;
+}
+
 const cardMetaChip =
   "inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-ink bg-[#f7f3ec] border border-line px-[9px] py-1 rounded-lg";
 
-function PlaceCard({ place }: { place: Place }) {
+function PlaceCard({ place, aiScore }: { place: Place; aiScore?: number }) {
   const { state, actions } = useTrip();
   const fmtDist = useDist();
   const isSel = state.exSelected.some((x) => x.id === place.id);
@@ -54,7 +98,7 @@ function PlaceCard({ place }: { place: Place }) {
       {/* header image */}
       <div className="h-[158px] relative shrink-0" style={{ background: thumb }}>
         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-[9px] py-[5px] rounded-[9px] bg-[rgba(20,16,12,.55)] text-white text-[11.5px] font-bold backdrop-blur-sm">
-          <Sparkle size={13} strokeWidth={1.7} />AI {place.ai}
+          <Sparkle size={13} strokeWidth={1.7} />AI {aiScore ?? place.ai}
         </div>
         <button
           onClick={() => actions.exToggleSave(place.id)}
@@ -206,33 +250,36 @@ function SelectedList() {
 
 function Insights() {
   const { state } = useTrip();
-  const selPlaces = state.exSelected.map((x) => PLACES.find((p) => p.id === x.id)).filter(Boolean) as Place[];
-  const cAttractions = selPlaces.filter((p) => p.type === "attraction" && !p.cats.includes("Hidden Gems")).length;
-  const insights: { text: string }[] = [];
-  if (!selPlaces.length) {
-    insights.push({ text: "Add the places you love and I will handle the order, timings and travel between them later." });
-    insights.push({ text: "Tip: tap a category or a smart filter to narrow the list — try Family Friendly." });
-  } else {
-    let pair: [Place, Place] | null = null;
-    for (let i = 0; i < selPlaces.length && !pair; i++)
-      for (let j = i + 1; j < selPlaces.length; j++) {
-        if (Math.abs(selPlaces[i].dist - selPlaces[j].dist) < 0.7) { pair = [selPlaces[i], selPlaces[j]]; break; }
-      }
-    if (pair) insights.push({ text: `${pair[0].name} and ${pair[1].name} are only a few minutes apart — I will plan them together.` });
-    const closed = selPlaces.find((p) => p.closedMon);
-    if (closed) insights.push({ text: `${closed.name} is closed on Mondays — I will avoid scheduling it then.` });
-    const lastR = [...selPlaces].reverse().find((p) => p.type === "restaurant");
-    if (lastR) insights.push({ text: `Adding ${lastR.name} fits nicely between your afternoon activities.` });
-    if (cAttractions > 4) insights.push({ text: "That's a lot of activity for one day — I can rebalance these across your trip when I build the schedule." });
-    const last = selPlaces[selPlaces.length - 1];
-    if (last && insights.length < 3) insights.push({ text: `Most travelers spend about ${last.duration || "an hour"} at ${last.name}.` });
-  }
+  const ctx = useTripContext();
+  const selKey = state.exSelected.map((x) => x.id).join(",");
+  const selPlaces = useMemo(
+    () => state.exSelected.map((x) => PLACES.find((p) => p.id === x.id)).filter(Boolean) as Place[],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selKey]
+  );
+  const local = useMemo(() => computeLocalInsights(selPlaces), [selPlaces]);
+  const [ai, setAi] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAi(null);
+    if (!state.exSelected.length) return;
+    fetchInsights(ctx).then((r) => {
+      if (!cancelled && r) setAi(r);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selKey]);
+
+  const insights = ai ?? local;
   return (
     <div className="mt-3 flex flex-col gap-[9px]">
-      {insights.map((n, i) => (
+      {insights.map((text, i) => (
         <div key={i} className="flex gap-2.5 px-3 py-[11px] rounded-xl bg-tint vp-slide-up">
           <span className="text-accent shrink-0 mt-px flex"><Info size={15} strokeWidth={2} /></span>
-          <span className="text-[12.5px] text-ink leading-[1.45]">{n.text}</span>
+          <span className="text-[12.5px] text-ink leading-[1.45]">{text}</span>
         </div>
       ))}
     </div>
@@ -288,6 +335,28 @@ function MapCanvas() {
 
 export function Explore() {
   const { state, actions } = useTrip();
+  const ctx = useTripContext();
+
+  // Best-effort: ask the AI to score the catalog by family fit (once). Falls back
+  // to the curated static scores/order when no key is configured or the call fails.
+  const [recoScores, setRecoScores] = useState<Record<string, number>>({});
+  const recoRequested = useRef(false);
+  useEffect(() => {
+    if (recoRequested.current) return;
+    recoRequested.current = true;
+    fetchRecommendations(ctx, PLACES.map((p) => ({ name: p.name, category: p.cats[0] }))).then((recs) => {
+      if (!recs) return;
+      const map: Record<string, number> = {};
+      for (const r of recs) {
+        const p = PLACES.find((pp) => pp.name === r.name);
+        if (p) map[p.id] = r.ai;
+      }
+      if (Object.keys(map).length) setRecoScores(map);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const scoreOf = (p: Place) => recoScores[p.id] ?? p.ai;
+
   const q = state.exSearch.trim().toLowerCase();
   const matches = (p: Place) => {
     if (q && !(p.name.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || (p.cuisine || "").toLowerCase().includes(q))) return false;
@@ -295,7 +364,8 @@ export function Explore() {
     if (state.exSmart.length && !state.exSmart.every((k) => p.tags.includes(k))) return false;
     return true;
   };
-  const list = PLACES.filter(matches);
+  let list = PLACES.filter(matches);
+  if (Object.keys(recoScores).length) list = [...list].sort((a, b) => scoreOf(b) - scoreOf(a));
   const savedCards = PLACES.filter((p) => state.exSaved.includes(p.id));
   const hasFilters = state.exSmart.length > 0 || state.exCat !== "All" || !!q;
   const createLabel = state.exSelected.length ? `Create My Schedule · ${state.exSelected.length}` : "Create My Schedule";
@@ -367,7 +437,7 @@ export function Explore() {
 
             {list.length > 0 ? (
               <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))" }}>
-                {list.map((p) => <PlaceCard key={p.id} place={p} />)}
+                {list.map((p) => <PlaceCard key={p.id} place={p} aiScore={recoScores[p.id]} />)}
               </div>
             ) : (
               <div className="py-[60px] px-5 text-center text-muted">
@@ -388,7 +458,7 @@ export function Explore() {
             </div>
             {savedCards.length > 0 ? (
               <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))" }}>
-                {savedCards.map((p) => <PlaceCard key={p.id} place={p} />)}
+                {savedCards.map((p) => <PlaceCard key={p.id} place={p} aiScore={recoScores[p.id]} />)}
               </div>
             ) : (
               <div className="py-[70px] px-5 text-center text-muted">

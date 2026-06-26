@@ -14,14 +14,40 @@ Flow: **Sign in → Route builder → Explore & build → (Create My Schedule) �
 
 ## Scope
 
-This is the **faithful UI build with mock data**. All five screens are recreated pixel-faithfully with
-the prototype's mock data and *simulated* AI (timed transitions, canned insights and replies) — exactly
-as the design prototype behaved. There is no live backend yet.
+All five screens are recreated pixel-faithfully with the prototype's mock data. **AI is powered by
+OpenRouter** (see below); every AI feature falls back to the built-in simulated behavior when no key
+is configured, so the app always works. Supabase (auth + persistence) is the remaining PRD piece —
+the mock data in [`lib/data.ts`](lib/data.ts) is the seam for those queries.
 
-The PRD targets **Next.js 16 + Supabase + OpenRouter**. The code is structured so those drop in cleanly:
-everything data-related lives in [`lib/data.ts`](lib/data.ts) and the pure helpers / `replyFor` / `recommend`
-functions there are the seams to replace with Supabase queries, geocoding/Mapbox calls, and OpenRouter
-completions.
+## AI provider (OpenRouter)
+
+All AI runs through OpenRouter and is driven entirely by environment variables — **no model name is
+hardcoded anywhere in the code**.
+
+```bash
+cp .env.example .env.local      # then paste your key
+# OPENROUTER_API_KEY=sk-or-v1-...
+# OPENROUTER_MODEL=qwen/qwen3-next-80b-a3b-instruct:free   # the default free Qwen 3
+```
+
+- **Swap models with one env change** — set `OPENROUTER_MODEL` to any OpenRouter id
+  (`anthropic/claude-3.7-sonnet`, `openai/gpt-5`, `google/gemini-2.5-pro`, …). No code changes.
+- **Shared service** — [`lib/ai/`](lib/ai) is the single place all OpenRouter requests go through:
+  - `client.ts` — OpenRouter client: base URL `https://openrouter.ai/api/v1`, streaming, retry with
+    backoff on transient failures (`429`/`5xx`/network), graceful error types, dev logging,
+    attribution headers.
+  - `provider.ts` — provider abstraction (`ChatProvider`) so a non-OpenRouter provider can be added later.
+  - `service.ts` — the four domain features: travel assistant (streaming), itinerary generation,
+    recommendations, planning insights.
+- **Server-only** — the key never reaches the browser. Features call Next.js route handlers under
+  [`app/api/ai/*`](app/api/ai), which call the shared service.
+- **Every AI feature uses it**:
+  - Travel **assistant** chat → streamed live (`/api/ai/assistant`).
+  - **Itinerary generation** during the Generating screen → `/api/ai/itinerary`.
+  - **Recommendations** (AI fit scores / ranking on Explore) → `/api/ai/recommendations`.
+  - Planning **insights** (AI Planner panel) → `/api/ai/insights`.
+- **Resilient** — without a key (or on any model/network error) each feature silently falls back to the
+  built-in heuristic/canned behavior; the UI is never blocked.
 
 ## Project structure
 
@@ -30,6 +56,7 @@ app/
   layout.tsx        # fonts + metadata
   globals.css       # theme tokens (Ocean/Sunset/Forest), keyframes, scrollbar
   page.tsx          # renders <App/>
+  api/ai/           # route handlers: assistant, itinerary, recommendations, insights
 components/
   App.tsx           # provider + screen router + theme wrapper
   AppNav.tsx        # shared segmented nav pill group + Brand
@@ -46,6 +73,8 @@ lib/
   types.ts          # domain types
   data.ts           # mock data + pure helpers (the backend seams)
   store.tsx         # React context store mirroring the prototype's state + actions
+  ai-client.ts      # browser helpers that call the /api/ai routes (with fallback)
+  ai/               # shared AI service (OpenRouter): client, provider, prompts, service
 ```
 
 ## Develop

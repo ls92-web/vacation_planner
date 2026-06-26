@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  DAYS,
   INITIAL_CHAT,
   INITIAL_DESTINATIONS,
   PLACES,
@@ -20,6 +21,7 @@ import type {
   AccomType,
   AuthMode,
   ChatMessage,
+  DayPlan,
   Destination,
   ExploreTab,
   PlanTab,
@@ -29,6 +31,8 @@ import type {
   TransportMode,
   Units,
 } from "./types";
+import type { AIMessage, TripContext } from "./ai";
+import { fetchItinerary, streamAssistantReply } from "./ai-client";
 
 interface AppState {
   screen: Screen;
@@ -64,6 +68,7 @@ interface AppState {
   typing: boolean;
   toast: string | null;
   scrollId: string | null;
+  days: DayPlan[];
 }
 
 const INITIAL: AppState = {
@@ -100,7 +105,24 @@ const INITIAL: AppState = {
   typing: false,
   toast: null,
   scrollId: null,
+  days: DAYS,
 };
+
+/** Build the trip context the AI service needs from current state. */
+function tripContext(s: AppState): TripContext {
+  const selected = s.exSelected
+    .map((x) => {
+      const p = PLACES.find((pp) => pp.id === x.id);
+      return p ? { name: p.name, category: p.cats[0], type: p.type, priority: x.priority } : null;
+    })
+    .filter((v): v is NonNullable<typeof v> => v !== null);
+  return {
+    destination: s.dest,
+    travelers: `${s.adults} adults · ${s.kids} kids (6 & 9)`,
+    numDays: s.days.length,
+    selected,
+  };
+}
 
 type Patch = Partial<AppState> | ((s: AppState) => Partial<AppState>);
 
@@ -125,6 +147,10 @@ export function useTripStore() {
   const chatTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const routingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uid = useRef(100);
+
+  // Always-current snapshot so async actions can read state without stale closures.
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     return () => {
@@ -156,6 +182,15 @@ export function useTripStore() {
 
   const runGenerate = useCallback(() => {
     set({ screen: "generating", genStep: 0, destOpen: false });
+
+    // Kick off real itinerary generation through the shared AI service.
+    // On success we swap in the AI plan; on any failure we keep the mock DAYS.
+    fetchItinerary(tripContext(stateRef.current))
+      .then((days) => {
+        if (days) setState((st) => ({ ...st, days }));
+      })
+      .catch(() => {});
+
     if (genInterval.current) clearInterval(genInterval.current);
     genInterval.current = setInterval(() => {
       setState((s) => {
@@ -168,6 +203,34 @@ export function useTripStore() {
       });
     }, 640);
   }, [set]);
+
+  // Streamed travel-assistant reply via the AI service; falls back to a canned reply.
+  const runAssistant = useCallback((ctx: TripContext, history: ChatMessage[], userText: string) => {
+    const aiMessages: AIMessage[] = history
+      .filter((m) => m.text.trim())
+      .map((m) => ({ role: m.role, content: m.text }));
+
+    const setLastAssistant = (text: string) =>
+      setState((s) => ({ ...s, chat: s.chat.map((m, i) => (i === s.chat.length - 1 ? { ...m, text } : m)) }));
+
+    let started = false;
+    streamAssistantReply(ctx, aiMessages, (full) => {
+      setLastAssistant(full);
+      if (!started) {
+        started = true;
+        setState((s) => ({ ...s, typing: false })); // first token arrived → hide dots
+      }
+    })
+      .then(() => setState((s) => ({ ...s, typing: false })))
+      .catch(() => {
+        // No key configured or the model failed — use the built-in reply.
+        if (chatTimer.current) clearTimeout(chatTimer.current);
+        chatTimer.current = setTimeout(() => {
+          setLastAssistant(replyFor(userText));
+          setState((s) => ({ ...s, typing: false }));
+        }, 600);
+      });
+  }, []);
 
   const actions = useMemo(() => {
     return {
@@ -335,18 +398,15 @@ export function useTripStore() {
       // chat
       onChatInput: (v: string) => set({ chatInput: v }),
       send: (preset?: string) => {
-        setState((s) => {
-          const txt = (preset || s.chatInput).trim();
-          if (!txt) return s;
-          if (chatTimer.current) clearTimeout(chatTimer.current);
-          chatTimer.current = setTimeout(() => {
-            setState((s2) => ({ ...s2, chat: [...s2.chat, { role: "assistant", text: replyFor(txt) }], typing: false }));
-          }, 1150);
-          return { ...s, chat: [...s.chat, { role: "user", text: txt }], chatInput: "", typing: true };
-        });
+        const s = stateRef.current;
+        const txt = (preset || s.chatInput).trim();
+        if (!txt) return;
+        const history: ChatMessage[] = [...s.chat, { role: "user", text: txt }];
+        setState((st) => ({ ...st, chat: [...history, { role: "assistant", text: "" }], chatInput: "", typing: true }));
+        runAssistant(tripContext(s), history, txt);
       },
     };
-  }, [set, flash, pulseRouting, runGenerate]);
+  }, [set, flash, pulseRouting, runGenerate, runAssistant]);
 
   return { state, actions };
 }
