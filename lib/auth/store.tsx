@@ -55,26 +55,37 @@ function useProvideAuth() {
     }
     let active = true;
 
-    sb.auth.getSession().then(async ({ data }) => {
-      const session = data.session;
-      // "Remember me": if the user opted out, end the session when the tab/browser was closed.
-      if (session && typeof window !== "undefined") {
-        const remember = window.localStorage.getItem(REMEMBER_KEY);
-        const stillActive = window.sessionStorage.getItem(ACTIVE_KEY);
-        if (remember === "0" && !stillActive) {
-          await sb.auth.signOut();
-          if (active) setState((s) => ({ ...s, ready: true, session: null, user: null }));
-          return;
+    // Hard safety net: never leave the user on the splash. If session init hangs
+    // or throws for any reason, mark ready so the gate proceeds (to auth or app).
+    const readyTimer = setTimeout(() => {
+      if (active) setState((s) => (s.ready ? s : { ...s, ready: true }));
+    }, 5000);
+
+    sb.auth
+      .getSession()
+      .then(async ({ data }) => {
+        const session = data.session;
+        // "Remember me": if the user opted out, end the session when the tab/browser was closed.
+        if (session && typeof window !== "undefined") {
+          const remember = window.localStorage.getItem(REMEMBER_KEY);
+          const stillActive = window.sessionStorage.getItem(ACTIVE_KEY);
+          if (remember === "0" && !stillActive) {
+            await sb.auth.signOut();
+            if (active) setState((s) => ({ ...s, ready: true, session: null, user: null }));
+            return;
+          }
+          window.sessionStorage.setItem(ACTIVE_KEY, "1");
         }
-        window.sessionStorage.setItem(ACTIVE_KEY, "1");
-      }
-      if (!active) return;
-      setState((s) => ({ ...s, ready: true, session, user: session?.user ?? null }));
-      if (session?.user) {
-        loadedFor.current = session.user.id;
-        loadProfile(session.user.id);
-      }
-    });
+        if (!active) return;
+        setState((s) => ({ ...s, ready: true, session, user: session?.user ?? null }));
+        if (session?.user) {
+          loadedFor.current = session.user.id;
+          loadProfile(session.user.id);
+        }
+      })
+      .catch(() => {
+        if (active) setState((s) => ({ ...s, ready: true }));
+      });
 
     const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
       if (!active) return;
@@ -96,6 +107,7 @@ function useProvideAuth() {
 
     return () => {
       active = false;
+      clearTimeout(readyTimer);
       sub.subscription.unsubscribe();
     };
   }, [sb, loadProfile]);
