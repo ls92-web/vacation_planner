@@ -65,10 +65,13 @@ Real email/password auth with per-user data isolation.
   `auth.users`, `created_at`, `updated_at` (auto-touch trigger). **RLS is on with owner-only policies**
   (`user_id = auth.uid()` for select/insert/update/delete). A trigger provisions the profile +
   preferences on signup; `delete_my_account()` cascades a full account wipe.
+- **Per-user schedules** — once signed in, saved places and the built schedule persist to the per-user
+  `saved_places` / `schedule_items` tables (owner-only RLS) via
+  [`lib/itinerary/repository.ts`](lib/itinerary/repository.ts). They're **private to the account** and
+  reload automatically on any device when the user signs back in. With no auth configured it falls back
+  to localStorage.
 - **Note:** the project currently has **email confirmation enabled**, so signup shows a "check your
-  email" step before first login (disable it in Supabase → Auth settings for instant access). The
-  existing planner persistence (`favorites`/`itinerary_items`) is still device-scoped — moving it onto
-  the new per-user `saved_places`/`schedule_items` tables is the natural next step.
+  email" step before first login (disable it in Supabase → Auth settings for instant access).
 
 ## Explore & Plan (core experience)
 

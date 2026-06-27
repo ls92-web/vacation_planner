@@ -1,14 +1,25 @@
 "use client";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { ExplorePlace, ItineraryItem, Slot } from "@/lib/places";
 
-// ===== Persistence for favorites + itinerary. =====
-// Supabase when configured, otherwise localStorage. Either way the data survives
-// leaving the page. Rows are scoped by a per-browser device id (no auth yet).
+// ===== Favorites + itinerary persistence. =====
+// When a user is signed in, everything is written to the per-user tables
+// (saved_places / schedule_items) which have owner-only RLS — so a user's saved
+// schedules are private to their account and reload on any device when they sign
+// back in. With no auth (Supabase not configured) it falls back to localStorage.
+
+export interface ItineraryRepository {
+  listFavorites(destination: string): Promise<ExplorePlace[]>;
+  setFavorite(destination: string, place: ExplorePlace, on: boolean): Promise<void>;
+  listItinerary(destination: string): Promise<ItineraryItem[]>;
+  saveItinerary(destination: string, items: ItineraryItem[]): Promise<void>;
+}
+
+// ---------- localStorage fallback (no auth) ----------
 
 const DEVICE_KEY = "wf_device_id";
-
 export function deviceId(): string {
   if (typeof window === "undefined") return "server";
   let id = window.localStorage.getItem(DEVICE_KEY);
@@ -19,17 +30,7 @@ export function deviceId(): string {
   return id;
 }
 
-export interface ItineraryRepository {
-  listFavorites(destination: string): Promise<ExplorePlace[]>;
-  setFavorite(destination: string, place: ExplorePlace, on: boolean): Promise<void>;
-  listItinerary(destination: string): Promise<ItineraryItem[]>;
-  saveItinerary(destination: string, items: ItineraryItem[]): Promise<void>;
-}
-
-// ---- localStorage implementation (also the fallback when Supabase calls fail) ----
-
 const lsKey = (kind: "fav" | "itin", destination: string) => `wf_${kind}_${destination.toLowerCase()}`;
-
 function lsRead<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
@@ -44,7 +45,7 @@ function lsWrite(key: string, value: unknown) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* ignore quota errors */
+    /* ignore */
   }
 }
 
@@ -66,127 +67,117 @@ const localRepo: ItineraryRepository = {
   },
 };
 
-// ---- Supabase implementation (mirrors to localStorage so reads stay instant offline) ----
+// ---------- per-user Supabase repository (owner-only RLS) ----------
 
-interface ItinRow {
+async function currentUserId(sb: SupabaseClient): Promise<string | null> {
+  const { data } = await sb.auth.getSession();
+  return data.session?.user?.id ?? null;
+}
+
+interface SavedRow {
+  data: ExplorePlace | null;
+}
+interface ItemRow {
+  data: ExplorePlace | null;
   day: number;
   slot: string;
   position: number;
-  data: Record<string, unknown> | null;
+  duration_min: number | null;
 }
 
-/** Reconstruct an ItineraryItem from a row's jsonb (supports both legacy place-only and full-item shapes). */
-function rowToItem(r: ItinRow): ItineraryItem | null {
-  const d = r.data;
-  if (!d) return null;
-  if ("place" in d) {
-    const item = d as unknown as ItineraryItem;
-    return { place: item.place, day: r.day, slot: r.slot as Slot, position: r.position, durationMin: item.durationMin };
-  }
-  return { place: d as unknown as ExplorePlace, day: r.day, slot: r.slot as Slot, position: r.position };
-}
+const userRepo: ItineraryRepository = {
+  async listFavorites(destination) {
+    const sb = getSupabase();
+    if (!sb) return localRepo.listFavorites(destination);
+    const uid = await currentUserId(sb);
+    if (!uid) return localRepo.listFavorites(destination);
+    const { data, error } = await sb
+      .from("saved_places")
+      .select("data")
+      .eq("destination", destination)
+      .order("created_at", { ascending: true });
+    if (error) return [];
+    return (data as SavedRow[]).map((r) => r.data).filter((p): p is ExplorePlace => !!p);
+  },
 
-function makeSupabaseRepo(): ItineraryRepository {
-  const sb = getSupabase()!;
-  const dev = deviceId();
+  async setFavorite(destination, place, on) {
+    const sb = getSupabase();
+    if (!sb) return localRepo.setFavorite(destination, place, on);
+    const uid = await currentUserId(sb);
+    if (!uid) return localRepo.setFavorite(destination, place, on);
+    if (on) {
+      await sb.from("saved_places").upsert(
+        {
+          user_id: uid,
+          destination,
+          place_id: place.id,
+          name: place.name,
+          category: place.category,
+          rating: place.rating ?? null,
+          lat: place.position.lat,
+          lng: place.position.lng,
+          address: place.address ?? null,
+          photo_url: place.photoUrl ?? null,
+          data: place,
+        },
+        { onConflict: "user_id,place_id,destination" }
+      );
+    } else {
+      await sb.from("saved_places").delete().eq("destination", destination).eq("place_id", place.id);
+    }
+  },
 
-  return {
-    async listFavorites(destination) {
-      try {
-        const { data, error } = await sb
-          .from("favorites")
-          .select("data")
-          .eq("device_id", dev)
-          .eq("destination", destination)
-          .order("created_at", { ascending: true });
-        if (error) throw error;
-        const places = (data ?? []).map((r) => r.data as ExplorePlace).filter(Boolean);
-        lsWrite(lsKey("fav", destination), places);
-        return places;
-      } catch {
-        return localRepo.listFavorites(destination);
-      }
-    },
-    async setFavorite(destination, place, on) {
-      await localRepo.setFavorite(destination, place, on); // optimistic mirror
-      try {
-        if (on) {
-          await sb.from("favorites").upsert(
-            {
-              device_id: dev,
-              destination,
-              place_id: place.id,
-              name: place.name,
-              category: place.category,
-              rating: place.rating ?? null,
-              lat: place.position.lat,
-              lng: place.position.lng,
-              address: place.address ?? null,
-              photo_url: place.photoUrl ?? null,
-              data: place,
-            },
-            { onConflict: "device_id,place_id" }
-          );
-        } else {
-          await sb.from("favorites").delete().eq("device_id", dev).eq("place_id", place.id);
-        }
-      } catch {
-        /* localStorage already updated */
-      }
-    },
-    async listItinerary(destination) {
-      try {
-        const { data, error } = await sb
-          .from("itinerary_items")
-          .select("*")
-          .eq("device_id", dev)
-          .eq("destination", destination)
-          .order("day", { ascending: true })
-          .order("slot", { ascending: true })
-          .order("position", { ascending: true });
-        if (error) throw error;
-        const items = (data as ItinRow[] | null ?? [])
-          .map(rowToItem)
-          .filter((i): i is ItineraryItem => i !== null);
-        lsWrite(lsKey("itin", destination), items);
-        return items;
-      } catch {
-        return localRepo.listItinerary(destination);
-      }
-    },
-    async saveItinerary(destination, items) {
-      await localRepo.saveItinerary(destination, items); // optimistic mirror
-      try {
-        await sb.from("itinerary_items").delete().eq("device_id", dev).eq("destination", destination);
-        if (items.length) {
-          await sb.from("itinerary_items").insert(
-            items.map((it) => ({
-              device_id: dev,
-              destination,
-              place_id: it.place.id,
-              name: it.place.name,
-              category: it.place.category,
-              lat: it.place.position.lat,
-              lng: it.place.position.lng,
-              photo_url: it.place.photoUrl ?? null,
-              day: it.day,
-              slot: it.slot,
-              position: it.position,
-              data: it,
-            }))
-          );
-        }
-      } catch {
-        /* localStorage already updated */
-      }
-    },
-  };
-}
+  async listItinerary(destination) {
+    const sb = getSupabase();
+    if (!sb) return localRepo.listItinerary(destination);
+    const uid = await currentUserId(sb);
+    if (!uid) return localRepo.listItinerary(destination);
+    const { data, error } = await sb
+      .from("schedule_items")
+      .select("data, day, slot, position, duration_min")
+      .eq("destination", destination)
+      .order("day", { ascending: true })
+      .order("slot", { ascending: true })
+      .order("position", { ascending: true });
+    if (error) return [];
+    return (data as ItemRow[])
+      .map((r): ItineraryItem | null =>
+        r.data ? { place: r.data, day: r.day, slot: r.slot as Slot, position: r.position, durationMin: r.duration_min ?? undefined } : null
+      )
+      .filter((i): i is ItineraryItem => i !== null);
+  },
+
+  async saveItinerary(destination, items) {
+    const sb = getSupabase();
+    if (!sb) return localRepo.saveItinerary(destination, items);
+    const uid = await currentUserId(sb);
+    if (!uid) return localRepo.saveItinerary(destination, items);
+    await sb.from("schedule_items").delete().eq("destination", destination);
+    if (items.length) {
+      await sb.from("schedule_items").insert(
+        items.map((it) => ({
+          user_id: uid,
+          destination,
+          place_id: it.place.id,
+          name: it.place.name,
+          category: it.place.category,
+          lat: it.place.position.lat,
+          lng: it.place.position.lng,
+          photo_url: it.place.photoUrl ?? null,
+          day: it.day,
+          slot: it.slot,
+          position: it.position,
+          duration_min: it.durationMin ?? null,
+          data: it.place,
+        }))
+      );
+    }
+  },
+};
 
 let repo: ItineraryRepository | null = null;
-
 export function getRepository(): ItineraryRepository {
   if (repo) return repo;
-  repo = isSupabaseConfigured() ? makeSupabaseRepo() : localRepo;
+  repo = isSupabaseConfigured() ? userRepo : localRepo;
   return repo;
 }
