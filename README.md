@@ -1,7 +1,7 @@
-# Itinera — AI Vacation Planner
+# Itinera — Every journey, perfectly planned.
 
-A faithful implementation of the **Vacation Planner** (`Vacation Planner.dc.html`) design handoff:
-a family-oriented, AI-assisted multi-destination trip planner.
+An AI-powered travel planning platform: plan multi-destination trips, manage hotels,
+discover attractions, optimize routes, build day-by-day schedules, and export beautiful itineraries.
 
 Flow: **Sign in → Route builder → Explore & build → (Create My Schedule) → Generating → Itinerary**
 

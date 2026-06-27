@@ -10,8 +10,8 @@ export function GeneratingScreen() {
     `Scouting top-rated places in ${city}`,
     "Checking opening hours & ticket info",
     "Mapping routes & travel distances",
-    "Matching spots to your kids' ages",
-    "Designing your custom plan",
+    "Tailoring picks to your travel style",
+    "Designing your day-by-day itinerary",
   ];
 
   return (
@@ -24,9 +24,9 @@ export function GeneratingScreen() {
           <div className="w-[30px] h-[30px] border-[3.5px] border-white/35 border-t-white rounded-full vp-spin" />
         </div>
         <div className="mt-[26px] font-display font-bold text-[25px] tracking-[-.01em]">
-          Building your {state.dest} plan
+          Crafting your {state.dest} itinerary
         </div>
-        <p className="text-muted mt-[7px] text-[14px]">Sit tight — this usually takes a moment.</p>
+        <p className="text-muted mt-[7px] text-[14px]">Every journey, perfectly planned — this only takes a moment.</p>
 
         <div className="mt-[26px] text-left flex flex-col gap-[11px]">
           {labels.map((label, i) => {
@@ -37,14 +37,14 @@ export function GeneratingScreen() {
                 key={i}
                 className="flex items-center gap-[13px] px-[15px] py-[13px] rounded-[13px] border transition-all"
                 style={{
-                  background: active ? "var(--tint)" : "#fff",
+                  background: active ? "var(--tint)" : "var(--surface)",
                   borderColor: active ? "color-mix(in oklab, var(--accent) 30%, transparent)" : "var(--line)",
                 }}
               >
                 <div
                   className="w-6 h-6 rounded-full shrink-0 grid place-items-center text-[13px] font-bold"
                   style={{
-                    background: done || active ? "var(--accent)" : "#f0ebe3",
+                    background: done || active ? "var(--accent)" : "var(--line)",
                     color: done || active ? "#fff" : "var(--muted)",
                   }}
                 >

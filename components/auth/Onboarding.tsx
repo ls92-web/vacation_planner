@@ -53,7 +53,7 @@ export function Onboarding() {
           <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-accent">
             <Sparkle size={14} strokeWidth={1.8} />A quick setup
           </div>
-          <div className="font-display font-bold text-[26px] tracking-[-.02em] mt-1.5">
+          <div className="font-brand font-semibold text-[28px] tracking-[-.01em] mt-1.5">
             Welcome{state.profile?.full_name ? `, ${state.profile.full_name.split(" ")[0]}` : ""}.
           </div>
           <p className="text-muted text-[14px] mt-1.5">Five quick taps so the AI tailors every plan to you. You can change these any time.</p>

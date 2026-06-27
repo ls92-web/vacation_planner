@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/store";
-import { Compass } from "@/components/icons";
+import { Logo } from "@/components/Logo";
 import { AuthScreen } from "./AuthScreen";
 import { Onboarding } from "./Onboarding";
 
@@ -11,7 +11,8 @@ function Splash() {
   return (
     <div className="min-h-screen grid place-items-center" style={{ background: "var(--bg)" }}>
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 rounded-[14px] bg-accent text-white grid place-items-center"><Compass size={22} strokeWidth={2} /></div>
+        <Logo size={52} />
+        <div className="font-brand font-semibold text-[22px] tracking-[-.01em] text-ink">Itinera</div>
         <div className="w-5 h-5 border-2 border-line border-t-accent rounded-full vp-spin" />
       </div>
     </div>
