@@ -32,6 +32,7 @@ import type {
   Units,
 } from "./types";
 import type { AIMessage, TripContext } from "./ai";
+import type { SelectedDestination } from "./geo";
 import { fetchItinerary, streamAssistantReply } from "./ai-client";
 import { placeCoords } from "./maps/coords";
 import type { PlaceResult } from "./maps/types";
@@ -253,6 +254,27 @@ export function useTripStore() {
         requestAnimationFrame(() => window.scrollTo({ top: 0 }));
       },
       setDestination: (dest: string) => set({ dest }),
+      /** Seed the route from picked cities (city + country + coords). Keeps current list when empty. */
+      setDestinations: (list: SelectedDestination[]) =>
+        setState((s) => ({
+          ...s,
+          destinations: list.length
+            ? list.map((d) => ({
+                id: ++uid.current,
+                name: d.cityName,
+                country: d.countryName,
+                countryCode: d.countryCode,
+                lat: d.lat,
+                lng: d.lng,
+                image: d.image ?? null,
+                saved: true,
+                expanded: false,
+                arrive: "",
+                depart: "",
+                accoms: [],
+              }))
+            : s.destinations,
+        })),
       // navigation between explore subviews / pages
       goExplore: () => {
         set({ screen: "explore" });

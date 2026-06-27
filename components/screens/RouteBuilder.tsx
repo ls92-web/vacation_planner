@@ -377,12 +377,17 @@ function RoutePanel() {
 
   // resolve coords for each destination (known or geocoded)
   const savedDests = state.destinations.filter((d) => d.saved && d.name);
-  const key = savedDests.map((d) => d.name).join("|");
+  const key = savedDests.map((d) => `${d.name}:${d.lat ?? ""},${d.lng ?? ""}`).join("|");
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const out: Record<number, LatLng> = {};
       for (const d of savedDests) {
+        // Prefer real coordinates captured when the city was picked.
+        if (typeof d.lat === "number" && typeof d.lng === "number" && (d.lat !== 0 || d.lng !== 0)) {
+          out[d.id] = { lat: d.lat, lng: d.lng };
+          continue;
+        }
         const known = destinationCoords(d.name);
         if (known) out[d.id] = known;
         else {

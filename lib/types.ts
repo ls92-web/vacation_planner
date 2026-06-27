@@ -25,6 +25,10 @@ export interface Destination {
   id: number;
   name: string;
   country: string;
+  countryCode?: string;
+  lat?: number;
+  lng?: number;
+  image?: string | null;
   saved: boolean;
   expanded: boolean;
   arrive: string;
