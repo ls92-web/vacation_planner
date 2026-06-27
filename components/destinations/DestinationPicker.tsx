@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { loadCities, loadCountries, searchCountries } from "@/lib/geo";
 import type { GeoCity, GeoCountry, SelectedDestination } from "@/lib/geo";
+import { CityImage } from "./CityImage";
 
 function fmtPopulation(n?: number): string | null {
   if (!n || n <= 0) return null;
@@ -341,6 +342,7 @@ export function DestinationPicker({
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-line bg-surface vp-pop"
               >
                 <span className="w-7 h-7 rounded-lg grid place-items-center text-[12.5px] font-bold shrink-0" style={{ background: "var(--tint)", color: "var(--accent)" }}>{i + 1}</span>
+                <CityImage name={d.cityName} country={d.countryName} image={d.image ?? undefined} scrim={false} className="w-[52px] h-[40px] rounded-lg shrink-0" />
                 <Flag src={flagFor(d.countryCode)} label={d.countryName} />
                 <span className="flex-1 min-w-0">
                   <span className="block text-[14px] font-semibold text-ink truncate">{d.cityName}</span>

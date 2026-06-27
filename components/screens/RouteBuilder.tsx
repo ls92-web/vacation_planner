@@ -13,6 +13,7 @@ import {
 import type { Accommodation, Destination } from "@/lib/types";
 import { destinationCoords, isMapsConfigured, useGeocode, type LatLng, type MapMarker } from "@/lib/maps";
 import { GoogleMap, MapsApiProvider, DestinationMarkers, OpenInMapsButton } from "@/components/maps";
+import { CityImage } from "@/components/destinations/CityImage";
 import { useTrip } from "@/lib/store";
 import { withSave } from "@/lib/ui/saveStatus";
 import { Bed, CloudSun } from "lucide-react";
@@ -252,7 +253,6 @@ function DestinationCard({ dest, index, last }: { dest: Destination; index: numb
   const booked = dest.accoms.reduce((s, a) => s + (nightsBetween(a.checkin, a.checkout) || 0), 0);
   const st = statusFor(n, booked);
   const canSave = !!(dest.name && dest.arrive && dest.depart && n != null);
-  const hero = "#002B36";
   const budget = estBudget(n || 0, state.adults + state.kids);
 
   return (
@@ -288,15 +288,16 @@ function DestinationCard({ dest, index, last }: { dest: Destination; index: numb
             /* saved — premium card */
             <div>
               {/* hero header */}
-              <button onClick={() => actions.toggleDest(dest.id)} className="w-full text-left relative h-[120px] block cursor-pointer" style={{ background: hero }}>
-                <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-bold" style={{ background: st.bg, color: st.color }}>
+              <button onClick={() => actions.toggleDest(dest.id)} className="w-full text-left relative h-[140px] block cursor-pointer overflow-hidden">
+                <CityImage name={dest.name} country={dest.country} image={dest.image ?? undefined} className="absolute inset-0 h-full w-full" />
+                <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-bold" style={{ background: st.bg, color: st.color }}>
                   {st.kind === "ok" ? <Check size={12} strokeWidth={2.5} /> : null}{st.text}
                 </div>
-                <div className="absolute bottom-3 left-4 right-4 text-white">
+                <div className="absolute bottom-3 left-4 right-4 z-10 text-white">
                   <div className="flex items-end justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-display font-bold text-[22px] leading-tight truncate">{dest.name || "New destination"}</div>
-                      <div className="flex items-center gap-1.5 text-[12.5px] text-white/85"><MapPin size={12} strokeWidth={2} />{dest.country || "—"}{ar && de ? ` · ${ar} → ${de}` : ""}</div>
+                      <div className="font-display font-bold text-[22px] leading-tight truncate" style={{ textShadow: "0 1px 8px rgba(0,0,0,.35)" }}>{dest.name || "New destination"}</div>
+                      <div className="flex items-center gap-1.5 text-[12.5px] text-white/90" style={{ textShadow: "0 1px 6px rgba(0,0,0,.4)" }}><MapPin size={12} strokeWidth={2} />{dest.country || "—"}{ar && de ? ` · ${ar} → ${de}` : ""}</div>
                     </div>
                     <span className="flex transition-transform shrink-0" style={{ transform: dest.expanded ? "rotate(180deg)" : "none" }}><ChevronDown size={20} strokeWidth={2} /></span>
                   </div>

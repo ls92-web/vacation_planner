@@ -6,7 +6,9 @@ import { ArrowRight, Check, MapPin, Pencil, Plus, Trash2, X } from "lucide-react
 import { useTrip } from "@/lib/store";
 import { useTrips, type Trip } from "@/lib/trips/store";
 import { DestinationPicker } from "@/components/destinations/DestinationPicker";
+import { CityImage } from "@/components/destinations/CityImage";
 import { listDestinations, saveDestinations } from "@/lib/destinations/repository";
+import { loadCityImage } from "@/lib/geo";
 import type { SelectedDestination } from "@/lib/geo";
 
 function NewTripModal({
@@ -29,10 +31,15 @@ function NewTripModal({
     const primary = dests[0];
     const destString = [primary.cityName, primary.countryName].filter(Boolean).join(", ");
     const tripName = name.trim() || (dests.length > 1 ? `${primary.cityName} +${dests.length - 1}` : primary.cityName);
+    // Resolve a representative photo for each city (best-effort) so cards are
+    // recognizable and the image persists with the destination.
+    const withImages = await Promise.all(
+      dests.map(async (d) => ({ ...d, image: d.image ?? (await loadCityImage(d.cityName, d.countryName).catch(() => null)) }))
+    );
     const trip = await actions.createTrip(tripName, destString);
-    if (trip) await saveDestinations(trip.id, dests);
+    if (trip) await saveDestinations(trip.id, withImages);
     setBusy(false);
-    if (trip) onCreated(trip, dests);
+    if (trip) onCreated(trip, withImages);
   }
 
   if (!mounted) return null;
@@ -96,12 +103,12 @@ function TripCard({ trip, active, onOpen }: { trip: Trip; active: boolean; onOpe
 
   return (
     <div className="rounded-[18px] border bg-surface overflow-hidden flex flex-col transition hover:-translate-y-0.5 hover:shadow-lg" style={{ borderColor: active ? "var(--accent)" : "var(--line)", boxShadow: "0 4px 18px -12px rgba(0,0,0,.18)" }}>
-      <div className="h-[88px] relative" style={{ background: "#002B36" }}>
-        {active && <span className="absolute top-2.5 right-2.5 text-[10.5px] font-bold uppercase tracking-wide bg-white text-ink px-2 py-0.5 rounded-md">Active</span>}
-        <div className="absolute bottom-2.5 left-3.5 text-white">
-          <div className="flex items-center gap-1.5 text-[12px] opacity-90"><MapPin size={12} strokeWidth={2} />{city}</div>
+      <CityImage name={city} country={trip.destination.split(",").slice(1).join(",").trim()} className="h-[96px] w-full">
+        {active && <span className="absolute top-2.5 right-2.5 z-10 text-[10.5px] font-bold uppercase tracking-wide bg-white text-ink px-2 py-0.5 rounded-md">Active</span>}
+        <div className="absolute bottom-2.5 left-3.5 z-10 text-white">
+          <div className="flex items-center gap-1.5 text-[12px]" style={{ textShadow: "0 1px 6px rgba(0,0,0,.4)" }}><MapPin size={12} strokeWidth={2} />{city}</div>
         </div>
-      </div>
+      </CityImage>
       <div className="p-3.5 flex flex-col flex-1">
         {renaming ? (
           <div className="flex items-center gap-1.5">
