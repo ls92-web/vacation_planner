@@ -12,12 +12,14 @@ import { CategoryRail } from "./CategoryRail";
 import { FilterBar } from "./FilterBar";
 import { PlaceCard } from "./PlaceCard";
 import { ExploreMap } from "./ExploreMap";
-import { ScheduleBuilder } from "./ScheduleBuilder";
+import { ItineraryTimeline } from "./ItineraryTimeline";
 import { DayAnalysis } from "./DayAnalysis";
+import { DaySummary } from "./DaySummary";
 import { NearbyOpportunities } from "./NearbyOpportunities";
 import { CompareTray } from "./CompareTray";
 import { useDebounced } from "./useDebounced";
-import { analyzeDay } from "@/lib/planner/dayAnalysis";
+import { ExportButton } from "@/components/export/ExportButton";
+import { analyzeDay, type RecAction } from "@/lib/planner/dayAnalysis";
 
 function applyFilters(places: ExplorePlace[], f: ExploreFilters, center: { lat: number; lng: number }): ExplorePlace[] {
   return places.filter((p) => {
@@ -135,22 +137,7 @@ function ExploreInner() {
           </div>
         </div>
       ) : (
-        <div className="max-w-[1320px] mx-auto px-[clamp(16px,3vw,28px)] py-5 pb-24 flex flex-col gap-5">
-          <DayAnalysisPanel />
-          <div className="flex flex-col lg:flex-row gap-5">
-            <div className="flex-1 min-w-0">
-              <div className="font-display font-bold text-[24px] tracking-[-.02em] mb-1">Your schedule</div>
-              <p className="text-muted text-[13.5px] mb-4">Build each day across morning, afternoon and evening. Drag to reorder — your day analysis updates live.</p>
-              <ScheduleBuilder />
-            </div>
-            <aside className="lg:w-[360px] shrink-0 flex flex-col gap-4">
-              <div className="relative rounded-[18px] overflow-hidden border border-line h-[260px]">
-                <PlanDayMap />
-              </div>
-              <NearbyOpportunities />
-            </aside>
-          </div>
-        </div>
+        <PlanView setView={setView} />
       )}
 
       <CompareTray pool={pool} />
@@ -159,11 +146,41 @@ function ExploreInner() {
   );
 }
 
-function DayAnalysisPanel() {
-  const { state } = usePlanner();
+function PlanView({ setView }: { setView: (v: "explore" | "plan") => void }) {
+  const { state, actions } = usePlanner();
   const dayItems = useMemo(() => state.itinerary.filter((it) => it.day === state.day), [state.itinerary, state.day]);
-  const analysis = useMemo(() => analyzeDay(dayItems, state.center), [dayItems, state.center]);
-  return <DayAnalysis analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} />;
+  const analysis = useMemo(
+    () => analyzeDay(dayItems, state.center, state.transportMode),
+    [dayItems, state.center, state.transportMode]
+  );
+
+  const onAction = (a: RecAction) => {
+    if (a.kind === "optimize") actions.optimizeDay(state.day);
+    else if (a.kind === "shorten") actions.setItemDuration(a.placeId, a.toMin);
+    else if (a.kind === "moveDay") actions.moveItemToDay(a.placeId);
+    else if (a.kind === "addCafe") { actions.setCategory("cafes"); setView("explore"); actions.flash("Browse cafés near your route, then add one."); }
+    else if (a.kind === "findSimilar") { actions.setCategory("hidden"); setView("explore"); actions.flash("Here are some different picks nearby."); }
+  };
+
+  return (
+    <div className="max-w-[1320px] mx-auto px-[clamp(16px,3vw,28px)] py-5 pb-24 flex flex-col gap-5">
+      <DayAnalysis analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} onAction={onAction} />
+      <div className="flex flex-col lg:flex-row gap-5">
+        <div className="flex-1 min-w-0">
+          <div className="font-display font-bold text-[24px] tracking-[-.02em] mb-1">Your itinerary</div>
+          <p className="text-muted text-[13.5px] mb-4">A continuous, timed plan. Drag stops to reorder, tune visit times, switch transport — the analysis updates live.</p>
+          <ItineraryTimeline />
+        </div>
+        <aside className="lg:w-[360px] shrink-0 flex flex-col gap-4">
+          <div className="relative rounded-[18px] overflow-hidden border border-line h-[260px]">
+            <PlanDayMap />
+          </div>
+          <NearbyOpportunities />
+        </aside>
+      </div>
+      <DaySummary analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} />
+    </div>
+  );
 }
 
 function SearchBox() {
@@ -202,6 +219,7 @@ function Header({ view, setView }: { view: "explore" | "plan"; setView: (v: "exp
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-3">
+          <ExportButton />
           <div className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
             <Heart size={16} strokeWidth={2} style={{ color: "var(--accent2)" }} fill="var(--accent2)" />
             {state.favorites.length}

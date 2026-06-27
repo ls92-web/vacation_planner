@@ -11,6 +11,7 @@ import {
   type Slot,
 } from "@/lib/places";
 import { getRepository } from "@/lib/itinerary/repository";
+import { optimizeOrder, resequence, type TransportMode } from "./travel";
 
 interface PlannerState {
   destination: string;
@@ -26,6 +27,7 @@ interface PlannerState {
   day: number;
   dayCount: number;
   units: "km" | "mi";
+  transportMode: TransportMode;
   loaded: boolean;
   toast: string | null;
 }
@@ -48,6 +50,7 @@ function makeInitial(destination: string): PlannerState {
     day: 0,
     dayCount: NUM_DAYS,
     units: "km",
+    transportMode: "walk",
     loaded: false,
     toast: null,
   };
@@ -92,6 +95,7 @@ function useProvidePlanner(destination: string) {
       setFilter: (patch: Partial<ExploreFilters>) => setState((s) => ({ ...s, filters: { ...s.filters, ...patch } })),
       resetFilters: () => setState((s) => ({ ...s, filters: { ...DEFAULT_FILTERS } })),
       setUnits: (u: "km" | "mi") => setState((s) => ({ ...s, units: u })),
+      setTransportMode: (m: TransportMode) => setState((s) => ({ ...s, transportMode: m })),
       setDay: (d: number) => setState((s) => ({ ...s, day: d })),
       setHovered: (id: string | null) => setState((s) => (s.hoveredId === id ? s : { ...s, hoveredId: id })),
       setSelected: (id: string | null) => setState((s) => ({ ...s, selectedId: id })),
@@ -127,6 +131,36 @@ function useProvidePlanner(destination: string) {
       },
       /** Replace the whole itinerary (used after drag-and-drop reordering). */
       replaceItinerary: (items: ItineraryItem[]) => persistItinerary(items),
+
+      setItemDuration: (placeId: string, min: number) => {
+        persistItinerary(
+          stateRef.current.itinerary.map((it) => (it.place.id === placeId ? { ...it, durationMin: Math.max(15, Math.round(min)) } : it))
+        );
+      },
+      moveItemToDay: (placeId: string, toDay?: number) => {
+        const s = stateRef.current;
+        const item = s.itinerary.find((it) => it.place.id === placeId);
+        if (!item) return;
+        const target = toDay ?? (item.day + 1) % s.dayCount;
+        if (target === item.day) return;
+        const pos = s.itinerary.filter((it) => it.day === target && it.slot === item.slot).length;
+        persistItinerary(s.itinerary.map((it) => (it.place.id === placeId ? { ...it, day: target, position: pos } : it)));
+        flash(`Moved ${item.place.name} to Day ${target + 1}.`);
+      },
+      optimizeDay: (day: number) => {
+        const s = stateRef.current;
+        const dayItems = s.itinerary.filter((it) => it.day === day);
+        if (dayItems.length < 2) return;
+        const optimized = resequence(optimizeOrder(dayItems, s.center), s.center, s.transportMode).map((it) => ({ ...it, day }));
+        persistItinerary([...s.itinerary.filter((it) => it.day !== day), ...optimized]);
+        flash("Reordered for a shorter route.");
+      },
+      /** Re-sequence a day from a new visit order (drag-and-drop). */
+      reorderDay: (day: number, orderedDay: ItineraryItem[]) => {
+        const s = stateRef.current;
+        const reseq = resequence(orderedDay, s.center, s.transportMode).map((it) => ({ ...it, day }));
+        persistItinerary([...s.itinerary.filter((it) => it.day !== day), ...reseq]);
+      },
 
       flash,
     };

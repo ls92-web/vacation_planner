@@ -66,15 +66,24 @@ build their own day-by-day schedule, with AI assisting (not replacing) their cho
   count, price, open status, estimated visit + recommended time, distance from hotel (Haversine),
   address, description, tags. Actions: favorite, add-to-plan (day + morning/afternoon/evening with a
   *suggested* slot), compare, view on Google Maps.
-- **Schedule builder** ([`ScheduleBuilder`](components/explore/ScheduleBuilder.tsx)): day selector +
-  time-of-day columns, drag-and-drop reorder across slots, distance-from-previous, "Open day route".
+- **Luxury itinerary timeline** ([`ItineraryTimeline`](components/explore/ItineraryTimeline.tsx)): a
+  continuous, time-ordered day with rich cards (photo, category, arrival time, editable visit duration,
+  AI tip, opening alerts, drag-and-drop) and **travel connectors** between stops. A
+  **transport toggle** (walk / drive / public transport) recomputes all times and the analysis.
+- **Day summary** ([`DaySummary`](components/explore/DaySummary.tsx)): a premium card with sightseeing
+  time, walking distance, travel time, budget, attraction/restaurant counts, pace and overall score.
+- **Export → travel book** ([`components/export/`](components/export)): a template gallery
+  (Luxury Magazine, Modern Explorer, Family Vacation, Minimal Professional, Adventure Journal, Elegant
+  Dark) with live previews → a print-ready itinerary book (cover, trip-at-a-glance, per-day timeline
+  with photos, AI tips, QR code) that saves to PDF via the browser print dialog.
 - **AI Day Analysis** ([`dayAnalysis.ts`](lib/planner/dayAnalysis.ts) + [`DayAnalysis`](components/explore/DayAnalysis.tsx)):
   a signature, real-time dashboard at the top of each planned day. A pure engine scores the day from
-  real data only (overall, comfort, travel efficiency, walking/driving distance + time, visit time,
+  real data only (overall, comfort, travel efficiency, walking/transport distance + time, visit time,
   free time, estimated cost range, family-friendliness, walking difficulty, pace, attraction variety),
-  plus explained recommendations and smart warnings (no meal break, closed venue, over-budget day, long
-  transfer…). It recomputes instantly via `useMemo` on any plan change — no button. Weather/crowd/etc.
-  are wired as future seams.
+  plus **actionable** recommendations (one-click Reorder route / Shorten 30 min / Move to another day /
+  Add nearby café / Find something different) and smart warnings (no meal break, closed venue,
+  over-budget day, long transfer…). It recomputes instantly via `useMemo` on any plan or transport
+  change — no button. Weather/crowd/etc. are wired as future seams.
 - **Nearby Opportunities** ([`NearbyOpportunities`](components/explore/NearbyOpportunities.tsx)): real
   Places near the day's stops (coffee, dessert, photo spots, markets, playgrounds, hidden gems) the user
   can add — never auto-inserted.

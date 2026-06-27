@@ -12,13 +12,22 @@ import {
   Layers,
   Route,
   Sparkle,
+  TrainFront,
   TriangleAlert,
   Users,
   Wallet,
   CloudSun,
 } from "lucide-react";
 import { formatDurationMin, formatKm } from "@/lib/places";
-import type { DayAnalysis as DayAnalysisData, Grade, Recommendation, Warning } from "@/lib/planner/dayAnalysis";
+import type { DayAnalysis as DayAnalysisData, Grade, RecAction, Recommendation, Warning } from "@/lib/planner/dayAnalysis";
+
+const ACTION_LABEL: Record<RecAction["kind"], string> = {
+  optimize: "Reorder route",
+  shorten: "Shorten 30 min",
+  moveDay: "Move to another day",
+  addCafe: "Add nearby café",
+  findSimilar: "Find something different",
+};
 
 const GRADE_STYLE: Record<Grade, { bg: string; color: string }> = {
   excellent: { bg: "#e7f4ec", color: "#2f7a4d" },
@@ -86,22 +95,29 @@ function Bar({ value }: { value: number }) {
   );
 }
 
-function RecCard({ rec }: { rec: Recommendation }) {
+function RecCard({ rec, onAction }: { rec: Recommendation; onAction?: (a: RecAction) => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <button
-      onClick={() => setOpen((o) => !o)}
-      className="w-full text-left bg-white border border-line rounded-[12px] px-3 py-2.5 cursor-pointer transition hover:border-accent"
-    >
-      <div className="flex items-start gap-2">
+    <div className="bg-white border border-line rounded-[12px] px-3 py-2.5 transition hover:border-accent">
+      <button onClick={() => setOpen((o) => !o)} className="w-full text-left flex items-start gap-2 cursor-pointer">
         <span className="text-accent shrink-0 mt-0.5 flex"><Sparkle size={14} strokeWidth={1.8} /></span>
         <span className="flex-1 text-[12.5px] font-semibold text-ink">{rec.title}</span>
         <span className="text-muted shrink-0 flex transition-transform" style={{ transform: open ? "rotate(180deg)" : "none" }}>
           <ChevronDown size={15} strokeWidth={2} />
         </span>
-      </div>
+      </button>
       {open && <div className="text-[12px] text-muted leading-[1.5] mt-1.5 pl-6 vp-slide-down">{rec.reason}</div>}
-    </button>
+      {rec.action && onAction && (
+        <div className="mt-2 pl-6">
+          <button
+            onClick={() => onAction(rec.action!)}
+            className="inline-flex items-center px-3 py-1.5 rounded-[9px] bg-accent text-white text-[12px] font-bold cursor-pointer hover:brightness-[1.06] transition"
+          >
+            {ACTION_LABEL[rec.action.kind]}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -131,7 +147,7 @@ const DIFF_LABEL = { easy: "Easy", moderate: "Moderate", high: "High" } as const
 const paceGrade = (p: DayAnalysisData["pace"]): Grade => (p === "relaxed" || p === "balanced" ? "good" : p === "busy" ? "good" : "attention");
 const diffGrade = (d: DayAnalysisData["walkingDifficulty"]): Grade => (d === "easy" ? "excellent" : d === "moderate" ? "good" : "attention");
 
-export function DayAnalysis({ analysis, units, dayLabel }: { analysis: DayAnalysisData; units: "km" | "mi"; dayLabel: string }) {
+export function DayAnalysis({ analysis, units, dayLabel, onAction }: { analysis: DayAnalysisData; units: "km" | "mi"; dayLabel: string; onAction?: (a: RecAction) => void }) {
   if (analysis.stops === 0) {
     return (
       <div className="bg-surface border border-line rounded-[18px] p-5 vp-fade-fast">
@@ -176,9 +192,9 @@ export function DayAnalysis({ analysis, units, dayLabel }: { analysis: DayAnalys
           <div className="font-display font-bold text-[18px]">{formatKm(analysis.walkingKm, units)}</div>
           <div className="text-[12px] text-muted">{formatDurationMin(analysis.walkingMin)}</div>
         </Metric>
-        <Metric icon={Car} label="Driving">
-          <div className="font-display font-bold text-[18px]">{analysis.drivingKm > 0 ? formatKm(analysis.drivingKm, units) : "—"}</div>
-          <div className="text-[12px] text-muted">{analysis.drivingMin > 0 ? formatDurationMin(analysis.drivingMin) : "All walkable"}</div>
+        <Metric icon={analysis.mode === "transit" ? TrainFront : Car} label={analysis.mode === "transit" ? "Transit" : "Driving"}>
+          <div className="font-display font-bold text-[18px]">{analysis.transportKm > 0 ? formatKm(analysis.transportKm, units) : "—"}</div>
+          <div className="text-[12px] text-muted">{analysis.transportMin > 0 ? formatDurationMin(analysis.transportMin) : "All walkable"}</div>
         </Metric>
         <Metric icon={Clock} label="Visit time">
           <div className="font-display font-bold text-[18px]">{formatDurationMin(analysis.visitMin)}</div>
@@ -213,7 +229,7 @@ export function DayAnalysis({ analysis, units, dayLabel }: { analysis: DayAnalys
             <Route size={13} strokeWidth={2} className="text-accent" />AI recommendations
           </div>
           <div className="flex flex-col gap-2">
-            {analysis.recommendations.map((r, i) => <RecCard key={i} rec={r} />)}
+            {analysis.recommendations.map((r, i) => <RecCard key={i} rec={r} onAction={onAction} />)}
           </div>
         </div>
       )}

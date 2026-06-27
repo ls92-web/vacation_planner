@@ -64,4 +64,6 @@ export interface ItineraryItem {
   day: number;
   slot: Slot;
   position: number;
+  /** Optional per-stop visit-duration override (minutes); falls back to place.estDurationMin. */
+  durationMin?: number;
 }

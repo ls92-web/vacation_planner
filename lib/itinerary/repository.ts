@@ -69,16 +69,21 @@ const localRepo: ItineraryRepository = {
 // ---- Supabase implementation (mirrors to localStorage so reads stay instant offline) ----
 
 interface ItinRow {
-  place_id: string;
-  name: string;
-  category: string | null;
-  lat: number | null;
-  lng: number | null;
-  photo_url: string | null;
   day: number;
   slot: string;
   position: number;
-  data: ExplorePlace | null;
+  data: Record<string, unknown> | null;
+}
+
+/** Reconstruct an ItineraryItem from a row's jsonb (supports both legacy place-only and full-item shapes). */
+function rowToItem(r: ItinRow): ItineraryItem | null {
+  const d = r.data;
+  if (!d) return null;
+  if ("place" in d) {
+    const item = d as unknown as ItineraryItem;
+    return { place: item.place, day: r.day, slot: r.slot as Slot, position: r.position, durationMin: item.durationMin };
+  }
+  return { place: d as unknown as ExplorePlace, day: r.day, slot: r.slot as Slot, position: r.position };
 }
 
 function makeSupabaseRepo(): ItineraryRepository {
@@ -141,7 +146,7 @@ function makeSupabaseRepo(): ItineraryRepository {
           .order("position", { ascending: true });
         if (error) throw error;
         const items = (data as ItinRow[] | null ?? [])
-          .map((r): ItineraryItem | null => (r.data ? { place: r.data, day: r.day, slot: r.slot as Slot, position: r.position } : null))
+          .map(rowToItem)
           .filter((i): i is ItineraryItem => i !== null);
         lsWrite(lsKey("itin", destination), items);
         return items;
@@ -167,7 +172,7 @@ function makeSupabaseRepo(): ItineraryRepository {
               day: it.day,
               slot: it.slot,
               position: it.position,
-              data: it.place,
+              data: it,
             }))
           );
         }

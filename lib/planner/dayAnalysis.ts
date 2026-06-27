@@ -1,19 +1,32 @@
 import type { LatLng } from "@/lib/maps";
-import { haversineKm, SLOTS, type ItineraryItem } from "@/lib/places";
+import { haversineKm, type ItineraryItem } from "@/lib/places";
+import {
+  computeTimeline,
+  DAY_AVAILABLE_MIN,
+  itemDuration,
+  optimizeOrder,
+  orderedItems,
+  travelMinutes,
+  type TransportMode,
+} from "./travel";
 
-// ===== AI Day Analysis: a deterministic engine that scores the day's itinerary. =====
-// It only analyzes real data (Places, coordinates, durations, categories, hotel
-// location, the user's schedule). Distances are straight-line (Haversine) and
-// travel times are estimated from them — clearly presented as estimates, never
-// invented. Everything here is pure → it recomputes instantly when the plan changes.
+// ===== AI Day Analysis engine — deterministic, real-data-only, transport-aware. =====
 
 export type Grade = "excellent" | "good" | "attention";
 export type Difficulty = "easy" | "moderate" | "high";
 export type Pace = "relaxed" | "balanced" | "busy" | "overloaded";
 
+export type RecAction =
+  | { kind: "optimize" }
+  | { kind: "shorten"; placeId: string; toMin: number }
+  | { kind: "moveDay"; placeId: string }
+  | { kind: "addCafe" }
+  | { kind: "findSimilar" };
+
 export interface Recommendation {
   title: string;
   reason: string;
+  action?: RecAction;
 }
 export interface Warning {
   title: string;
@@ -27,15 +40,18 @@ export interface ThemeCount {
 
 export interface DayAnalysis {
   stops: number;
-  overall: number; // 0–10
-  comfort: number; // 0–10
+  attractions: number;
+  restaurants: number;
+  overall: number;
+  comfort: number;
   efficiency: Grade;
+  mode: TransportMode;
   walkingKm: number;
   walkingMin: number;
-  drivingKm: number;
-  drivingMin: number;
+  transportKm: number;
+  transportMin: number;
   visitMin: number;
-  freeMin: number; // negative ⇒ over budget
+  freeMin: number;
   costMin: number;
   costMax: number;
   family: Grade;
@@ -46,99 +62,56 @@ export interface DayAnalysis {
   warnings: Warning[];
 }
 
-// Tunables (assumptions, surfaced to the user as estimates).
-const DAY_MINUTES = 600; // a ~10h active day (09:00–19:00)
-const WALK_THRESHOLD_KM = 1.2; // legs under this are walked
-const WALK_MIN_PER_KM = 12; // ~5 km/h
-const DRIVE_MIN_PER_KM = 2.2; // ~27 km/h city driving
-const PARTY = 3.4; // 2 adults + 2 kids, kids discounted
-
+const PARTY = 3.4;
 const THEME_BY_CATEGORY: Record<string, string> = {
-  top: "Culture",
-  hidden: "Culture",
-  restaurants: "Food",
-  cafes: "Food",
-  breakfast: "Food",
-  museums: "Culture",
-  parks: "Nature",
-  beaches: "Nature",
-  shopping: "Shopping",
-  family: "Entertainment",
-  kids: "Entertainment",
-  nightlife: "Entertainment",
-  viewpoints: "Nature",
-  historical: "History",
-  architecture: "History",
-  free: "Nature",
-  indoor: "Culture",
-  rainy: "Culture",
-  adventure: "Entertainment",
-  nature: "Nature",
-  local: "Food",
+  top: "Culture", hidden: "Culture", restaurants: "Food", cafes: "Food", breakfast: "Food",
+  museums: "Culture", parks: "Nature", beaches: "Nature", shopping: "Shopping", family: "Entertainment",
+  kids: "Entertainment", nightlife: "Entertainment", viewpoints: "Nature", historical: "History",
+  architecture: "History", free: "Nature", indoor: "Culture", rainy: "Culture", adventure: "Entertainment",
+  nature: "Nature", local: "Food",
 };
+const themeOf = (c: string) => THEME_BY_CATEGORY[c] ?? "Culture";
+const isFood = (c: string) => ["restaurants", "cafes", "breakfast"].includes(c);
 
-function themeOf(categoryKey: string): string {
-  return THEME_BY_CATEGORY[categoryKey] ?? "Culture";
-}
-
-function isFood(categoryKey: string): boolean {
-  return ["restaurants", "cafes", "breakfast"].includes(categoryKey);
-}
-
-const ATTRACTION_TICKET = [0, 8, 15, 25, 40]; // by priceLevel
-const FOOD_PER_PERSON = [10, 14, 26, 45, 75]; // by priceLevel
-
+const ATTRACTION_TICKET = [0, 8, 15, 25, 40];
+const FOOD_PER_PERSON = [10, 14, 26, 45, 75];
 function placeCost(categoryKey: string, priceLevel?: number): number {
-  if (isFood(categoryKey)) {
-    const pp = FOOD_PER_PERSON[priceLevel ?? 2];
-    return Math.round(pp * PARTY);
-  }
+  if (isFood(categoryKey)) return Math.round(FOOD_PER_PERSON[priceLevel ?? 2] * PARTY);
   if (priceLevel === 0) return 0;
-  const ticket = ATTRACTION_TICKET[priceLevel ?? 2];
-  return Math.round(ticket * PARTY);
+  return Math.round(ATTRACTION_TICKET[priceLevel ?? 2] * PARTY);
 }
 
-function ordered(items: ItineraryItem[]): ItineraryItem[] {
-  return [...items].sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || a.position - b.position);
+function pathKm(seq: ItineraryItem[], hotel: LatLng, loop = false): number {
+  if (!seq.length) return 0;
+  let total = haversineKm(hotel, seq[0].place.position);
+  for (let i = 0; i < seq.length - 1; i++) total += haversineKm(seq[i].place.position, seq[i + 1].place.position);
+  if (loop) total += haversineKm(seq[seq.length - 1].place.position, hotel);
+  return total;
 }
 
-export function analyzeDay(items: ItineraryItem[], hotel: LatLng): DayAnalysis {
-  const stops = items.length;
-  const seq = ordered(items);
+export function analyzeDay(items: ItineraryItem[], hotel: LatLng, mode: TransportMode): DayAnalysis {
+  const seq = orderedItems(items);
+  const stops = seq.length;
+  const tl = computeTimeline(seq, hotel, mode);
 
-  // Travel legs: hotel → stops → hotel.
-  const points = [hotel, ...seq.map((it) => it.place.position), hotel];
-  let walkingKm = 0;
-  let drivingKm = 0;
-  let longestDriveMin = 0;
-  for (let i = 0; i < points.length - 1; i++) {
-    const km = haversineKm(points[i], points[i + 1]);
-    if (km <= WALK_THRESHOLD_KM) walkingKm += km;
-    else {
-      drivingKm += km;
-      longestDriveMin = Math.max(longestDriveMin, km * DRIVE_MIN_PER_KM);
-    }
-  }
-  const walkingMin = Math.round(walkingKm * WALK_MIN_PER_KM);
-  const drivingMin = Math.round(drivingKm * DRIVE_MIN_PER_KM);
-  const visitMin = seq.reduce((sum, it) => sum + it.place.estDurationMin, 0);
-  const freeMin = DAY_MINUTES - (visitMin + walkingMin + drivingMin);
+  const restaurants = seq.filter((it) => isFood(it.place.category)).length;
+  const attractions = stops - restaurants;
+  const freeMin = DAY_AVAILABLE_MIN - (tl.visitMin + tl.totalTravelMin);
 
-  // Cost range.
-  const cost = seq.reduce((sum, it) => sum + placeCost(it.place.category, it.place.priceLevel), 0);
-  const transport = Math.round(drivingKm * 1.5) + (stops > 0 ? 6 : 0);
-  const costBase = cost + transport;
+  // cost
+  const placeSum = seq.reduce((s, it) => s + placeCost(it.place.category, it.place.priceLevel), 0);
+  const transportCost = mode === "walk" ? 0 : mode === "transit" ? stops * 9 : Math.round(tl.transportKm * 1.5) + 6;
+  const costBase = placeSum + transportCost;
   const costMin = Math.round((costBase * 0.85) / 5) * 5;
   const costMax = Math.round((costBase * 1.2) / 5) * 5;
 
-  // Variety.
+  // variety
   const themeMap = new Map<string, number>();
   for (const it of seq) themeMap.set(themeOf(it.place.category), (themeMap.get(themeOf(it.place.category)) ?? 0) + 1);
   const themes = Array.from(themeMap, ([theme, count]) => ({ theme, count })).sort((a, b) => b.count - a.count);
   const varietyScore = stops === 0 ? 0 : Math.round(Math.min(1, themeMap.size / 4) * 10);
 
-  // Difficulty / pace.
-  const walkingDifficulty: Difficulty = walkingKm < 3 ? "easy" : walkingKm < 6 ? "moderate" : "high";
+  const walkingDifficulty: Difficulty = tl.walkingKm < 3 ? "easy" : tl.walkingKm < 6 ? "moderate" : "high";
   let pace: Pace;
   if (freeMin < 0) pace = "overloaded";
   else if (stops <= 2) pace = "relaxed";
@@ -146,125 +119,96 @@ export function analyzeDay(items: ItineraryItem[], hotel: LatLng): DayAnalysis {
   else if (stops <= 6) pace = "busy";
   else pace = "overloaded";
 
-  // Efficiency (compactness of inter-stop hops, excluding hotel legs).
+  // efficiency vs optimal
+  const currentKm = pathKm(seq, hotel, true);
+  const optimalKm = pathKm(optimizeOrder(items, hotel), hotel, true);
+  const detour = optimalKm > 0 && currentKm > optimalKm * 1.25 && stops >= 3;
   let interSum = 0;
-  let interCount = 0;
-  for (let i = 0; i < seq.length - 1; i++) {
-    interSum += haversineKm(seq[i].place.position, seq[i + 1].place.position);
-    interCount++;
-  }
-  const avgLeg = interCount ? interSum / interCount : 0;
-  const efficiency: Grade = interCount === 0 ? "good" : avgLeg < 1.5 ? "excellent" : avgLeg < 3.5 ? "good" : "attention";
+  for (let i = 0; i < seq.length - 1; i++) interSum += haversineKm(seq[i].place.position, seq[i + 1].place.position);
+  const avgLeg = stops > 1 ? interSum / (stops - 1) : 0;
+  const efficiency: Grade = stops < 2 ? "good" : detour || avgLeg > 3.5 ? "attention" : avgLeg < 1.6 ? "excellent" : "good";
 
-  // Meal presence.
-  const hasMeal = seq.some((it) => isFood(it.place.category));
-
-  // Comfort (0–10).
-  let comfort = 10 - walkingMin / 22 - drivingMin / 28 - (freeMin < 0 ? 2 : 0) + (hasMeal ? 0.5 : 0);
+  const hasMeal = restaurants > 0;
+  let comfort = 10 - tl.walkingMin / 22 - tl.transportMin / 30 - (freeMin < 0 ? 2 : 0) + (hasMeal ? 0.5 : 0);
   comfort = Math.max(2, Math.min(10, comfort));
 
-  // Family grade.
   const familyShare = stops === 0 ? 0 : seq.filter((it) => it.place.tags.includes("Family Friendly")).length / stops;
-  const family: Grade =
-    walkingDifficulty === "high" || pace === "overloaded" ? "attention" : familyShare >= 0.4 ? "excellent" : "good";
+  const family: Grade = walkingDifficulty === "high" || pace === "overloaded" ? "attention" : familyShare >= 0.4 ? "excellent" : "good";
 
-  // Overall (0–10).
   let overall = 10;
   if (freeMin < 0) overall -= 2.5;
-  if (walkingKm > 8) overall -= 1.5;
-  else if (walkingKm > 5) overall -= 0.7;
-  if (drivingKm > 40) overall -= 1.5;
+  if (mode === "walk" && tl.walkingKm > 8) overall -= 1.5;
+  else if (tl.walkingKm > 5) overall -= 0.7;
+  if (tl.transportMin > 150) overall -= 1.2;
   if (!hasMeal && stops >= 3) overall -= 1;
   if (efficiency === "attention") overall -= 1;
   if (varietyScore < 5 && stops >= 3) overall -= 0.6;
   overall = Math.max(3, Math.min(10, Math.round(overall * 10) / 10));
 
-  // ===== Recommendations (each explains its reason). =====
+  // ===== recommendations (actionable where possible) =====
   const recommendations: Recommendation[] = [];
-  // proximity pair
+  if (detour) {
+    recommendations.push({
+      title: "Reorder for a shorter route",
+      reason: `Your current order covers about ${currentKm.toFixed(1)} km; an optimized order is roughly ${optimalKm.toFixed(1)} km — less backtracking, more time at the sights.`,
+      action: { kind: "optimize" },
+    });
+  }
+  if (freeMin < 0) {
+    const longest = [...seq].sort((a, b) => itemDuration(b) - itemDuration(a))[0];
+    if (longest) {
+      recommendations.push({
+        title: `Shorten your visit at ${longest.place.name}`,
+        reason: `The day runs about ${Math.round((-freeMin / 60) * 10) / 10}h over. Trimming its visit by 30 min helps it fit.`,
+        action: { kind: "shorten", placeId: longest.place.id, toMin: Math.max(30, itemDuration(longest) - 30) },
+      });
+    }
+    const last = seq[seq.length - 1];
+    if (last) {
+      recommendations.push({
+        title: `Move ${last.place.name} to another day`,
+        reason: "Spreading stops across days keeps the pace relaxed, especially with kids.",
+        action: { kind: "moveDay", placeId: last.place.id },
+      });
+    }
+  }
+  if (!hasMeal && stops >= 3) {
+    recommendations.push({ title: "Add a nearby café or lunch", reason: "There's no meal break yet — a stop near your route gives the day a natural pause.", action: { kind: "addCafe" } });
+  }
+  // proximity pair (informational)
   outer: for (let i = 0; i < seq.length; i++)
     for (let j = i + 1; j < seq.length; j++) {
       const km = haversineKm(seq[i].place.position, seq[j].place.position);
       if (km < 0.4) {
-        recommendations.push({
-          title: `Pair ${seq[i].place.name} with ${seq[j].place.name}`,
-          reason: `They're only about a ${Math.max(1, Math.round(km * WALK_MIN_PER_KM))}-minute walk apart, so visiting them back-to-back saves travel.`,
-        });
+        recommendations.push({ title: `${seq[i].place.name} and ${seq[j].place.name} are side by side`, reason: `Only about a ${Math.max(1, Math.round(km * 12))}-minute walk apart — visit them together.` });
         break outer;
       }
     }
-  // closer first stop
-  if (seq.length >= 2) {
-    const firstKm = haversineKm(hotel, seq[0].place.position);
-    let closer = seq[0];
-    let closerKm = firstKm;
-    for (const it of seq) {
-      const km = haversineKm(hotel, it.place.position);
-      if (km < closerKm) { closer = it; closerKm = km; }
-    }
-    if (closer.place.id !== seq[0].place.id && firstKm - closerKm > 1.5) {
-      recommendations.push({
-        title: `Start with ${closer.place.name}`,
-        reason: `It's ${(firstKm - closerKm).toFixed(1)} km closer to your hotel than your current first stop, trimming early travel.`,
-      });
-    }
-  }
-  // sunset opportunity
-  const sunsetCandidate = seq.find((it) => ["viewpoints", "beaches"].includes(it.place.category) && it.slot !== "evening");
-  if (sunsetCandidate) {
-    recommendations.push({
-      title: `See ${sunsetCandidate.place.name} at sunset`,
-      reason: `Viewpoints and beaches are best in the evening light — consider moving it to the evening slot.`,
-    });
-  }
-  // walking heavy
-  if (walkingKm > 6) {
-    recommendations.push({
-      title: "Consider a taxi for the longest leg",
-      reason: `Your day involves about ${walkingKm.toFixed(1)} km of walking — a short ride on the longest stretch keeps energy for the sights.`,
-    });
-  }
-  // hotel far from evening
-  const evening = seq.filter((it) => it.slot === "evening");
-  if (evening.length) {
-    const last = evening[evening.length - 1];
-    const km = haversineKm(hotel, last.place.position);
-    if (km > 8) {
-      recommendations.push({
-        title: "Late return to your hotel",
-        reason: `${last.place.name} is about ${km.toFixed(1)} km from your hotel — plan the trip back or pick a closer evening spot.`,
-      });
-    }
-  }
+  const sunset = seq.find((it) => ["viewpoints", "beaches"].includes(it.place.category) && it.slot !== "evening");
+  if (sunset) recommendations.push({ title: `See ${sunset.place.name} at sunset`, reason: "Viewpoints and beaches shine in the evening light — consider moving it later." });
+  const dupTheme = themes.find((t) => t.count >= 3);
+  if (dupTheme && stops >= 3) recommendations.push({ title: `A lot of ${dupTheme.theme.toLowerCase()} today`, reason: `${dupTheme.count} stops are ${dupTheme.theme.toLowerCase()} — mixing in something different makes the day more memorable.`, action: { kind: "findSimilar" } });
 
-  // ===== Warnings (help, don't block). =====
+  // ===== warnings =====
   const warnings: Warning[] = [];
-  if (freeMin < 0) warnings.push({ title: "Day exceeds available hours", detail: `Visits and travel total about ${Math.round((-freeMin / 60) * 10) / 10}h over a typical day. Drop or move a stop.`, level: "high" });
-  if (walkingKm > 8) warnings.push({ title: "A lot of walking", detail: `~${walkingKm.toFixed(1)} km on foot may tire young kids — add a break or a taxi leg.`, level: "warn" });
-  if (drivingKm > 60) warnings.push({ title: "A lot of driving", detail: `~${Math.round(drivingKm)} km of driving leaves less time at the sights.`, level: "warn" });
-  if (longestDriveMin > 40) warnings.push({ title: "One long transfer", detail: `A single hop is roughly ${Math.round(longestDriveMin)} min — consider reordering to shorten it.`, level: "info" });
-  if (!hasMeal && stops >= 3) warnings.push({ title: "No meal break scheduled", detail: "Add a restaurant or café so the day has a natural pause.", level: "info" });
+  if (freeMin < 0) warnings.push({ title: "Day exceeds available hours", detail: `Visits and travel run about ${Math.round((-freeMin / 60) * 10) / 10}h past a comfortable day.`, level: "high" });
+  if (mode === "walk" && tl.walkingKm > 8) warnings.push({ title: "Too much walking", detail: `~${tl.walkingKm.toFixed(1)} km on foot is a lot with children — switch some legs to transit or a taxi.`, level: "warn" });
+  if (mode === "drive" && tl.transportKm > 60) warnings.push({ title: "Too much driving", detail: `~${Math.round(tl.transportKm)} km of driving leaves less time at the sights.`, level: "warn" });
+  if (tl.totalTravelMin > 180) warnings.push({ title: "Travel time is high", detail: `About ${Math.round(tl.totalTravelMin / 60 * 10) / 10}h is spent getting between stops — reorder or drop one.`, level: "warn" });
+  const longLeg = [...tl.entries.map((e) => e.travelFromPrev), tl.returnLeg].filter(Boolean).find((l) => (l as { min: number }).min > 40);
+  if (longLeg) warnings.push({ title: "One long transfer", detail: `A single hop is about ${Math.round((longLeg as { min: number }).min)} min — reordering may shorten it.`, level: "info" });
+  if (!hasMeal && stops >= 3) warnings.push({ title: "No lunch break scheduled", detail: "Add a restaurant or café so the day has a pause.", level: "info" });
   const closed = seq.find((it) => it.place.openNow === false);
-  if (closed) warnings.push({ title: `${closed.place.name} is currently closed`, detail: "Double-check its opening hours for the day you're visiting.", level: "warn" });
+  if (closed) warnings.push({ title: `${closed.place.name} is currently closed`, detail: "Check its hours for your visit day so you don't arrive after closing.", level: "warn" });
 
   return {
-    stops,
-    overall,
-    comfort: Math.round(comfort * 10) / 10,
-    efficiency,
-    walkingKm: Math.round(walkingKm * 10) / 10,
-    walkingMin,
-    drivingKm: Math.round(drivingKm * 10) / 10,
-    drivingMin,
-    visitMin,
-    freeMin,
-    costMin,
-    costMax,
-    family,
-    walkingDifficulty,
-    pace,
-    variety: { score: varietyScore, themes },
-    recommendations: recommendations.slice(0, 5),
-    warnings,
+    stops, attractions, restaurants, overall, comfort: Math.round(comfort * 10) / 10, efficiency, mode,
+    walkingKm: Math.round(tl.walkingKm * 10) / 10, walkingMin: tl.walkingMin,
+    transportKm: Math.round(tl.transportKm * 10) / 10, transportMin: tl.transportMin,
+    visitMin: tl.visitMin, freeMin, costMin, costMax, family, walkingDifficulty, pace,
+    variety: { score: varietyScore, themes }, recommendations: recommendations.slice(0, 6), warnings,
   };
 }
+
+// Re-export for callers that compute travel time labels.
+export { travelMinutes };
