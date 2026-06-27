@@ -76,7 +76,7 @@ interface AppState {
 }
 
 const INITIAL: AppState = {
-  screen: "auth",
+  screen: "form",
   authMode: "signin",
   theme: "Ocean",
   dest: "Barcelona, Spain",

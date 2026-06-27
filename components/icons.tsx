@@ -44,6 +44,11 @@ import {
   User,
   Train,
   Map,
+  Eye,
+  EyeOff,
+  LogOut,
+  Settings,
+  Trash2 as TrashIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -93,6 +98,11 @@ export {
   User,
   Train,
   Map,
+  Eye,
+  EyeOff,
+  LogOut,
+  Settings,
+  TrashIcon,
 };
 
 export const ACCOM_ICONS: Record<AccomType, LucideIcon> = {

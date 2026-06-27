@@ -50,6 +50,26 @@ cp .env.example .env.local      # then paste your key
 - **Resilient** — without a key (or on any model/network error) each feature silently falls back to the
   built-in heuristic/canned behavior; the UI is never blocked.
 
+## Authentication (Supabase)
+
+Real email/password auth with per-user data isolation.
+
+- **Auth** — Supabase Auth ([`lib/auth/`](lib/auth)): sign up, sign in (by **email or username**),
+  forgot/reset password, session persistence + "remember me", show/hide password, loading/validation/
+  error states. Username login resolves via a `SECURITY DEFINER` RPC.
+- **Premium UI** — [`components/auth/`](components/auth): split-panel login/signup, a 5-question
+  **onboarding** (saved to the profile), an **account panel** (edit profile + preferences, log out,
+  **delete account**), and an **AuthGate** that protects the whole app (loading → auth → onboarding → app).
+- **Schema + RLS** — tables `profiles`, `user_preferences`, `trips`, `destinations`, `accommodations`,
+  `saved_places`, `schedules`, `schedule_items`, `itinerary_exports`. Each has `id`, `user_id` →
+  `auth.users`, `created_at`, `updated_at` (auto-touch trigger). **RLS is on with owner-only policies**
+  (`user_id = auth.uid()` for select/insert/update/delete). A trigger provisions the profile +
+  preferences on signup; `delete_my_account()` cascades a full account wipe.
+- **Note:** the project currently has **email confirmation enabled**, so signup shows a "check your
+  email" step before first login (disable it in Supabase → Auth settings for instant access). The
+  existing planner persistence (`favorites`/`itinerary_items`) is still device-scoped — moving it onto
+  the new per-user `saved_places`/`schedule_items` tables is the natural next step.
+
 ## Explore & Plan (core experience)
 
 The Explore page is the heart of the app: users browse **real Google Places**, compare them, and

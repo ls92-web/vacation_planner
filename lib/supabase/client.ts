@@ -14,6 +14,14 @@ let client: SupabaseClient | null = null;
 /** Singleton browser Supabase client (null when not configured → repo uses localStorage). */
 export function getSupabase(): SupabaseClient | null {
   if (!isSupabaseConfigured()) return null;
-  if (!client) client = createClient(url, anonKey, { auth: { persistSession: false } });
+  if (!client) {
+    client = createClient(url, anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true, // handles password-recovery / confirmation links
+      },
+    });
+  }
   return client;
 }
