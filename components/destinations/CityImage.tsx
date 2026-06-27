@@ -55,7 +55,9 @@ export function CityImage({
           style={{ opacity: loaded ? 1 : 0 }}
         />
       )}
-      {scrim && (
+      {/* Scrim only over a real photo (for legible text). No photo → clean, flat
+          deep-ink background, exactly like before. */}
+      {scrim && src && (
         <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(0,43,54,.12) 0%, rgba(0,43,54,.18) 45%, rgba(0,43,54,.72) 100%)" }} />
       )}
       {children}
