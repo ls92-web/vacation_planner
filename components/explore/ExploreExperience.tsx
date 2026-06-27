@@ -164,7 +164,6 @@ function PlanView({ setView }: { setView: (v: "explore" | "plan") => void }) {
 
   return (
     <div className="max-w-[1320px] mx-auto px-[clamp(16px,3vw,28px)] py-5 pb-24 flex flex-col gap-5">
-      <DayAnalysis analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} onAction={onAction} />
       <div className="flex flex-col lg:flex-row gap-5">
         <div className="flex-1 min-w-0">
           <div className="font-display font-bold text-[24px] tracking-[-.02em] mb-1">Your itinerary</div>
@@ -178,6 +177,7 @@ function PlanView({ setView }: { setView: (v: "explore" | "plan") => void }) {
           <NearbyOpportunities />
         </aside>
       </div>
+      <DayAnalysis analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} onAction={onAction} />
       <DaySummary analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} />
     </div>
   );
