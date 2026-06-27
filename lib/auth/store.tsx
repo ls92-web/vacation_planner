@@ -11,6 +11,7 @@ interface AuthState {
   user: User | null;
   profile: Profile | null;
   preferences: Preferences | null;
+  profileLoaded: boolean; // profile fetch has settled (success, empty, or failure)
   recovery: boolean; // password-recovery link in progress
 }
 
@@ -19,17 +20,30 @@ const ACTIVE_KEY = "wf_active";
 
 function useProvideAuth() {
   const sb = getSupabase();
-  const [state, setState] = useState<AuthState>({ ready: false, session: null, user: null, profile: null, preferences: null, recovery: false });
+  const [state, setState] = useState<AuthState>({ ready: false, session: null, user: null, profile: null, preferences: null, profileLoaded: false, recovery: false });
   const loadedFor = useRef<string | null>(null);
 
   const loadProfile = useCallback(
     async (userId: string) => {
       if (!sb) return;
-      const [{ data: profile }, { data: preferences }] = await Promise.all([
-        sb.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-        sb.from("user_preferences").select("*").eq("user_id", userId).maybeSingle(),
-      ]);
-      setState((s) => ({ ...s, profile: (profile as Profile) ?? null, preferences: (preferences as Preferences) ?? null }));
+      setState((s) => ({ ...s, profileLoaded: false }));
+      try {
+        const work = Promise.all([
+          sb.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+          sb.from("user_preferences").select("*").eq("user_id", userId).maybeSingle(),
+        ]);
+        // Never let a slow/hung request trap the user on the splash screen.
+        const timeout = new Promise<null>((res) => setTimeout(() => res(null), 6000));
+        const result = await Promise.race([work, timeout]);
+        if (result) {
+          const [{ data: profile }, { data: preferences }] = result;
+          setState((s) => ({ ...s, profile: (profile as Profile) ?? null, preferences: (preferences as Preferences) ?? null }));
+        }
+      } catch {
+        /* swallow — falling through is better than dead-ending on the splash */
+      } finally {
+        setState((s) => ({ ...s, profileLoaded: true }));
+      }
     },
     [sb]
   );
@@ -71,6 +85,7 @@ function useProvideAuth() {
         recovery: event === "PASSWORD_RECOVERY" ? true : s.recovery,
         profile: session ? s.profile : null,
         preferences: session ? s.preferences : null,
+        profileLoaded: session ? s.profileLoaded : false,
       }));
       if (session?.user && loadedFor.current !== session.user.id) {
         loadedFor.current = session.user.id;

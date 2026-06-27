@@ -28,7 +28,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (!isSupabaseConfigured()) return <>{children}</>;
   if (!state.ready) return <Splash />;
   if (state.recovery || !state.session) return <AuthScreen />;
-  if (state.session && !state.profile) return <Splash />;
+  // Wait only until the profile fetch settles — never dead-end on the splash.
+  if (state.session && !state.profileLoaded) return <Splash />;
   if (state.profile && !state.profile.onboarded) return <Onboarding />;
   return <>{children}</>;
 }
