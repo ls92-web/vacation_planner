@@ -1,5 +1,6 @@
 export { CATEGORIES, DEFAULT_CATEGORY, categoryByKey, type CategoryDef } from "./categories";
 export { usePlaces, type UsePlacesResult } from "./usePlaces";
+export { useNearby } from "./useNearby";
 export { curatedForCategory } from "./curated";
 export {
   haversineKm,

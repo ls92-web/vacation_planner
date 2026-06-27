@@ -68,9 +68,16 @@ build their own day-by-day schedule, with AI assisting (not replacing) their cho
   *suggested* slot), compare, view on Google Maps.
 - **Schedule builder** ([`ScheduleBuilder`](components/explore/ScheduleBuilder.tsx)): day selector +
   time-of-day columns, drag-and-drop reorder across slots, distance-from-previous, "Open day route".
-- **AI assistant** ([`AssistantInsights`](components/explore/AssistantInsights.tsx)): deterministic
-  insights from real data (proximity, far-apart, overload, total time) + an "Optimize this day"
-  action that streams suggestions from OpenRouter.
+- **AI Day Analysis** ([`dayAnalysis.ts`](lib/planner/dayAnalysis.ts) + [`DayAnalysis`](components/explore/DayAnalysis.tsx)):
+  a signature, real-time dashboard at the top of each planned day. A pure engine scores the day from
+  real data only (overall, comfort, travel efficiency, walking/driving distance + time, visit time,
+  free time, estimated cost range, family-friendliness, walking difficulty, pace, attraction variety),
+  plus explained recommendations and smart warnings (no meal break, closed venue, over-budget day, long
+  transfer…). It recomputes instantly via `useMemo` on any plan change — no button. Weather/crowd/etc.
+  are wired as future seams.
+- **Nearby Opportunities** ([`NearbyOpportunities`](components/explore/NearbyOpportunities.tsx)): real
+  Places near the day's stops (coffee, dessert, photo spots, markets, playgrounds, hidden gems) the user
+  can add — never auto-inserted.
 - **Synced map**: hovering/selecting a card highlights its marker; the day map shows the itinerary.
 - **Persistence = Supabase** ([`lib/itinerary/repository.ts`](lib/itinerary/repository.ts)): favorites
   and itinerary are saved to Postgres (tables `favorites`, `itinerary_items`) and reload on return.

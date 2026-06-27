@@ -13,9 +13,11 @@ import { FilterBar } from "./FilterBar";
 import { PlaceCard } from "./PlaceCard";
 import { ExploreMap } from "./ExploreMap";
 import { ScheduleBuilder } from "./ScheduleBuilder";
-import { AssistantInsights } from "./AssistantInsights";
+import { DayAnalysis } from "./DayAnalysis";
+import { NearbyOpportunities } from "./NearbyOpportunities";
 import { CompareTray } from "./CompareTray";
 import { useDebounced } from "./useDebounced";
+import { analyzeDay } from "@/lib/planner/dayAnalysis";
 
 function applyFilters(places: ExplorePlace[], f: ExploreFilters, center: { lat: number; lng: number }): ExplorePlace[] {
   return places.filter((p) => {
@@ -133,19 +135,20 @@ function ExploreInner() {
           </div>
         </div>
       ) : (
-        <div className="max-w-[1320px] mx-auto px-[clamp(16px,3vw,28px)] py-5 pb-24">
+        <div className="max-w-[1320px] mx-auto px-[clamp(16px,3vw,28px)] py-5 pb-24 flex flex-col gap-5">
+          <DayAnalysisPanel />
           <div className="flex flex-col lg:flex-row gap-5">
             <div className="flex-1 min-w-0">
               <div className="font-display font-bold text-[24px] tracking-[-.02em] mb-1">Your schedule</div>
-              <p className="text-muted text-[13.5px] mb-4">Build each day across morning, afternoon and evening. Drag to reorder; the assistant keeps it balanced.</p>
+              <p className="text-muted text-[13.5px] mb-4">Build each day across morning, afternoon and evening. Drag to reorder — your day analysis updates live.</p>
               <ScheduleBuilder />
             </div>
-            <div className="lg:w-[360px] shrink-0 flex flex-col gap-4">
+            <aside className="lg:w-[360px] shrink-0 flex flex-col gap-4">
               <div className="relative rounded-[18px] overflow-hidden border border-line h-[260px]">
                 <PlanDayMap />
               </div>
-              <PlanDayInsights />
-            </div>
+              <NearbyOpportunities />
+            </aside>
           </div>
         </div>
       )}
@@ -156,10 +159,11 @@ function ExploreInner() {
   );
 }
 
-function PlanDayInsights() {
+function DayAnalysisPanel() {
   const { state } = usePlanner();
-  const dayItems = state.itinerary.filter((it) => it.day === state.day);
-  return <AssistantInsights dayItems={dayItems} />;
+  const dayItems = useMemo(() => state.itinerary.filter((it) => it.day === state.day), [state.itinerary, state.day]);
+  const analysis = useMemo(() => analyzeDay(dayItems, state.center), [dayItems, state.center]);
+  return <DayAnalysis analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} />;
 }
 
 function SearchBox() {
