@@ -3,7 +3,7 @@
 import { TripProvider, useTrip } from "@/lib/store";
 import { AuthScreen } from "./screens/Auth";
 import { RouteBuilder } from "./screens/RouteBuilder";
-import { Explore } from "./screens/Explore";
+import { ExploreExperience } from "./explore/ExploreExperience";
 import { GeneratingScreen } from "./screens/Generating";
 import { Itinerary } from "./screens/Itinerary";
 import { Toast } from "./Toast";
@@ -19,7 +19,7 @@ function Screens() {
     >
       {state.screen === "auth" && <AuthScreen />}
       {state.screen === "form" && <RouteBuilder />}
-      {state.screen === "explore" && <Explore />}
+      {state.screen === "explore" && <ExploreExperience />}
       {state.screen === "generating" && <GeneratingScreen />}
       {state.screen === "plan" && <Itinerary />}
       <Toast />

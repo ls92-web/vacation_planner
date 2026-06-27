@@ -14,10 +14,11 @@ Flow: **Sign in → Route builder → Explore & build → (Create My Schedule) �
 
 ## Scope
 
-All five screens are recreated pixel-faithfully with the prototype's mock data. **AI is powered by
-OpenRouter** (see below); every AI feature falls back to the built-in simulated behavior when no key
-is configured, so the app always works. Supabase (auth + persistence) is the remaining PRD piece —
-the mock data in [`lib/data.ts`](lib/data.ts) is the seam for those queries.
+The screens are recreated pixel-faithfully; the **Explore & Plan** page (see below) is now backed by
+**real Google Places** with **Supabase persistence**. **AI is powered by OpenRouter** (see below);
+every AI feature falls back to the built-in simulated behavior when no key is configured, so the app
+always works. The remaining PRD piece is **real auth** (the auth screen is still mock; Supabase rows
+are device-scoped for now).
 
 ## AI provider (OpenRouter)
 
@@ -48,6 +49,37 @@ cp .env.example .env.local      # then paste your key
   - Planning **insights** (AI Planner panel) → `/api/ai/insights`.
 - **Resilient** — without a key (or on any model/network error) each feature silently falls back to the
   built-in heuristic/canned behavior; the UI is never blocked.
+
+## Explore & Plan (core experience)
+
+The Explore page is the heart of the app: users browse **real Google Places**, compare them, and
+build their own day-by-day schedule, with AI assisting (not replacing) their choices.
+
+- **Source of truth = Google Places** ([`lib/places/`](lib/places)). Places are fetched per
+  destination + category via Places (New) `searchNearby` / `searchByText`, normalized
+  ([`transform.ts`](lib/places/transform.ts)), TTL-cached + de-duplicated, with a **curated fallback**
+  ([`curated.ts`](lib/places/curated.ts)) so the grid is never empty. The AI never invents places — it
+  only analyzes/orders them.
+- **21 categories** + a full filter set (rating, price, cost, indoor/outdoor, visit length, distance,
+  open-now, family, wheelchair) — [`categories.ts`](lib/places/categories.ts), `FilterBar`.
+- **Rich place cards** ([`PlaceCard`](components/explore/PlaceCard.tsx)): real photo, rating + review
+  count, price, open status, estimated visit + recommended time, distance from hotel (Haversine),
+  address, description, tags. Actions: favorite, add-to-plan (day + morning/afternoon/evening with a
+  *suggested* slot), compare, view on Google Maps.
+- **Schedule builder** ([`ScheduleBuilder`](components/explore/ScheduleBuilder.tsx)): day selector +
+  time-of-day columns, drag-and-drop reorder across slots, distance-from-previous, "Open day route".
+- **AI assistant** ([`AssistantInsights`](components/explore/AssistantInsights.tsx)): deterministic
+  insights from real data (proximity, far-apart, overload, total time) + an "Optimize this day"
+  action that streams suggestions from OpenRouter.
+- **Synced map**: hovering/selecting a card highlights its marker; the day map shows the itinerary.
+- **Persistence = Supabase** ([`lib/itinerary/repository.ts`](lib/itinerary/repository.ts)): favorites
+  and itinerary are saved to Postgres (tables `favorites`, `itinerary_items`) and reload on return.
+  Falls back to `localStorage` when Supabase isn't configured or a call fails. Rows are scoped by a
+  per-browser `device_id` (no auth yet) — RLS is enabled with permissive anon policies (**prototype
+  grade**; swap to `auth.uid()` policies when real auth lands).
+- **Future-ready seams** (no refactor needed): AI day-plan generation, weather-aware scheduling, crowd
+  prediction, live hours, transit/walking optimization, shared trips, budgets, offline — all hang off
+  the `lib/places` + `lib/planner` + repository layers.
 
 ## Google Maps Platform
 
@@ -116,7 +148,12 @@ lib/
   ai-client.ts      # browser helpers that call the /api/ai routes (with fallback)
   ai/               # shared AI service (OpenRouter): client, provider, prompts, service
   maps/             # Google Maps service: config, hooks, cache, routes, coords, categories
+  places/           # Google Places source-of-truth: categories, transform, curated, usePlaces
+  planner/          # Explore/Plan state (context) + persistence wiring
+  itinerary/        # favorites + itinerary repository (Supabase / localStorage)
+  supabase/         # browser Supabase client
 components/maps/     # GoogleMap, markers, InfoCard, RoutePlanner, PlacesExplorer, MapSearch, …
+components/explore/  # ExploreExperience, PlaceCard, FilterBar, CategoryRail, ScheduleBuilder, …
 ```
 
 ## Develop
