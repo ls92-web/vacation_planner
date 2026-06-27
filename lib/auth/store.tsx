@@ -143,8 +143,34 @@ function useProvideAuth() {
             },
           },
         });
-        if (error) return { ok: false, error: error.message };
-        return { ok: true, needsConfirmation: !data.session };
+        // New accounts are auto-confirmed (DB trigger), so we sign the user in
+        // immediately instead of asking them to confirm an email.
+        const persist = () => {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(REMEMBER_KEY, "1");
+            window.sessionStorage.setItem(ACTIVE_KEY, "1");
+          }
+        };
+
+        if (error) {
+          // The account may still have been created (e.g. a confirmation email
+          // failed to send). Try signing in before surfacing the error.
+          persist();
+          const { error: siErr } = await sb.auth.signInWithPassword({ email: input.email, password: input.password });
+          if (!siErr) return { ok: true, needsConfirmation: false };
+          return { ok: false, error: error.message };
+        }
+
+        if (data.session) {
+          persist();
+          return { ok: true, needsConfirmation: false };
+        }
+
+        // No session returned — sign in now (email is already confirmed).
+        persist();
+        const { error: siErr } = await sb.auth.signInWithPassword({ email: input.email, password: input.password });
+        if (siErr) return { ok: true, needsConfirmation: true }; // fall back to the confirm-email message
+        return { ok: true, needsConfirmation: false };
       },
 
       async signIn(identifier: string, password: string, remember: boolean): Promise<AuthResult> {
