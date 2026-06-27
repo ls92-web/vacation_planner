@@ -14,6 +14,7 @@ import { getRepository } from "@/lib/itinerary/repository";
 import { optimizeOrder, resequence, type TransportMode } from "./travel";
 
 interface PlannerState {
+  tripId: string;
   destination: string;
   center: LatLng;
   categoryKey: string;
@@ -34,10 +35,16 @@ interface PlannerState {
 
 const NUM_DAYS = 3;
 
-function makeInitial(destination: string): PlannerState {
-  const center = destinationCoords(destination.split(",")[0]) ?? mapsConfig.defaultCenter;
+interface TripRef {
+  id: string;
+  destination: string;
+}
+
+function makeInitial(trip: TripRef): PlannerState {
+  const center = destinationCoords(trip.destination.split(",")[0]) ?? mapsConfig.defaultCenter;
   return {
-    destination,
+    tripId: trip.id,
+    destination: trip.destination,
     center,
     categoryKey: DEFAULT_CATEGORY,
     search: "",
@@ -56,8 +63,8 @@ function makeInitial(destination: string): PlannerState {
   };
 }
 
-function useProvidePlanner(destination: string) {
-  const [state, setState] = useState<PlannerState>(() => makeInitial(destination));
+function useProvidePlanner(trip: TripRef) {
+  const [state, setState] = useState<PlannerState>(() => makeInitial(trip));
   const stateRef = useRef(state);
   stateRef.current = state;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,18 +79,18 @@ function useProvidePlanner(destination: string) {
   // Load persisted favorites + itinerary for the destination.
   useEffect(() => {
     let cancelled = false;
-    Promise.all([repo.listFavorites(destination), repo.listItinerary(destination)]).then(([favorites, itinerary]) => {
+    Promise.all([repo.listFavorites(trip.id), repo.listItinerary(trip.id)]).then(([favorites, itinerary]) => {
       if (!cancelled) setState((s) => ({ ...s, favorites, itinerary, loaded: true }));
     });
     return () => {
       cancelled = true;
     };
-  }, [destination, repo]);
+  }, [trip.id, repo]);
 
   const persistItinerary = useCallback(
     (items: ItineraryItem[]) => {
       setState((s) => ({ ...s, itinerary: items }));
-      repo.saveItinerary(stateRef.current.destination, items);
+      repo.saveItinerary(stateRef.current.tripId, stateRef.current.destination, items);
     },
     [repo]
   );
@@ -95,6 +102,7 @@ function useProvidePlanner(destination: string) {
       setFilter: (patch: Partial<ExploreFilters>) => setState((s) => ({ ...s, filters: { ...s.filters, ...patch } })),
       resetFilters: () => setState((s) => ({ ...s, filters: { ...DEFAULT_FILTERS } })),
       setUnits: (u: "km" | "mi") => setState((s) => ({ ...s, units: u })),
+      setCenter: (center: LatLng) => setState((s) => ({ ...s, center })),
       setTransportMode: (m: TransportMode) => setState((s) => ({ ...s, transportMode: m })),
       setDay: (d: number) => setState((s) => ({ ...s, day: d })),
       setHovered: (id: string | null) => setState((s) => (s.hoveredId === id ? s : { ...s, hoveredId: id })),
@@ -106,7 +114,7 @@ function useProvidePlanner(destination: string) {
           ...s,
           favorites: on ? [...s.favorites, place] : s.favorites.filter((p) => p.id !== place.id),
         }));
-        repo.setFavorite(stateRef.current.destination, place, on);
+        repo.setFavorite(stateRef.current.tripId, stateRef.current.destination, place, on);
       },
 
       toggleCompare: (id: string) =>
@@ -173,8 +181,8 @@ export type PlannerStore = ReturnType<typeof useProvidePlanner>;
 
 const PlannerContext = createContext<PlannerStore | null>(null);
 
-export function PlannerProvider({ destination, children }: { destination: string; children: ReactNode }) {
-  const store = useProvidePlanner(destination);
+export function PlannerProvider({ trip, children }: { trip: TripRef; children: ReactNode }) {
+  const store = useProvidePlanner(trip);
   return <PlannerContext.Provider value={store}>{children}</PlannerContext.Provider>;
 }
 

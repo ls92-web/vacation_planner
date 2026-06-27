@@ -76,7 +76,7 @@ interface AppState {
 }
 
 const INITIAL: AppState = {
-  screen: "form",
+  screen: "trips",
   authMode: "signin",
   theme: "Ocean",
   dest: "Barcelona, Spain",
@@ -248,6 +248,11 @@ export function useTripStore() {
       // auth
       toggleAuth: () => set((s) => ({ authMode: s.authMode === "signin" ? "signup" : "signin" })),
       goForm: () => set({ screen: "form" }),
+      goTrips: () => {
+        set({ screen: "trips" });
+        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+      },
+      setDestination: (dest: string) => set({ dest }),
       // navigation between explore subviews / pages
       goExplore: () => {
         set({ screen: "explore" });

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Heart, Search } from "lucide-react";
 import { useTrip } from "@/lib/store";
+import { useTrips } from "@/lib/trips/store";
 import { PlannerProvider, usePlanner } from "@/lib/planner/store";
 import { haversineKm, usePlaces, type ExploreFilters, type ExplorePlace } from "@/lib/places";
 import { GoogleMap, MapsApiProvider, PlaceMarkers } from "@/components/maps";
-import type { MapMarker } from "@/lib/maps";
+import { destinationCoords, useGeocode, type MapMarker } from "@/lib/maps";
 import { Brand } from "@/components/AppNav";
 import { CategoryRail } from "./CategoryRail";
 import { FilterBar } from "./FilterBar";
@@ -82,9 +83,21 @@ function PlanDayMap() {
 }
 
 function ExploreInner() {
-  const { state } = usePlanner();
+  const { state, actions } = usePlanner();
   const [view, setView] = useState<"explore" | "plan">("explore");
   const debouncedSearch = useDebounced(state.search, 350);
+  const geocode = useGeocode();
+
+  // For destinations we don't have seed coords for, geocode to center the map/search.
+  useEffect(() => {
+    if (destinationCoords(state.destination.split(",")[0])) return;
+    let cancelled = false;
+    geocode(state.destination).then((loc) => {
+      if (!cancelled && loc) actions.setCenter(loc);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.destination]);
   const { places, loading, source } = usePlaces({ center: state.center, categoryKey: state.categoryKey, search: debouncedSearch });
   const filtered = useMemo(() => applyFilters(places, state.filters, state.center), [places, state.filters, state.center]);
   const pool = useMemo(() => [...places, ...state.favorites, ...state.itinerary.map((i) => i.place)], [places, state.favorites, state.itinerary]);
@@ -254,9 +267,20 @@ function Toast() {
 }
 
 export function ExploreExperience() {
-  const { state } = useTrip();
+  const { activeTrip } = useTrips();
+  const { actions } = useTrip();
+  if (!activeTrip) {
+    return (
+      <div className="min-h-screen grid place-items-center px-4 text-center">
+        <div>
+          <div className="font-display font-bold text-[20px]">No trip selected</div>
+          <button onClick={actions.goTrips} className="mt-3 px-4 py-2.5 rounded-xl bg-accent text-white text-[14px] font-bold cursor-pointer">Choose a trip</button>
+        </div>
+      </div>
+    );
+  }
   return (
-    <PlannerProvider destination={state.dest}>
+    <PlannerProvider key={activeTrip.id} trip={{ id: activeTrip.id, destination: activeTrip.destination }}>
       <MapsApiProvider>
         <ExploreInner />
       </MapsApiProvider>

@@ -65,11 +65,14 @@ Real email/password auth with per-user data isolation.
   `auth.users`, `created_at`, `updated_at` (auto-touch trigger). **RLS is on with owner-only policies**
   (`user_id = auth.uid()` for select/insert/update/delete). A trigger provisions the profile +
   preferences on signup; `delete_my_account()` cascades a full account wipe.
-- **Per-user schedules** — once signed in, saved places and the built schedule persist to the per-user
-  `saved_places` / `schedule_items` tables (owner-only RLS) via
-  [`lib/itinerary/repository.ts`](lib/itinerary/repository.ts). They're **private to the account** and
-  reload automatically on any device when the user signs back in. With no auth configured it falls back
-  to localStorage.
+- **Multiple named trips** — a **Trips dashboard** ([`components/trips`](components/trips) +
+  [`lib/trips/store.tsx`](lib/trips/store.tsx)) lets each user create / open / rename / delete trips
+  (rows in `trips`, owner-only RLS). Each trip keeps its **own** saved places and schedule, scoped by
+  `trip_id`, so users can revisit any previously built schedule. Switching trips loads that trip's data;
+  unknown destinations are geocoded to center the map.
+- **Per-user, private persistence** — saved places + schedule persist to `saved_places` /
+  `schedule_items` (owner-only RLS) via [`lib/itinerary/repository.ts`](lib/itinerary/repository.ts),
+  **private to the account** and reloaded on any device at sign-in. Falls back to localStorage with no auth.
 - **Note:** the project currently has **email confirmation enabled**, so signup shows a "check your
   email" step before first login (disable it in Supabase → Auth settings for instant access).
 
