@@ -3,9 +3,9 @@
 import { useTrip } from "@/lib/store";
 import { PIN_COLORS, THUMBS } from "@/lib/data";
 import type { PlanTab, Stop } from "@/lib/types";
-import { destinationCoords, mapsConfig, stopCoords } from "@/lib/maps";
+import { dayDirectionsLink, destinationCoords, mapsConfig, placeLink, stopCoords } from "@/lib/maps";
 import type { LatLng, MapMarker } from "@/lib/maps";
-import { GoogleMap, MapsApiProvider, MapInfoCard, PlaceMarkers, RoutePlanner } from "../maps";
+import { GoogleMap, MapsApiProvider, MapInfoCard, OpenInMapsButton, PlaceMarkers } from "../maps";
 import { AppNav, Brand } from "../AppNav";
 import { DAY_ICONS, TRAVEL_ICONS } from "../icons";
 import {
@@ -40,6 +40,8 @@ function Schedule() {
   const planSummary = `3 days · ${totalStops} stops · tuned for kids 6 & 9 · ${state.pace} pace`;
   const DayIcon = DAY_ICONS[day.emoji] || Footprints;
   const stopChip = "inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink bg-[#f7f3ec] border border-line px-2.5 py-[5px] rounded-lg";
+  const dayStopCoords = day.stops.map((s) => stopCoords(s.title)).filter((c): c is LatLng => c !== null);
+  const dayDirLink = dayDirectionsLink(dayStopCoords);
 
   return (
     <div className="flex-1 max-w-[1080px] w-full mx-auto pb-[70px] vp-fade" style={{ padding: "clamp(20px,3vw,36px) clamp(16px,3vw,24px) 70px" }}>
@@ -75,10 +77,12 @@ function Schedule() {
       {/* Day theme banner */}
       <div className="mt-[22px] flex items-center gap-3 px-[18px] py-3.5 rounded-[14px] bg-tint border" style={{ borderColor: "color-mix(in oklab, var(--accent) 18%, transparent)" }}>
         <span className="text-accent flex"><DayIcon size={22} strokeWidth={2} /></span>
-        <div>
+        <div className="min-w-0">
           <div className="font-bold text-[14.5px]">{day.title}</div>
           <div className="text-[12.5px] text-muted">{day.note}</div>
         </div>
+        <div className="flex-1" />
+        {dayDirLink && <OpenInMapsButton href={dayDirLink} label="Open day route" size="sm" className="shrink-0" />}
       </div>
 
       {/* Timeline */}
@@ -86,6 +90,8 @@ function Schedule() {
         {day.stops.map((s, i) => {
           const last = i === day.stops.length - 1;
           const TravelIcon = TRAVEL_ICONS[s.mode] || Footprints;
+          const sc = stopCoords(s.title);
+          const stopLink = placeLink({ name: s.title, position: sc });
           return (
             <div key={i} className="flex gap-4 vp-fade-fast">
               {/* rail */}
@@ -108,6 +114,9 @@ function Schedule() {
                       <span className={stopChip}><Clock size={13} strokeWidth={2} className="text-accent" />{s.duration}</span>
                       <span className={stopChip}><Calendar size={13} strokeWidth={2} className="text-accent" />{s.hours}</span>
                       <span className={stopChip}><User size={13} strokeWidth={2} className="text-accent" />{s.age}</span>
+                    </div>
+                    <div className="mt-3">
+                      <OpenInMapsButton href={stopLink} label="Open in Google Maps" size="sm" />
                     </div>
                   </div>
                   <div className="flex-[0_0_132px] flex items-end p-[11px] relative" style={{ background: THUMBS[i % THUMBS.length] }}>
@@ -206,6 +215,7 @@ function PlanMap() {
   const center = waypoints[0] ?? destinationCoords(state.dest.split(",")[0]) ?? mapsConfig.defaultCenter;
   const selectedId = state.pin != null ? `stop-${state.pin}` : null;
   const selectedMarker = markers.find((m) => m.id === selectedId) ?? null;
+  const dayDirLink = dayDirectionsLink(waypoints);
 
   return (
     <div className="flex-1 flex flex-wrap vp-fade">
@@ -220,9 +230,13 @@ function PlanMap() {
           >
             <PlaceMarkers markers={markers} selectedId={selectedId} onSelect={(id) => actions.pickPin(Number((id ?? "").replace("stop-", "")))} />
             {selectedMarker && <MapInfoCard marker={selectedMarker} onClose={() => state.pin != null && actions.pickPin(state.pin)} />}
-            {waypoints.length > 1 && <RoutePlanner waypoints={waypoints} units={state.units} />}
           </GoogleMap>
         </MapsApiProvider>
+        {dayDirLink && (
+          <div className="absolute top-3 right-3 z-10">
+            <OpenInMapsButton href={dayDirLink} label="Directions for this day" size="sm" className="shadow-sm" />
+          </div>
+        )}
       </div>
       {/* side list */}
       <div className="vp-scroll flex-[1_1_320px] overflow-y-auto border-l border-line bg-white p-[18px]" style={{ maxHeight: "calc(100vh - 62px)" }}>

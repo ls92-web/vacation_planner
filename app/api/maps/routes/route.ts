@@ -1,4 +1,4 @@
-import { isMapsConfigured, mapsConfig } from "@/lib/maps/config";
+import { isRoutesProxyConfigured, mapsConfig } from "@/lib/maps/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,8 +13,8 @@ const waypoint = (p: Pt) => ({ location: { latLng: { latitude: p.lat, longitude:
 // Server proxy for the Google Routes API — keeps quota controllable and lets us
 // cache/dedupe on the client. Uses the same Maps key (available server-side).
 export async function POST(req: Request) {
-  if (!isMapsConfigured()) {
-    return Response.json({ error: "Maps is not configured" }, { status: 503 });
+  if (!isRoutesProxyConfigured()) {
+    return Response.json({ error: "Routes proxy is not configured" }, { status: 503 });
   }
 
   let body: { origin?: Pt; destination?: Pt; intermediates?: Pt[]; travelMode?: string };
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Goog-Api-Key": mapsConfig.apiKey,
+        "X-Goog-Api-Key": mapsConfig.serverApiKey,
         "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
       },
       body: JSON.stringify({

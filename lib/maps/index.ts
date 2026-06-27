@@ -2,6 +2,8 @@
 export { mapsConfig, isMapsConfigured, MAPS_LIBRARIES } from "./config";
 export { PLACE_CATEGORIES, CATEGORY_TYPES, MARKER_STYLES, kindForType } from "./categories";
 export { cached, clearMapCache, TTL } from "./cache";
+export { placeLink, queryLink, directionsLink, dayDirectionsLink } from "./links";
+// Dormant premium seam — in-app route calculation (not used by the app today).
 export { fetchRoute, formatDistance, formatDuration } from "./routes-client";
 export { usePlacesSearch, useGeocode, useAutocomplete, type AutocompleteSuggestion } from "./hooks";
 export {

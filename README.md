@@ -61,28 +61,33 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=        # enable Maps JS, Places (New), Routes, 
 NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=DEMO_MAP_ID
 ```
 
+**Directions are external, not computed in-app.** The app uses Maps for *display* and Places for *discovery*;
+it does not call the Directions/Routes APIs at runtime. Instead it builds **"Open in Google Maps"** links so
+users get turn-by-turn directions in Google Maps itself (a single place, or a full day as
+origin → waypoints → destination). In-app route calculation stays in the codebase as a **dormant premium
+seam** ([`routes-client`](lib/maps/routes-client.ts), [`/api/maps/routes`](app/api/maps/routes),
+`<RoutePlanner>`/`<DirectionsOverlay>`) — wired off, ready to enable later.
+
 - **Service layer** — [`lib/maps/`](lib/maps): `config` (env, `isMapsConfigured()`), `cache` (TTL +
-  in-flight de-dup), `categories` (Places types + marker styles), `routes-client` + the
-  [`/api/maps/routes`](app/api/maps/routes) **Routes API** proxy, `coords` (seed lat/lng), and `hooks`
-  (`usePlacesSearch`, `useGeocode`, `useAutocomplete` — debounced 300ms).
+  in-flight de-dup), `categories` (Places types + marker styles), `links` (Google Maps URL builders),
+  `coords` (seed lat/lng), and `hooks` (`usePlacesSearch`, `useGeocode`, `useAutocomplete` — debounced 300ms).
 - **Reusable components** — [`components/maps/`](components/maps): `<MapsApiProvider>` (lazy-loads the
   script per map screen), `<GoogleMap>` (smooth re-center, zoom controls, skeleton, error + fallback),
   `<DestinationMarkers>` / `<HotelMarkers>` / `<PlaceMarkers>` (Advanced Markers, per-kind styling),
-  `<MapInfoCard>`, `<RoutePlanner>` + `<DirectionsOverlay>` (polyline + distance/time),
-  `<PlacesExplorer>`, `<MapSearch>`.
+  `<MapInfoCard>`, `<PlacesExplorer>`, `<MapSearch>`, `<OpenInMapsButton>`.
 - **Where it's wired**:
-  - **Itinerary → Map**: real map of the day's stops with markers, info cards, and the route polyline.
-  - **Explore → Map**: destination + selected-place + geocoded hotel markers, info cards with add-to-trip,
-    plus a **Places** panel to browse & add nearby spots.
-  - **Route builder**: address **autocomplete** for accommodations and **live driving distance/time**
-    between destinations.
-  - **AI**: the assistant context now includes place coordinates + map-added places, so it can reason
-    about proximity, nearby recommendations, and efficient routes.
-- **Performance**: script lazy-loads only on map screens; Places/Routes/Geocoding results are cached and
-  de-duplicated; autocomplete is debounced; failures degrade gracefully.
-- **Future-ready**: the `ChatProvider`-style separation and `MAPS_LIBRARIES`/category maps make it easy to
-  add traffic, transit/walking/cycling routes (Routes API `travelMode`), weather/crowd overlays, or
-  AI-generated sightseeing routes without touching screen code.
+  - **Itinerary → Map / Schedule**: display-only markers + info cards; an **"Open in Google Maps"** link per
+    stop and a multi-stop **"Directions for this day"** link (origin → waypoints → destination).
+  - **Explore → Map**: destination + selected-place + geocoded hotel markers, info cards, plus a **Places**
+    panel to browse & add nearby spots. Each place card has an **"Open in Google Maps"** link.
+  - **Route builder**: address **autocomplete** for accommodations + an **"Open in Google Maps"** link per stay.
+  - **AI**: the assistant context includes place coordinates + map-added places, so it can reason about
+    proximity, nearby recommendations, and efficient ordering.
+- **Performance**: script lazy-loads only on map screens; Places/Geocoding results are cached and
+  de-duplicated; autocomplete is debounced; failures degrade gracefully to the stylized fallback map.
+- **Future-ready**: enable the dormant routing seam for in-app polylines/ETAs, or add traffic,
+  transit/walking/cycling routes, weather/crowd overlays, or AI-generated sightseeing routes — the
+  `<GoogleMap>` context + category/library maps mean screens don't change.
 
 ## Project structure
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTrip } from "@/lib/store";
 import {
   ACCOM_TYPES,
@@ -11,15 +10,8 @@ import {
   recommend,
 } from "@/lib/data";
 import type { Accommodation, Destination } from "@/lib/types";
-import {
-  destinationCoords,
-  fetchRoute,
-  formatDistance,
-  formatDuration,
-  isMapsConfigured,
-} from "@/lib/maps";
-import type { LatLng, RouteResult } from "@/lib/maps";
-import { MapSearch, MapsApiProvider } from "../maps";
+import { isMapsConfigured, queryLink } from "@/lib/maps";
+import { MapSearch, MapsApiProvider, OpenInMapsButton } from "../maps";
 import {
   ACCOM_ICONS,
   MODE_ICONS,
@@ -172,11 +164,14 @@ function AccommodationCard({ dest, accom }: { dest: Destination; accom: Accommod
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1.5 mt-[5px] pl-0.5">
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: accom.address ? "var(--accent)" : "var(--line)" }} />
-          <span className="text-[11px] text-muted font-mono">
-            geocoding · {accom.address ? "pinned · debounced 300ms" : "type to locate on map"}
-          </span>
+        <div className="flex items-center justify-between gap-2 mt-[5px] pl-0.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: accom.address ? "var(--accent)" : "var(--line)" }} />
+            <span className="text-[11px] text-muted font-mono truncate">
+              geocoding · {accom.address ? "pinned · debounced 300ms" : "type to locate on map"}
+            </span>
+          </div>
+          {accom.address && <OpenInMapsButton href={queryLink(accom.address)} label="Open in Google Maps" size="sm" className="shrink-0" />}
         </div>
       </div>
 
@@ -196,26 +191,6 @@ function AccommodationCard({ dest, accom }: { dest: Destination; accom: Accommod
   );
 }
 
-/** Live driving distance/time between two destinations (Routes API), when both geocode. */
-function useLiveDrive(from: LatLng | null, to: LatLng | null, enabled: boolean): RouteResult | null {
-  const [route, setRoute] = useState<RouteResult | null>(null);
-  useEffect(() => {
-    if (!enabled || !from || !to) {
-      setRoute(null);
-      return;
-    }
-    let cancelled = false;
-    fetchRoute(from, to, { travelMode: "DRIVE" }).then((r) => {
-      if (!cancelled) setRoute(r);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, from?.lat, from?.lng, to?.lat, to?.lng]);
-  return route;
-}
-
 function TransportConnector({ from, to, dragKey }: { from: Destination; to: Destination; dragKey: string }) {
   const { state, actions } = useTrip();
   const rec = recommend(from, to);
@@ -224,13 +199,11 @@ function TransportConnector({ from, to, dragKey }: { from: Destination; to: Dest
   const scenicOn = (chosen === "Drive" || chosen === "Ferry") && tpl.scenic;
   const ModeIcon = MODE_ICONS[chosen];
 
-  // When configured and driving, replace the mock duration/distance with a live Routes result.
-  const fromC = destinationCoords(from.name);
-  const toC = destinationCoords(to.name);
-  const live = useLiveDrive(fromC, toC, isMapsConfigured() && chosen === "Drive" && !!fromC && !!toC);
-  const durationLabel = live ? formatDuration(live.durationSeconds) : tpl.duration;
-  const distanceLabel = live ? formatDistance(live.distanceMeters) : tpl.distance;
-  const summaryLabel = `${durationLabel} · ${tpl.cost}${live ? " · live" : ""}`;
+  // AI-suggested estimates (no live Directions/Routes API call). Users get turn-by-turn
+  // via the "Open in Google Maps" links on places and day itineraries.
+  const durationLabel = tpl.duration;
+  const distanceLabel = tpl.distance;
+  const summaryLabel = `${durationLabel} · ${tpl.cost}`;
 
   return (
     <div className="flex gap-4" key={dragKey}>

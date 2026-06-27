@@ -11,6 +11,7 @@ import {
   isMapsConfigured,
   mapsConfig,
   placeCoords,
+  placeLink,
   useGeocode,
 } from "@/lib/maps";
 import type { MapMarker, PlaceResult } from "@/lib/maps";
@@ -20,6 +21,7 @@ import {
   HotelMarkers,
   MapInfoCard,
   MapsApiProvider,
+  OpenInMapsButton,
   PlaceMarkers,
   PlacesExplorer,
 } from "../maps";
@@ -190,6 +192,11 @@ function PlaceCard({ place, aiScore }: { place: Place; aiScore?: number }) {
             {isSel ? "Added to trip" : "Add to My Trip"}
           </button>
         </div>
+        <OpenInMapsButton
+          href={placeLink({ name: place.name, position: placeCoords(place.id) })}
+          size="sm"
+          className="mt-2 w-full"
+        />
       </div>
     </div>
   );

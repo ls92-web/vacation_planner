@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Plus, Star } from "lucide-react";
-import { PLACE_CATEGORIES, usePlacesSearch } from "@/lib/maps";
+import { Check, ExternalLink, Plus, Star } from "lucide-react";
+import { PLACE_CATEGORIES, placeLink, usePlacesSearch } from "@/lib/maps";
 import type { LatLng, PlaceCategory, PlaceResult } from "@/lib/maps";
 
 /**
@@ -86,6 +86,15 @@ export function PlacesExplorer({
                     {p.address && <span className="truncate">{p.address}</span>}
                   </div>
                 </div>
+                <a
+                  href={placeLink({ name: p.name, position: p.position, placeId: p.id })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open in Google Maps"
+                  className="shrink-0 w-[30px] h-[30px] rounded-lg border border-line bg-white text-muted grid place-items-center cursor-pointer transition hover:border-accent hover:text-accent"
+                >
+                  <ExternalLink size={14} strokeWidth={2} />
+                </a>
                 <button
                   onClick={() => onAdd(p)}
                   title={added ? "Added" : "Add to trip"}

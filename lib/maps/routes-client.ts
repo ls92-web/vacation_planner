@@ -1,11 +1,58 @@
 "use client";
 
 import { cached, TTL } from "./cache";
+import { mapsConfig } from "./config";
 import type { LatLng, RouteResult, TravelMode } from "./types";
 
+const waypoint = (p: LatLng) => ({ location: { latLng: { latitude: p.lat, longitude: p.lng } } });
+
+function parseRoute(data: unknown): RouteResult | null {
+  const r = (data as { routes?: Record<string, unknown>[] })?.routes?.[0];
+  if (!r) return null;
+  const durationSeconds = typeof r.duration === "string" ? parseInt(r.duration, 10) || 0 : Number(r.duration) || 0;
+  const polyline = (r.polyline as { encodedPolyline?: string } | undefined)?.encodedPolyline ?? "";
+  return { distanceMeters: Number(r.distanceMeters) || 0, durationSeconds, polyline };
+}
+
 /**
- * Compute a route via the server proxy (Routes API). Cached + de-duplicated.
- * Returns null on any failure so callers can fall back gracefully.
+ * Browser-side call to the Google Routes API. The browser sends a referrer, so this
+ * works with an HTTP-referrer-restricted public key (server-side calls don't).
+ */
+async function viaRoutesApi(
+  origin: LatLng,
+  destination: LatLng,
+  intermediates: LatLng[],
+  travelMode: TravelMode
+): Promise<RouteResult | null> {
+  if (!mapsConfig.apiKey) return null;
+  try {
+    const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": mapsConfig.apiKey,
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
+      },
+      body: JSON.stringify({
+        origin: waypoint(origin),
+        destination: waypoint(destination),
+        intermediates: intermediates.map(waypoint),
+        travelMode,
+        polylineEncoding: "ENCODED_POLYLINE",
+        ...(travelMode === "DRIVE" ? { routingPreference: "TRAFFIC_AWARE" } : {}),
+      }),
+    });
+    if (!res.ok) return null;
+    return parseRoute(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compute a route. Prefers the browser Routes API call (works with referrer-restricted
+ * keys), then falls back to the server proxy (for dedicated server-key setups).
+ * Cached + de-duplicated. Returns null on any failure so callers degrade gracefully.
  */
 export async function fetchRoute(
   origin: LatLng,
@@ -17,6 +64,9 @@ export async function fetchRoute(
   const key = `route:${travelMode}:${pt(origin)}>${intermediates.map(pt).join("|")}>${pt(destination)}`;
   try {
     return await cached<RouteResult | null>(key, TTL.routes, async () => {
+      const direct = await viaRoutesApi(origin, destination, intermediates, travelMode);
+      if (direct) return direct;
+
       const res = await fetch("/api/maps/routes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
