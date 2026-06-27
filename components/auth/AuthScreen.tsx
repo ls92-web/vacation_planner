@@ -148,10 +148,8 @@ export function AuthScreen() {
       {/* brand panel */}
       <div
         className="flex-[1_1_440px] min-h-[280px] relative overflow-hidden text-white flex flex-col justify-between"
-        style={{ background: "linear-gradient(155deg, var(--accent), color-mix(in oklab, var(--accent) 55%, #11304f))", padding: "clamp(32px,4vw,60px)" }}
+        style={{ background: "#002B36", padding: "clamp(32px,4vw,60px)" }}
       >
-        <div className="absolute inset-0 opacity-10" style={{ background: "repeating-linear-gradient(135deg,#fff 0 2px,transparent 2px 16px)" }} />
-        <div className="absolute -right-24 -top-24 w-[360px] h-[360px] rounded-full opacity-20" style={{ background: "radial-gradient(circle, #fff, transparent 70%)" }} />
         <div className="relative flex items-center gap-[11px]">
           <Logo size={36} tile="rgba(255,255,255,.16)" />
           <span className="font-brand font-semibold text-[23px] tracking-[-.01em]">Itinera</span>
@@ -179,7 +177,7 @@ export function AuthScreen() {
           <p className="text-muted mt-[7px] text-[14.5px]">{subtitle}</p>
 
           {notice && (
-            <div className="mt-4 flex items-start gap-2 px-3.5 py-3 rounded-xl text-[13px]" style={{ background: "#e7f4ec", color: "#2f7a4d" }}>
+            <div className="mt-4 flex items-start gap-2 px-3.5 py-3 rounded-xl text-[13px]" style={{ background: "#E4F4F2", color: "#0A7A76" }}>
               <Check size={15} strokeWidth={2} className="mt-0.5 shrink-0" />{notice}
             </div>
           )}
@@ -220,7 +218,7 @@ export function AuthScreen() {
                 <label className={label}>Username</label>
                 <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" placeholder="mayatravels" className={input} />
                 {username.trim().length >= 3 && (
-                  <div className="text-[12px] mt-1.5" style={{ color: !usernameValid ? "#9e3c37" : usernameFree === false ? "#9e3c37" : usernameFree ? "#2f7a4d" : "var(--muted)" }}>
+                  <div className="text-[12px] mt-1.5" style={{ color: !usernameValid ? "#9e3c37" : usernameFree === false ? "#9e3c37" : usernameFree ? "#0A7A76" : "var(--muted)" }}>
                     {!usernameValid ? "3–20 letters, numbers or underscores." : usernameFree === false ? "Username is taken." : usernameFree ? "Username is available." : "Checking…"}
                   </div>
                 )}

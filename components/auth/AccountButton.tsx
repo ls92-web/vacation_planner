@@ -114,7 +114,7 @@ function Panel({ onClose }: { onClose: () => void }) {
           </section>
 
           {saved && (
-            <div className="flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: "#2f7a4d" }}><Check size={14} strokeWidth={2.5} />{saved}</div>
+            <div className="flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: "#0A7A76" }}><Check size={14} strokeWidth={2.5} />{saved}</div>
           )}
 
           {/* danger / session */}

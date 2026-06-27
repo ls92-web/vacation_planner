@@ -68,9 +68,8 @@ function TripCard({ trip, active, onOpen }: { trip: Trip; active: boolean; onOpe
 
   return (
     <div className="rounded-[18px] border bg-surface overflow-hidden flex flex-col transition hover:-translate-y-0.5 hover:shadow-lg" style={{ borderColor: active ? "var(--accent)" : "var(--line)", boxShadow: "0 4px 18px -12px rgba(0,0,0,.18)" }}>
-      <div className="h-[88px] relative" style={{ background: "linear-gradient(150deg, var(--accent), color-mix(in oklab, var(--accent) 55%, #11304f))" }}>
-        <div className="absolute inset-0 opacity-10" style={{ background: "repeating-linear-gradient(135deg,#fff 0 2px,transparent 2px 14px)" }} />
-        {active && <span className="absolute top-2.5 right-2.5 text-[10.5px] font-bold uppercase tracking-wide bg-white/90 text-accent px-2 py-0.5 rounded-md">Active</span>}
+      <div className="h-[88px] relative" style={{ background: "#002B36" }}>
+        {active && <span className="absolute top-2.5 right-2.5 text-[10.5px] font-bold uppercase tracking-wide bg-white text-ink px-2 py-0.5 rounded-md">Active</span>}
         <div className="absolute bottom-2.5 left-3.5 text-white">
           <div className="flex items-center gap-1.5 text-[12px] opacity-90"><MapPin size={12} strokeWidth={2} />{city}</div>
         </div>

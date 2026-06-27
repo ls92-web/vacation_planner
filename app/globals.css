@@ -1,28 +1,18 @@
 @import "tailwindcss";
 
-/* ===== Design tokens (Itinera brand = default). Only accent/accent2/bg/tint change per theme. ===== */
+/* ===== Itinera brand tokens — strictly the 5-colour palette (plus white).
+   002B36 ink · 0EA5A0 teal · F5A623 gold · F2F6F7 surface-bg · 6B7280 gray.
+   Tints/borders are low-strength derivations of those same hues. ===== */
 :root {
-  --accent: #0EA5A0;
-  --accent2: #F5A623;
-  --bg: #f3f7f7;
-  --tint: #e3f3f1;
-  --ink: #0D2B36;
-  --muted: #6B7280;
-  --line: #e2eaea;
+  --accent: #0EA5A0;   /* teal  */
+  --accent2: #F5A623;  /* gold  */
+  --ink: #002B36;      /* deep ink */
+  --muted: #6B7280;    /* gray  */
+  --bg: #F2F6F7;       /* off-white */
   --surface: #ffffff;
-  --brand-deep: #0E5A56;
-}
-[data-theme="sunset"] {
-  --accent: #c2614a;
-  --accent2: #e0a458;
-  --bg: #fdf5ee;
-  --tint: #f8ebe1;
-}
-[data-theme="forest"] {
-  --accent: #3f7a5a;
-  --accent2: #cf9046;
-  --bg: #f5f6ee;
-  --tint: #e9f1e9;
+  --tint: #E4F4F2;     /* 0EA5A0 ~12% on white */
+  --line: #E0E4E7;     /* 6B7280 ~16% on white */
+  --brand-deep: #002B36;
 }
 
 /* Expose tokens to Tailwind utilities (bg-accent, text-ink, border-line, font-display…) */
@@ -36,8 +26,8 @@
   --color-line: var(--line);
   --color-surface: var(--surface);
 
-  --color-ok: #2f7a4d;
-  --color-ok-bg: #e7f4ec;
+  --color-ok: #0EA5A0;
+  --color-ok-bg: #E4F4F2;
   --color-star: #F5A623;
 
   --font-display: var(--font-bricolage), sans-serif;
@@ -57,7 +47,7 @@ body {
 }
 
 ::placeholder {
-  color: #9aa3a8;
+  color: #9CA3AB; /* 6B7280 lightened */
 }
 
 /* ===== Prototype keyframes ===== */

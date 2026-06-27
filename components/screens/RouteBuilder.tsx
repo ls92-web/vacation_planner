@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useMap } from "@vis.gl/react-google-maps";
 import {
   ACCOM_TYPES,
-  EX_THUMBS,
   MODE_ORDER,
   MODE_TEMPLATES,
   fmtMonthDay,
@@ -39,11 +38,11 @@ import {
 
 type Status = { kind: "ok" | "warn" | "none"; text: string; color: string; bg: string };
 function statusFor(dn: number | null, booked: number): Status {
-  if (dn == null) return { kind: "none", text: "Add dates", color: "var(--muted)", bg: "#f0ece4" };
+  if (dn == null) return { kind: "none", text: "Add dates", color: "var(--muted)", bg: "var(--line)" };
   const diff = booked - dn;
-  if (diff === 0) return { kind: "ok", text: "Nights set", color: "#2f7a4d", bg: "#e7f4ec" };
-  if (diff < 0) { const miss = dn - booked; return { kind: "warn", text: `${miss} night${miss !== 1 ? "s" : ""} left`, color: "#9a6512", bg: "#fbf0dd" }; }
-  return { kind: "warn", text: `Over by ${diff}`, color: "#9e3c37", bg: "#f7e4e2" };
+  if (diff === 0) return { kind: "ok", text: "Nights set", color: "#0A7A76", bg: "#E4F4F2" };
+  if (diff < 0) { const miss = dn - booked; return { kind: "warn", text: `${miss} night${miss !== 1 ? "s" : ""} left`, color: "#9A6512", bg: "#FCEFD6" }; }
+  return { kind: "warn", text: `Over by ${diff}`, color: "#9A6512", bg: "#FCEFD6" };
 }
 const STEPS = ["Route", "Travelers", "Preferences", "Explore", "Build Schedule", "Review", "Export"];
 const fieldLabel = "text-[12px] font-semibold text-muted";
@@ -132,7 +131,7 @@ function TripOverview() {
   }
 
   return (
-    <div className="rounded-[20px] border border-line p-5" style={{ background: "linear-gradient(135deg, var(--tint), color-mix(in oklab, var(--surface) 92%, var(--tint)))" }}>
+    <div className="rounded-[20px] border border-line p-5" style={{ background: "var(--tint)" }}>
       <div className="flex items-center gap-5 flex-wrap">
         <ProgressRing value={completion} />
         <div className="min-w-0">
@@ -253,7 +252,7 @@ function DestinationCard({ dest, index, last }: { dest: Destination; index: numb
   const booked = dest.accoms.reduce((s, a) => s + (nightsBetween(a.checkin, a.checkout) || 0), 0);
   const st = statusFor(n, booked);
   const canSave = !!(dest.name && dest.arrive && dest.depart && n != null);
-  const hero = EX_THUMBS[index % EX_THUMBS.length];
+  const hero = "#002B36";
   const budget = estBudget(n || 0, state.adults + state.kids);
 
   return (
@@ -289,8 +288,7 @@ function DestinationCard({ dest, index, last }: { dest: Destination; index: numb
             /* saved — premium card */
             <div>
               {/* hero header */}
-              <button onClick={() => actions.toggleDest(dest.id)} className="w-full text-left relative h-[130px] block cursor-pointer" style={{ background: hero }}>
-                <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.5))" }} />
+              <button onClick={() => actions.toggleDest(dest.id)} className="w-full text-left relative h-[120px] block cursor-pointer" style={{ background: hero }}>
                 <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-bold" style={{ background: st.bg, color: st.color }}>
                   {st.kind === "ok" ? <Check size={12} strokeWidth={2.5} /> : null}{st.text}
                 </div>
@@ -362,7 +360,7 @@ function RouteLine({ points }: { points: LatLng[] }) {
   const map = useMap();
   useEffect(() => {
     if (!map || points.length < 2 || typeof google === "undefined") return;
-    const line = new google.maps.Polyline({ path: points, geodesic: true, strokeColor: "#16767e", strokeOpacity: 0.85, strokeWeight: 3 });
+    const line = new google.maps.Polyline({ path: points, geodesic: true, strokeColor: "#0EA5A0", strokeOpacity: 0.85, strokeWeight: 3 });
     line.setMap(map);
     const b = new google.maps.LatLngBounds();
     points.forEach((p) => b.extend(p));

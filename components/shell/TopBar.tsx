@@ -37,11 +37,11 @@ function SaveStatus() {
     );
   }
   if (snap.state === "unsaved") {
-    return <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: "#8a5a12" }}><span className="w-2 h-2 rounded-full" style={{ background: "#8a5a12" }} />Unsaved changes</span>;
+    return <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: "#9A6512" }}><span className="w-2 h-2 rounded-full" style={{ background: "#F5A623" }} />Unsaved changes</span>;
   }
   if (snap.state === "saved") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: "#2f7a4d" }}>
+      <span className="inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: "#0A7A76" }}>
         <Check size={13} strokeWidth={2.5} />Saved <span className="text-muted">· {relativeTime(snap.lastSaved)}</span>
       </span>
     );

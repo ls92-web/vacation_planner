@@ -31,14 +31,14 @@ const TAG_STYLES: Record<string, { bg: string; color: string }> = {
   "Must Visit": { bg: "var(--accent)", color: "#fff" },
   "Hidden Gem": { bg: "#7a5a9e", color: "#fff" },
   "Local Favorite": { bg: "#3f7a5a", color: "#fff" },
-  "Family Friendly": { bg: "#e7f4ec", color: "#2f7a4d" },
+  "Family Friendly": { bg: "#E4F4F2", color: "#0A7A76" },
   "Great for Sunset": { bg: "#f8ead9", color: "#9a6512" },
   "Rainy Day": { bg: "#e6eef5", color: "#3f5e8a" },
   Foodie: { bg: "#fbe9e2", color: "#b8542f" },
   Shopping: { bg: "#f0ece4", color: "#6b5e4f" },
   Historic: { bg: "#efe7dd", color: "#7a6a4f" },
   "Photo Spot": { bg: "#e9f3f1", color: "#16767e" },
-  Free: { bg: "#e7f4ec", color: "#2f7a4d" },
+  Free: { bg: "#E4F4F2", color: "#0A7A76" },
 };
 
 function chip(tag: string) {
@@ -106,7 +106,7 @@ export function PlaceCard({
         {place.openNow != null && (
           <span
             className="absolute bottom-2.5 left-2.5 px-2 py-1 rounded-lg text-[11px] font-bold backdrop-blur-sm"
-            style={{ background: place.openNow ? "#e7f4ec" : "#f7e4e2", color: place.openNow ? "#2f7a4d" : "#9e3c37" }}
+            style={{ background: place.openNow ? "#E4F4F2" : "#f7e4e2", color: place.openNow ? "#0A7A76" : "#9e3c37" }}
           >
             {place.openNow ? "Open now" : "Closed"}
           </span>

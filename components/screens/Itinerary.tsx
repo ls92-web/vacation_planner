@@ -106,7 +106,7 @@ function Schedule() {
                   <div className="flex-[1_1_260px] px-[18px] py-4">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[11px] font-bold tracking-[.03em] uppercase text-accent bg-tint px-[9px] py-[3px] rounded-[7px]">{s.cat}</span>
-                      {s.kid && <span className="text-[11px] font-bold px-[9px] py-[3px] rounded-[7px]" style={{ color: "#2f7a4d", background: "#e7f4ec" }}>★ Kid-friendly</span>}
+                      {s.kid && <span className="text-[11px] font-bold px-[9px] py-[3px] rounded-[7px]" style={{ color: "#0A7A76", background: "#E4F4F2" }}>★ Kid-friendly</span>}
                     </div>
                     <div className="font-display font-bold text-[19px] mt-2.5 tracking-[-.01em]">{s.title}</div>
                     <p className="text-[13.5px] text-muted leading-[1.55] mt-[5px]">{s.blurb}</p>

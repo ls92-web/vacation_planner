@@ -11,7 +11,6 @@ import {
   PanelLeftOpen,
   Plane,
   Settings,
-  Sparkle,
   Star,
   User,
 } from "lucide-react";
@@ -19,8 +18,6 @@ import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { useUI } from "@/lib/ui/store";
 import { openAccount } from "@/lib/ui/account";
-import { THEMES } from "@/lib/data";
-import type { ThemeName } from "@/lib/types";
 import { Logo } from "@/components/Logo";
 
 type Group = "dashboard" | "planner" | "saved" | null;
@@ -39,8 +36,6 @@ const NAV: NavItem[] = [
   { label: "Saved Places", icon: Heart, group: "saved", onClick: (a) => a.goExplore() },
   { label: "Export Itinerary", icon: Download, group: null, onClick: (a) => a.goExplore() },
 ];
-
-const THEME_NAMES: ThemeName[] = ["Ocean", "Sunset", "Forest"];
 
 export function Sidebar() {
   const { state, actions } = useTrip();
@@ -100,11 +95,10 @@ export function Sidebar() {
 
       {/* current trip */}
       {activeTrip && !collapsed && (
-        <div className="mx-3 mt-3 rounded-[14px] p-3 text-white relative overflow-hidden" style={{ background: "linear-gradient(150deg, var(--accent), color-mix(in oklab, var(--accent) 55%, #11304f))" }}>
-          <div className="absolute inset-0 opacity-10" style={{ background: "repeating-linear-gradient(135deg,#fff 0 2px,transparent 2px 14px)" }} />
-          <div className="relative text-[10.5px] uppercase tracking-[.08em] opacity-80">Current trip</div>
-          <div className="relative font-display font-bold text-[15px] leading-tight mt-0.5 truncate">{activeTrip.name}</div>
-          <div className="relative text-[11.5px] opacity-85 truncate">{activeTrip.destination}</div>
+        <div className="mx-3 mt-3 rounded-[14px] p-3 text-white" style={{ background: "#002B36" }}>
+          <div className="text-[10.5px] uppercase tracking-[.08em] opacity-70">Current trip</div>
+          <div className="font-display font-bold text-[15px] leading-tight mt-0.5 truncate">{activeTrip.name}</div>
+          <div className="text-[11.5px] opacity-80 truncate">{activeTrip.destination}</div>
         </div>
       )}
 
@@ -120,24 +114,13 @@ export function Sidebar() {
         <Action label="Help" icon={HelpCircle} onClick={() => actions.flash("Help center coming soon — meanwhile, the AI assistant can help.")} />
       </nav>
 
-      {/* footer: palette */}
+      {/* footer */}
       <div className="border-t border-line p-3">
-        {!collapsed && <div className="text-[10.5px] font-bold uppercase tracking-[.08em] text-muted mb-2 flex items-center gap-1"><Sparkle size={11} strokeWidth={1.8} />Theme</div>}
-        <div className={`flex items-center gap-2 ${collapsed ? "flex-col" : ""}`}>
-          {THEME_NAMES.map((n) => {
-            const on = state.theme === n;
-            return (
-              <button
-                key={n}
-                onClick={() => actions.setTheme(n)}
-                title={n}
-                aria-label={n}
-                className="w-6 h-6 rounded-full cursor-pointer transition"
-                style={{ background: THEMES[n].accent, outline: on ? "2px solid var(--ink)" : "2px solid transparent", outlineOffset: 2 }}
-              />
-            );
-          })}
-        </div>
+        {!collapsed ? (
+          <div className="font-brand text-[12px] text-muted leading-snug">Every journey,<br />perfectly planned.</div>
+        ) : (
+          <div className="flex justify-center"><Logo size={26} /></div>
+        )}
       </div>
     </aside>
   );

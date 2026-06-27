@@ -23,8 +23,7 @@ function Stat({ icon: Icon, label, value }: { icon: typeof Clock; label: string;
 export function DaySummary({ analysis, units, dayLabel }: { analysis: DayAnalysis; units: "km" | "mi"; dayLabel: string }) {
   if (analysis.stops === 0) return null;
   return (
-    <div className="rounded-[18px] border border-line p-5 text-white relative overflow-hidden" style={{ background: "linear-gradient(135deg, color-mix(in oklab, var(--accent) 92%, #11304f), color-mix(in oklab, var(--accent) 60%, #11304f))" }}>
-      <div className="absolute inset-0 opacity-10" style={{ background: "repeating-linear-gradient(135deg,#fff 0 2px,transparent 2px 16px)" }} />
+    <div className="rounded-[18px] border border-line p-5 text-white relative overflow-hidden" style={{ background: "#002B36" }}>
       <div className="relative flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="font-display font-bold text-[40px] leading-none">{analysis.overall.toFixed(1)}<span className="text-[16px] opacity-70">/10</span></div>

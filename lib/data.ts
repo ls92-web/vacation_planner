@@ -12,9 +12,10 @@ import type {
 // Here they mirror the design prototype's mock data exactly.
 
 export const THEMES: Record<ThemeName, { accent: string; accent2: string; bg: string; tint: string }> = {
-  Ocean: { accent: "#0EA5A0", accent2: "#F5A623", bg: "#f3f7f7", tint: "#e3f3f1" },
-  Sunset: { accent: "#c2614a", accent2: "#e0a458", bg: "#fdf5ee", tint: "#f8ebe1" },
-  Forest: { accent: "#3f7a5a", accent2: "#cf9046", bg: "#f5f6ee", tint: "#e9f1e9" },
+  // Single Itinera brand palette (5 colours only); alternates retained for type compatibility.
+  Ocean: { accent: "#0EA5A0", accent2: "#F5A623", bg: "#F2F6F7", tint: "#E4F4F2" },
+  Sunset: { accent: "#0EA5A0", accent2: "#F5A623", bg: "#F2F6F7", tint: "#E4F4F2" },
+  Forest: { accent: "#0EA5A0", accent2: "#F5A623", bg: "#F2F6F7", tint: "#E4F4F2" },
 };
 
 export const DESTINATION_SUGGESTIONS = [
@@ -143,23 +144,17 @@ export const SMART_FILTERS: { k: string; label: string }[] = [
   { k: "reservation", label: "Reservation Required" },
 ];
 
+// Flat photo-placeholder fills — kept within the Itinera teal/ink family only.
 export const EX_THUMBS = [
-  "linear-gradient(135deg,#6cae9e,#356b73)",
-  "linear-gradient(135deg,#e0a458,#c2614a)",
-  "linear-gradient(135deg,#7fa6d0,#3f5e8a)",
-  "linear-gradient(135deg,#b58fc4,#7a5a9e)",
-  "linear-gradient(135deg,#e08aa0,#b85572)",
-  "linear-gradient(135deg,#8dbf9a,#5a8d6f)",
+  "#002B36",
+  "#0EA5A0",
+  "#0A4A50",
+  "#013A44",
+  "#0E7C78",
+  "#06585B",
 ];
 
-export const THUMBS = [
-  "linear-gradient(150deg,#6cae9e,#3a7d72)",
-  "linear-gradient(150deg,#e0a458,#c2614a)",
-  "linear-gradient(150deg,#7fa6d0,#3f5e8a)",
-  "linear-gradient(150deg,#b58fc4,#7a5a9e)",
-  "linear-gradient(150deg,#e08aa0,#b85572)",
-  "linear-gradient(150deg,#8dbf9a,#5a8d6f)",
-];
+export const THUMBS = EX_THUMBS;
 
 export const PIN_COLORS = ["#16767e", "#e07a4f", "#7a5a9e", "#3f7a5a", "#c2614a", "#3f5e8a"];
 

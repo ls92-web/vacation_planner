@@ -8,7 +8,7 @@
 export function Logo({
   size = 32,
   variant = "tile",
-  tile = "#0E5A56",
+  tile = "#002B36",
   className = "",
 }: {
   size?: number;

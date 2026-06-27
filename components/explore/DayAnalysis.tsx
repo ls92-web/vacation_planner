@@ -30,7 +30,7 @@ const ACTION_LABEL: Record<RecAction["kind"], string> = {
 };
 
 const GRADE_STYLE: Record<Grade, { bg: string; color: string }> = {
-  excellent: { bg: "#e7f4ec", color: "#2f7a4d" },
+  excellent: { bg: "#E4F4F2", color: "#0A7A76" },
   good: { bg: "var(--tint)", color: "var(--accent)" },
   attention: { bg: "#fbf0dd", color: "#8a5a12" },
 };
