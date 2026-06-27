@@ -62,7 +62,7 @@ export function ItineraryBook({ template: t, onClose }: { template: BookTemplate
           <div className="book-page relative px-10 py-16 flex flex-col justify-between min-h-[420px]" style={{ background: t.coverBg, color: t.coverFg }}>
             <div className="absolute inset-0 opacity-[.08]" style={{ background: "repeating-linear-gradient(135deg,#fff 0 2px,transparent 2px 18px)" }} />
             <div className="relative flex items-center justify-between">
-              <div className={`text-[12px] font-bold ${labelCls}`}>Wanderfold</div>
+              <div className={`text-[12px] font-bold ${labelCls}`}>Itinera</div>
               <div className={`text-[12px] ${labelCls}`} style={{ opacity: 0.8 }}>Curated travel itinerary</div>
             </div>
             <div className="relative">
@@ -158,7 +158,7 @@ export function ItineraryBook({ template: t, onClose }: { template: BookTemplate
           {/* footer */}
           <div className="px-10 py-8 flex items-center justify-between gap-4" style={{ borderTop: `1px solid ${t.line}` }}>
             <div>
-              <div className="font-display font-bold text-[15px]">Planned with Wanderfold</div>
+              <div className="font-display font-bold text-[15px]">Planned with Itinera</div>
               <div className="text-[11.5px]" style={{ color: t.muted }}>Scan to open and edit the live itinerary.</div>
             </div>
             {qr && (

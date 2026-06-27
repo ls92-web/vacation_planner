@@ -1,4 +1,4 @@
-# Wanderfold — AI Vacation Planner
+# Itinera — AI Vacation Planner
 
 A faithful implementation of the **Vacation Planner** (`Vacation Planner.dc.html`) design handoff:
 a family-oriented, AI-assisted multi-destination trip planner.

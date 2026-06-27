@@ -2,7 +2,7 @@
 
 import { useTrip } from "@/lib/store";
 import type { ExploreTab } from "@/lib/types";
-import { Compass } from "./icons";
+import { Logo } from "./Logo";
 
 const NAV: { k: ExploreTab; label: string }[] = [
   { k: "explore", label: "Explore" },
@@ -14,12 +14,7 @@ const NAV: { k: ExploreTab; label: string }[] = [
 export function Brand({ label = "Barcelona", size = 28 }: { label?: string; size?: number }) {
   return (
     <div className="flex items-center gap-2.5 font-bold text-[15px] shrink-0">
-      <div
-        className="rounded-lg bg-accent text-white grid place-items-center"
-        style={{ width: size, height: size }}
-      >
-        <Compass size={size === 28 ? 16 : 17} strokeWidth={2} />
-      </div>
+      <Logo size={size} />
       {label}
     </div>
   );

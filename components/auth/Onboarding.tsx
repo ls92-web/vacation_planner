@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Compass, Sparkle } from "@/components/icons";
+import { Check, Sparkle } from "@/components/icons";
 import { useAuth } from "@/lib/auth/store";
+import { Logo } from "@/components/Logo";
 
 const QUESTIONS: { key: "traveler_type" | "travel_with" | "pace" | "transport"; q: string; opts: string[] }[] = [
   { key: "traveler_type", q: "What type of traveler are you?", opts: ["Culture seeker", "Foodie", "Outdoorsy", "Relaxed", "Adventurer", "Luxury"] },
@@ -44,9 +45,9 @@ export function Onboarding() {
   return (
     <div className="min-h-screen grid place-items-center px-4 py-10" style={{ background: "var(--bg)" }}>
       <div className="w-full max-w-[640px] vp-fade">
-        <div className="flex items-center gap-2.5 font-bold text-[15px] mb-5">
-          <div className="w-7 h-7 rounded-lg bg-accent text-white grid place-items-center"><Compass size={16} strokeWidth={2} /></div>
-          Wanderfold
+        <div className="flex items-center gap-2.5 mb-5">
+          <Logo size={30} />
+          <span className="font-brand font-semibold text-[20px] tracking-[-.01em] text-ink">Itinera</span>
         </div>
         <div className="bg-surface border border-line rounded-[22px] p-6 sm:p-8" style={{ boxShadow: "0 20px 50px -24px rgba(0,0,0,.25)" }}>
           <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-accent">

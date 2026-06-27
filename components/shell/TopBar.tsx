@@ -71,7 +71,7 @@ export function TopBar() {
           <span>{SCREEN_LABEL[state.screen]}</span>
         </div>
         <div className="flex items-baseline gap-2 mt-0.5">
-          <span className="font-display font-bold text-[16px] tracking-[-.01em] truncate">{activeTrip?.name ?? "Wanderfold"}</span>
+          <span className={`truncate ${activeTrip ? "font-display font-bold text-[16px] tracking-[-.01em]" : "font-brand font-semibold text-[18px]"}`}>{activeTrip?.name ?? "Itinera"}</span>
           {activeTrip && <span className="text-[12.5px] text-muted truncate hidden md:inline">· {activeTrip.destination}</span>}
         </div>
       </div>

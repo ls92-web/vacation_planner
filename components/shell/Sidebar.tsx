@@ -21,6 +21,7 @@ import { useUI } from "@/lib/ui/store";
 import { openAccount } from "@/lib/ui/account";
 import { THEMES } from "@/lib/data";
 import type { ThemeName } from "@/lib/types";
+import { Logo } from "@/components/Logo";
 
 type Group = "dashboard" | "planner" | "saved" | null;
 
@@ -87,9 +88,9 @@ export function Sidebar() {
       {/* brand + collapse */}
       <div className={`flex items-center h-[60px] px-3 border-b border-line ${collapsed ? "justify-center" : "justify-between"}`}>
         {!collapsed && (
-          <div className="flex items-center gap-2.5 font-bold text-[15px]">
-            <div className="w-8 h-8 rounded-[10px] bg-accent text-white grid place-items-center"><Compass size={17} strokeWidth={2} /></div>
-            Wanderfold
+          <div className="flex items-center gap-2.5">
+            <Logo size={32} />
+            <span className="font-brand font-semibold text-[21px] tracking-[-.01em] text-ink">Itinera</span>
           </div>
         )}
         <button onClick={toggleSidebar} className="w-8 h-8 rounded-[9px] grid place-items-center text-muted hover:text-ink hover:bg-tint cursor-pointer" title={collapsed ? "Expand" : "Collapse"}>

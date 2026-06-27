@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, Compass, Eye, EyeOff } from "@/components/icons";
+import { Check, ChevronDown, Eye, EyeOff } from "@/components/icons";
+import { Logo } from "@/components/Logo";
 import { useAuth } from "@/lib/auth/store";
 
 type Mode = "signin" | "signup" | "forgot" | "reset";
@@ -151,13 +152,13 @@ export function AuthScreen() {
       >
         <div className="absolute inset-0 opacity-10" style={{ background: "repeating-linear-gradient(135deg,#fff 0 2px,transparent 2px 16px)" }} />
         <div className="absolute -right-24 -top-24 w-[360px] h-[360px] rounded-full opacity-20" style={{ background: "radial-gradient(circle, #fff, transparent 70%)" }} />
-        <div className="relative flex items-center gap-[11px] font-semibold tracking-[.2px]">
-          <div className="w-[34px] h-[34px] rounded-[11px] bg-white/[.18] grid place-items-center"><Compass size={17} strokeWidth={2} /></div>
-          Wanderfold
+        <div className="relative flex items-center gap-[11px]">
+          <Logo size={36} tile="rgba(255,255,255,.16)" />
+          <span className="font-brand font-semibold text-[23px] tracking-[-.01em]">Itinera</span>
         </div>
         <div className="relative">
-          <div className="font-display font-bold leading-[1.04] tracking-[-.02em] text-balance" style={{ fontSize: "clamp(30px,3.4vw,46px)" }}>
-            Plan less.<br />Travel more.
+          <div className="font-brand font-semibold leading-[1.08] tracking-[-.01em] text-balance" style={{ fontSize: "clamp(30px,3.4vw,46px)" }}>
+            Every journey,<br />perfectly planned.
           </div>
           <p className="mt-[18px] max-w-[420px] text-[15.5px] leading-[1.6] text-white/80">
             Your trips, schedules, saved places and AI day plans — in one private, beautifully organized place.

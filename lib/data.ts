@@ -12,7 +12,7 @@ import type {
 // Here they mirror the design prototype's mock data exactly.
 
 export const THEMES: Record<ThemeName, { accent: string; accent2: string; bg: string; tint: string }> = {
-  Ocean: { accent: "#16767e", accent2: "#e07a4f", bg: "#fbf7f0", tint: "#e9f3f1" },
+  Ocean: { accent: "#0EA5A0", accent2: "#F5A623", bg: "#f3f7f7", tint: "#e3f3f1" },
   Sunset: { accent: "#c2614a", accent2: "#e0a458", bg: "#fdf5ee", tint: "#f8ebe1" },
   Forest: { accent: "#3f7a5a", accent2: "#cf9046", bg: "#f5f6ee", tint: "#e9f1e9" },
 };

@@ -14,7 +14,7 @@ function TemplateCard({ t, city, days, onPick }: { t: BookTemplate; city: string
       {/* live preview */}
       <div className="relative h-[130px] p-4 flex flex-col justify-between" style={{ background: t.coverBg, color: t.coverFg }}>
         <div className="absolute inset-0 opacity-[.08]" style={{ background: "repeating-linear-gradient(135deg,#fff 0 2px,transparent 2px 16px)" }} />
-        <div className={`relative text-[8.5px] font-bold ${labelCls}`} style={{ opacity: 0.85 }}>Wanderfold</div>
+        <div className={`relative text-[8.5px] font-bold ${labelCls}`} style={{ opacity: 0.85 }}>Itinera</div>
         <div className="relative">
           <div className={`${t.titleClass} font-bold leading-none`} style={{ fontSize: 24 }}>{city}</div>
           <div className="h-[2px] w-10 mt-1.5" style={{ background: t.accent }} />

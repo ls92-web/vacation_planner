@@ -1,15 +1,16 @@
 @import "tailwindcss";
 
-/* ===== Design tokens (Ocean = default). Only accent/accent2/bg/tint change per theme. ===== */
+/* ===== Design tokens (Itinera brand = default). Only accent/accent2/bg/tint change per theme. ===== */
 :root {
-  --accent: #16767e;
-  --accent2: #e07a4f;
-  --bg: #fbf7f0;
-  --tint: #e9f3f1;
-  --ink: #2a2520;
-  --muted: #857b72;
-  --line: #ece5db;
+  --accent: #0EA5A0;
+  --accent2: #F5A623;
+  --bg: #f3f7f7;
+  --tint: #e3f3f1;
+  --ink: #0D2B36;
+  --muted: #6B7280;
+  --line: #e2eaea;
   --surface: #ffffff;
+  --brand-deep: #0E5A56;
 }
 [data-theme="sunset"] {
   --accent: #c2614a;
@@ -37,11 +38,12 @@
 
   --color-ok: #2f7a4d;
   --color-ok-bg: #e7f4ec;
-  --color-star: #e0a44f;
+  --color-star: #F5A623;
 
   --font-display: var(--font-bricolage), sans-serif;
   --font-body: var(--font-jakarta), system-ui, sans-serif;
   --font-mono: var(--font-spline), ui-monospace, monospace;
+  --font-brand: var(--font-lora), Georgia, "Times New Roman", serif;
 }
 
 * {
@@ -55,7 +57,7 @@ body {
 }
 
 ::placeholder {
-  color: #a89f96;
+  color: #9aa3a8;
 }
 
 /* ===== Prototype keyframes ===== */
