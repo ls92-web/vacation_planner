@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, LogOut, Settings, TrashIcon, User, X } from "@/components/icons";
 import { useAuth } from "@/lib/auth/store";
+import { subscribeAccount } from "@/lib/ui/account";
 
 const fieldLabel = "text-[12px] font-semibold text-muted";
 const field = "w-full mt-1.5 px-3 py-2.5 border border-line rounded-[10px] text-[14px] bg-white outline-none vp-input";
@@ -142,12 +143,14 @@ function Panel({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Floating account control, available across the app once signed in. */
-export function AccountButton() {
+/** Account control. `inline` renders a compact avatar (for the top bar); it also
+ *  opens whenever something calls openAccount() (e.g. the sidebar Settings/Profile). */
+export function AccountButton({ inline = false }: { inline?: boolean }) {
   const { state } = useAuth();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  useEffect(() => subscribeAccount(() => setOpen(true)), []);
   if (!state.user) return null;
   const initial = (state.profile?.full_name || state.user.email || "?").slice(0, 1).toUpperCase();
 
@@ -156,8 +159,12 @@ export function AccountButton() {
       <button
         onClick={() => setOpen(true)}
         title="Account"
-        className="fixed bottom-[22px] left-[84px] z-[70] w-10 h-10 rounded-full bg-accent text-white font-display font-bold grid place-items-center cursor-pointer"
-        style={{ boxShadow: "0 8px 24px -10px rgba(0,0,0,.4)" }}
+        className={
+          inline
+            ? "w-9 h-9 rounded-full bg-accent text-white font-display font-bold grid place-items-center cursor-pointer hover:brightness-[1.06] transition"
+            : "fixed bottom-[22px] left-[84px] z-[70] w-10 h-10 rounded-full bg-accent text-white font-display font-bold grid place-items-center cursor-pointer"
+        }
+        style={inline ? undefined : { boxShadow: "0 8px 24px -10px rgba(0,0,0,.4)" }}
       >
         {initial}
       </button>

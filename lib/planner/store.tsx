@@ -12,6 +12,7 @@ import {
 } from "@/lib/places";
 import { getRepository } from "@/lib/itinerary/repository";
 import { optimizeOrder, resequence, type TransportMode } from "./travel";
+import { withSave } from "@/lib/ui/saveStatus";
 
 interface PlannerState {
   tripId: string;
@@ -90,7 +91,7 @@ function useProvidePlanner(trip: TripRef) {
   const persistItinerary = useCallback(
     (items: ItineraryItem[]) => {
       setState((s) => ({ ...s, itinerary: items }));
-      repo.saveItinerary(stateRef.current.tripId, stateRef.current.destination, items);
+      withSave(repo.saveItinerary(stateRef.current.tripId, stateRef.current.destination, items));
     },
     [repo]
   );
@@ -114,7 +115,7 @@ function useProvidePlanner(trip: TripRef) {
           ...s,
           favorites: on ? [...s.favorites, place] : s.favorites.filter((p) => p.id !== place.id),
         }));
-        repo.setFavorite(stateRef.current.tripId, stateRef.current.destination, place, on);
+        withSave(repo.setFavorite(stateRef.current.tripId, stateRef.current.destination, place, on));
       },
 
       toggleCompare: (id: string) =>

@@ -5,7 +5,6 @@ import { ArrowRight, Check, MapPin, Pencil, Plus, Trash2, X } from "lucide-react
 import { DESTINATION_SUGGESTIONS } from "@/lib/data";
 import { useTrip } from "@/lib/store";
 import { useTrips, type Trip } from "@/lib/trips/store";
-import { Brand } from "@/components/AppNav";
 
 function NewTrip({ onCreated }: { onCreated: (t: Trip) => void }) {
   const { actions } = useTrips();
@@ -119,17 +118,13 @@ export function TripsDashboard() {
   const openTrip = (t: Trip) => {
     actions.select(t.id);
     trip.actions.setDestination(t.destination);
-    trip.actions.goExplore();
+    trip.actions.goForm();
   };
 
   return (
     <div className="vp-scroll min-h-screen" style={{ background: "var(--bg)" }}>
       <div className="max-w-[1100px] mx-auto px-[clamp(16px,3vw,28px)] py-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <Brand label="Wanderfold" />
-        </div>
-
-        <div className="mt-8">
+        <div>
           <div className="font-display font-bold text-[clamp(26px,3.4vw,36px)] tracking-[-.02em]">Your trips</div>
           <p className="text-muted text-[14.5px] mt-1.5">Every trip keeps its own saved places and schedule — private to your account.</p>
         </div>
