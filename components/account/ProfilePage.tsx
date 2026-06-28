@@ -103,7 +103,7 @@ export function ProfilePage() {
 
   async function changePassword() {
     if (busy) return;
-    if (pw.length < 8) { flash("Password must be at least 8 characters."); return; }
+    if (pw.length < 12) { flash("Password must be at least 12 characters."); return; }
     if (pw !== pw2) { flash("Passwords don't match."); return; }
     setBusy(true);
     const r = await actions.updatePassword(pw);

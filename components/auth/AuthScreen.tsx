@@ -105,7 +105,7 @@ export function AuthScreen() {
     }
 
     if (effectiveMode === "reset") {
-      if (password.length < 8) return setError("Password must be at least 8 characters.");
+      if (password.length < 12) return setError("Password must be at least 12 characters.");
       if (password !== confirm) return setError("Passwords don't match.");
       setLoading(true);
       const r = await actions.updatePassword(password);
@@ -120,7 +120,7 @@ export function AuthScreen() {
     if (!usernameValid) return setError("Username must be 3–20 letters, numbers or underscores.");
     if (usernameFree === false) return setError("That username is already taken.");
     if (!emailValid) return setError("Enter a valid email address.");
-    if (password.length < 8) return setError("Password must be at least 8 characters.");
+    if (password.length < 12) return setError("Password must be at least 12 characters.");
     if (password !== confirm) return setError("Passwords don't match.");
     if (!terms) return setError("Please accept the Terms & Privacy Policy.");
 

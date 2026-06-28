@@ -2,19 +2,30 @@
 
 import type { DayPlan } from "./types";
 import type { Recommendation, TripContext, AIMessage } from "./ai";
+import { getSupabase } from "./supabase/client";
 
 // ===== Browser helpers that call the server AI routes. =====
 // Each returns null / throws on failure so callers can fall back to the
 // built-in simulated behavior — the app always works, with or without a key.
 
+// The AI routes require a valid session (they spend a paid server-side key), so
+// every request carries the user's Supabase access token.
+async function authHeaders(): Promise<Record<string, string>> {
+  const sb = getSupabase();
+  if (!sb) return {};
+  const { data } = await sb.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function postJson<T>(url: string, body: unknown): Promise<T | null> {
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       body: JSON.stringify(body),
     });
-    if (!res.ok) return null; // 503 (no key), 502 (model error), etc. → fall back
+    if (!res.ok) return null; // 401/429/503/502 → fall back to built-in behavior
     return (await res.json()) as T;
   } catch {
     return null;
@@ -52,7 +63,7 @@ export async function streamAssistantReply(
 ): Promise<string> {
   const res = await fetch("/api/ai/assistant", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ context, messages }),
     signal,
   });

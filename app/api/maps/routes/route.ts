@@ -49,7 +49,8 @@ export async function POST(req: Request) {
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      return Response.json({ error: `Routes API ${res.status}`, detail }, { status: 502 });
+      console.error("[maps/routes] upstream", res.status, detail);
+      return Response.json({ error: "Routing unavailable" }, { status: 502 });
     }
 
     const data = await res.json();
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : "Routes error" }, { status: 502 });
+    console.error("[maps/routes]", err);
+    return Response.json({ error: "Routing unavailable" }, { status: 502 });
   }
 }

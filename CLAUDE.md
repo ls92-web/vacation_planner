@@ -117,6 +117,13 @@ lib/supabase/client.ts            Supabase singleton (on globalThis, HMR-safe)
 - **Async store actions:** use the `stateRef.current` pattern (see `lib/planner/store.tsx`) to avoid stale closures.
 - **Editable forms:** call `useUnsavedChanges(dirty)` and route navigation through the store actions so the discard guard works automatically.
 
+## Security posture
+- **AI routes are gated.** Every `app/api/ai/*` route runs `guardAI()` (`lib/ai/guard.ts`): requires a valid Supabase session (Bearer access token verified via `auth.getUser`), per-user in-memory rate limit, body-size + message caps, and generic errors (details logged server-side, never returned). `lib/ai-client.ts` attaches the token. The OpenRouter key is server-only.
+- **RLS is owner-only** on all live tables (`trips`/`destinations`/`accommodations`/`schedule_items`/`saved_places`/`profiles`/`user_preferences`). Legacy `favorites`/`itinerary_items` are **locked (default-deny)** — kept for now, not used; drop when convenient. The `avatars` bucket serves via public URL with **no listing policy**.
+- **Run the linters after DB/auth changes:** Supabase MCP `get_advisors` (security + performance) and `npm audit`. Don't `npm audit fix --force` (it tries to downgrade Next).
+- **Known/accepted:** `get_email_for_username` is anon-callable (needed for username login) → username→email enumeration; the proper fix is a rate-limited server route doing the lookup with a service-role key. **Manual dashboard steps (not code):** enable Auth → *Leaked password protection* (HIBP) and set the min password length to 12 (the client already enforces 12).
+- **MCP is full-admin** and bypasses RLS/app guards — prefer `SELECT` before `DELETE`.
+
 ## Current state & next steps
 **Working:** auth + onboarding; trips dashboard; route builder (multi-destination, dates, hotels w/ location links, per-destination budget + weather, fully persisted); country→city picker; per-destination attraction browsing; destination-grouped itinerary with **per-day AI analysis** (DaySummary score strip + expandable DayAnalysis with recommendations/warnings + per-destination NearbyOpportunities); luxury per-destination PDF export; Profile + Settings pages; 3-theme selector; live-FX currency (KWD/GCC); unsaved-changes route protection.
 
