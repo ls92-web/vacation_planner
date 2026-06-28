@@ -36,6 +36,7 @@ import type { SelectedDestination } from "./geo";
 import type { BudgetLevel } from "./budget/estimate";
 import type { LoadedDestination } from "./destinations/repository";
 import { fetchItinerary, streamAssistantReply } from "./ai-client";
+import { requestNavigation } from "./ui/unsavedGuard";
 import { placeCoords } from "./maps/coords";
 import type { PlaceResult } from "./maps/types";
 
@@ -252,19 +253,22 @@ export function useTripStore() {
       setTheme: (t: ThemeName) => set({ theme: t }),
       // auth
       toggleAuth: () => set((s) => ({ authMode: s.authMode === "signin" ? "signup" : "signin" })),
-      goForm: () => set({ screen: "form" }),
-      goProfile: () => {
-        set({ screen: "profile" });
-        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-      },
-      goSettings: () => {
-        set({ screen: "settings" });
-        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-      },
-      goTrips: () => {
-        set({ screen: "trips" });
-        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-      },
+      goForm: () => requestNavigation(() => set({ screen: "form" })),
+      goProfile: () =>
+        requestNavigation(() => {
+          set({ screen: "profile" });
+          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+        }),
+      goSettings: () =>
+        requestNavigation(() => {
+          set({ screen: "settings" });
+          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+        }),
+      goTrips: () =>
+        requestNavigation(() => {
+          set({ screen: "trips" });
+          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+        }),
       setDestination: (dest: string) => set({ dest }),
       /** Seed the route from picked cities (city + country + coords). Keeps current list when empty. */
       setDestinations: (list: SelectedDestination[]) =>
@@ -311,18 +315,20 @@ export function useTripStore() {
             : s.destinations,
         })),
       // navigation between explore subviews / pages
-      goExplore: () => {
-        set({ screen: "explore" });
-        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-      },
+      goExplore: () =>
+        requestNavigation(() => {
+          set({ screen: "explore" });
+          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+        }),
       exSetTab: (t: ExploreTab) => {
         set({ exTab: t });
         requestAnimationFrame(() => window.scrollTo({ top: 0 }));
       },
-      navPick: (k: ExploreTab) => {
-        set({ screen: "explore", exTab: k });
-        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-      },
+      navPick: (k: ExploreTab) =>
+        requestNavigation(() => {
+          set({ screen: "explore", exTab: k });
+          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+        }),
       // generating
       runGenerate,
       createSchedule: runGenerate,

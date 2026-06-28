@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { UnsavedChangesDialog } from "@/components/ui/UnsavedChangesDialog";
 
 /** Permanent application shell: fixed sidebar + sticky top bar + scrollable content. */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -13,6 +14,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <TopBar />
         <main className="flex-1 min-w-0 overflow-y-auto vp-scroll">{children}</main>
       </div>
+      <UnsavedChangesDialog />
     </div>
   );
 }

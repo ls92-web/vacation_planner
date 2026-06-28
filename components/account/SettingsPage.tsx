@@ -8,6 +8,7 @@ import { CURRENCIES } from "@/lib/budget/estimate";
 import { ThemePicker } from "@/components/theme/ThemePicker";
 import { applyThemeToDocument, normalizeTheme, type ThemeId } from "@/lib/theme/themes";
 import { acctInput, Field, PageHeader, Segmented, SelectInput, SettingCard, Toggle } from "./ui";
+import { useUnsavedChanges } from "@/lib/ui/useUnsavedChanges";
 
 const opt = (xs: string[]) => xs.map((x) => ({ value: x, label: x }));
 const PACE = opt(["Relaxed", "Balanced", "Fast-paced"]);
@@ -73,11 +74,7 @@ export function SettingsPage() {
     layout !== g(p?.itinerary_layout, "Timeline") || exLang !== g(p?.export_language, "English");
 
   const anyDirty = themeDirty || travelDirty || aiDirty || exportDirty;
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => { if (anyDirty) { e.preventDefault(); e.returnValue = ""; } };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [anyDirty]);
+  useUnsavedChanges(anyDirty);
 
   const save = async (patch: Record<string, unknown>) => {
     const r = await actions.updatePreferences(patch);

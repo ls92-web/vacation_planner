@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LogOut, Settings, User } from "lucide-react";
 import { useAuth } from "@/lib/auth/store";
 import { useTrip } from "@/lib/store";
+import { requestNavigation } from "@/lib/ui/unsavedGuard";
 
 function Avatar({ url, initial, size }: { url?: string | null; initial: string; size: number }) {
   return (
@@ -77,7 +78,7 @@ export function AccountButton(_props: { inline?: boolean }) {
             <MenuItem icon={Settings} label="Settings" onClick={() => go(nav.goSettings)} />
           </div>
           <div className="p-1.5 border-t border-line">
-            <MenuItem icon={LogOut} label="Log out" danger onClick={() => go(() => actions.signOut())} />
+            <MenuItem icon={LogOut} label="Log out" danger onClick={() => go(() => requestNavigation(() => actions.signOut()))} />
           </div>
         </div>
       )}

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { BadgeCheck, Camera, Loader2, Lock, Mail, ShieldAlert, Trash2, User, UserCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth/store";
 import { useTrip } from "@/lib/store";
 import { acctInput, Field, PageHeader, SelectInput, SettingCard } from "./ui";
+import { useUnsavedChanges } from "@/lib/ui/useUnsavedChanges";
 
 const LANGUAGES = ["English", "Arabic", "French", "Spanish", "German", "Italian"].map((l) => ({ value: l, label: l }));
 const TIMEZONES = [
@@ -55,11 +56,7 @@ export function ProfilePage() {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => { if (piDirty) { e.preventDefault(); e.returnValue = ""; } };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [piDirty]);
+  useUnsavedChanges(piDirty);
 
   async function savePersonal() {
     const r = await actions.updateProfile({ full_name: fullName.trim(), username: username.trim(), country: country.trim(), language, timezone });
