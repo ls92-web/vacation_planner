@@ -1,18 +1,45 @@
 @import "tailwindcss";
 
-/* ===== Itinera brand tokens — strictly the 5-colour palette (plus white).
-   002B36 ink · 0EA5A0 teal · F5A623 gold · F2F6F7 surface-bg · 6B7280 gray.
-   Tints/borders are low-strength derivations of those same hues. ===== */
-:root {
-  --accent: #0EA5A0;   /* teal  */
-  --accent2: #F5A623;  /* gold  */
-  --ink: #002B36;      /* deep ink */
-  --muted: #6B7280;    /* gray  */
-  --bg: #F2F6F7;       /* off-white */
+/* ===== Itinera theme palettes. Three luxury layouts; "classic" is the default.
+   Every surface uses these tokens, so switching data-theme retints the whole app. */
+:root,
+[data-theme="classic"] {
+  /* Classic Luxury — ivory, deep navy, soft gold */
+  --accent: #9A7B33;   /* soft gold (buttons/highlights) */
+  --accent2: #20304D;  /* deep navy */
+  --ink: #20304D;      /* deep navy text + deep surfaces */
+  --muted: #7B7264;
+  --bg: #F6F1E7;       /* warm ivory */
   --surface: #ffffff;
-  --tint: #E4F4F2;     /* 0EA5A0 ~12% on white */
-  --line: #E0E4E7;     /* 6B7280 ~16% on white */
-  --brand-deep: #002B36;
+  --tint: #F1E7CE;     /* light gold */
+  --line: #E7DECB;
+  --brand-deep: #20304D;
+}
+
+[data-theme="desert"] {
+  /* Desert Luxe — sand, terracotta, olive */
+  --accent: #AC5A39;   /* terracotta */
+  --accent2: #6E7A4E;  /* olive / muted green */
+  --ink: #3B2E24;      /* warm dark brown */
+  --muted: #8C7860;
+  --bg: #F2E7D6;       /* sand / beige */
+  --surface: #fffdf9;
+  --tint: #EFDFC9;     /* light terracotta sand */
+  --line: #E6D6BF;
+  --brand-deep: #5A4232;
+}
+
+[data-theme="minimal"] {
+  /* Modern Minimal — clean white, charcoal, soft sage */
+  --accent: #50745F;   /* soft sage */
+  --accent2: #5C7C9C;  /* muted blue */
+  --ink: #2B2F36;      /* charcoal */
+  --muted: #6B7280;
+  --bg: #F6F7F8;       /* clean near-white */
+  --surface: #ffffff;
+  --tint: #E9EFEA;     /* light sage */
+  --line: #E6E8EB;
+  --brand-deep: #2B2F36;
 }
 
 /* Expose tokens to Tailwind utilities (bg-accent, text-ink, border-line, font-display…) */
@@ -26,9 +53,9 @@
   --color-line: var(--line);
   --color-surface: var(--surface);
 
-  --color-ok: #0EA5A0;
-  --color-ok-bg: #E4F4F2;
-  --color-star: #F5A623;
+  --color-ok: #3E7C5A;
+  --color-ok-bg: #E6F0E9;
+  --color-star: #C8912E;
 
   --font-display: var(--font-bricolage), sans-serif;
   --font-body: var(--font-jakarta), system-ui, sans-serif;
@@ -48,6 +75,14 @@ body {
 
 ::placeholder {
   color: #9CA3AB; /* 6B7280 lightened */
+}
+
+/* Smooth, professional transition when the theme changes. Elements with their
+   own `transition` utility keep it (class beats this element selector). */
+@media (prefers-reduced-motion: no-preference) {
+  body * {
+    transition: background-color 0.35s ease, border-color 0.35s ease;
+  }
 }
 
 /* ===== Prototype keyframes ===== */

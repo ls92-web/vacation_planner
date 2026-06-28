@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, LogOut, Settings, TrashIcon, User, X } from "@/components/icons";
 import { useAuth } from "@/lib/auth/store";
 import { subscribeAccount } from "@/lib/ui/account";
 import { CURRENCIES, DEFAULT_CURRENCY } from "@/lib/budget/estimate";
+import { ThemePicker } from "@/components/theme/ThemePicker";
+import { applyThemeToDocument, normalizeTheme, type ThemeId } from "@/lib/theme/themes";
 
 const fieldLabel = "text-[12px] font-semibold text-muted";
 const field = "w-full mt-1.5 px-3 py-2.5 border border-line rounded-[10px] text-[14px] bg-white outline-none vp-input";
@@ -40,6 +42,12 @@ function Panel({ onClose }: { onClose: () => void }) {
   const [withChildren, setWithChildren] = useState(state.preferences?.with_children ?? false);
   const [childrenAges, setChildrenAges] = useState(state.preferences?.children_ages ?? "");
   const [currency, setCurrency] = useState(state.preferences?.currency ?? DEFAULT_CURRENCY);
+  const [theme, setTheme] = useState<ThemeId>(normalizeTheme(state.preferences?.theme));
+  const pickTheme = (id: ThemeId) => { setTheme(id); applyThemeToDocument(id); };
+  // If the panel closes with an unsaved theme preview, revert to the saved theme.
+  const savedThemeRef = useRef(state.preferences?.theme);
+  savedThemeRef.current = state.preferences?.theme;
+  useEffect(() => () => applyThemeToDocument(savedThemeRef.current), []);
   const [savingP, setSavingP] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -55,7 +63,7 @@ function Panel({ onClose }: { onClose: () => void }) {
   }
   async function savePrefs() {
     setSavingPrefs(true);
-    await actions.updatePreferences({ pace, transport, family_friendly: family, travelers: travelers ? Number(travelers) : null, with_children: withChildren, children_ages: childrenAges.trim() || null, currency });
+    await actions.updatePreferences({ pace, transport, family_friendly: family, travelers: travelers ? Number(travelers) : null, with_children: withChildren, children_ages: childrenAges.trim() || null, currency, theme });
     setSavingPrefs(false);
     flash("Preferences saved");
   }
@@ -123,6 +131,14 @@ function Panel({ onClose }: { onClose: () => void }) {
               <div className="mt-3"><label className={fieldLabel}>Children&apos;s ages</label><input value={childrenAges} onChange={(e) => setChildrenAges(e.target.value)} placeholder="6, 9" className={field} /></div>
             )}
             <button onClick={savePrefs} disabled={savingPrefs} className="mt-3 px-4 py-2 rounded-[10px] bg-accent text-white text-[13px] font-bold cursor-pointer hover:brightness-[1.06] disabled:opacity-60">Save preferences</button>
+          </section>
+
+          {/* appearance */}
+          <section className="border-t border-line pt-5">
+            <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[.04em] text-muted mb-1"><Settings size={13} strokeWidth={2} className="text-accent" />Appearance</div>
+            <p className="text-[12px] text-muted mb-3">Choose a colour theme for the whole app.</p>
+            <ThemePicker value={theme} onChange={pickTheme} />
+            <button onClick={savePrefs} disabled={savingPrefs} className="mt-3 px-4 py-2 rounded-[10px] bg-accent text-white text-[13px] font-bold cursor-pointer hover:brightness-[1.06] disabled:opacity-60">Save theme</button>
           </section>
 
           {saved && (

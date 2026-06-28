@@ -148,7 +148,7 @@ export function AuthScreen() {
       {/* brand panel */}
       <div
         className="flex-[1_1_440px] min-h-[280px] relative overflow-hidden text-white flex flex-col justify-between"
-        style={{ background: "#002B36", padding: "clamp(32px,4vw,60px)" }}
+        style={{ background: "var(--brand-deep)", padding: "clamp(32px,4vw,60px)" }}
       >
         <div className="relative flex items-center gap-[11px]">
           <Logo size={36} tile="rgba(255,255,255,.16)" />

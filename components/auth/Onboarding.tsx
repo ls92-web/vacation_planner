@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Check, Sparkle } from "@/components/icons";
 import { useAuth } from "@/lib/auth/store";
 import { Logo } from "@/components/Logo";
+import { ThemePicker } from "@/components/theme/ThemePicker";
+import { applyThemeToDocument, normalizeTheme, type ThemeId } from "@/lib/theme/themes";
 
 const QUESTIONS: { key: "traveler_type" | "travel_with" | "pace" | "transport"; q: string; opts: string[] }[] = [
   { key: "traveler_type", q: "What type of traveler are you?", opts: ["Culture seeker", "Foodie", "Outdoorsy", "Relaxed", "Adventurer", "Luxury"] },
@@ -22,10 +24,15 @@ export function Onboarding() {
     transport: p?.transport || "Walking",
   });
   const [family, setFamily] = useState<boolean>(p?.family_friendly ?? true);
+  const [theme, setTheme] = useState<ThemeId>(normalizeTheme(p?.theme));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const set = (k: string, v: string) => setAnswers((a) => ({ ...a, [k]: v }));
+  const pickTheme = (id: ThemeId) => {
+    setTheme(id);
+    applyThemeToDocument(id); // instant live preview across the app
+  };
 
   async function finish() {
     setSaving(true);
@@ -36,6 +43,7 @@ export function Onboarding() {
       pace: answers.pace,
       transport: answers.transport,
       family_friendly: family,
+      theme,
     });
     setSaving(false);
     if (!r.ok) setError(r.error);
@@ -97,6 +105,12 @@ export function Onboarding() {
                   );
                 })}
               </div>
+            </div>
+
+            <div>
+              <div className="text-[13.5px] font-semibold mb-1">Choose your colour theme</div>
+              <p className="text-[12px] text-muted mb-2.5">Sets the look of the whole app — you can change it anytime in Settings.</p>
+              <ThemePicker value={theme} onChange={pickTheme} />
             </div>
           </div>
 

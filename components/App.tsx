@@ -5,6 +5,7 @@ import { AuthProvider } from "@/lib/auth/store";
 import { TripsProvider } from "@/lib/trips/store";
 import { UIProvider } from "@/lib/ui/store";
 import { AuthGate } from "./auth/AuthGate";
+import { ThemeApplier } from "./theme/ThemeApplier";
 import { AppShell } from "./shell/AppShell";
 import { TripsDashboard } from "./trips/TripsDashboard";
 import { RouteBuilder } from "./screens/RouteBuilder";
@@ -30,6 +31,7 @@ function Screens() {
 export function App() {
   return (
     <AuthProvider>
+      <ThemeApplier />
       <AuthGate>
         <UIProvider>
           <TripsProvider>

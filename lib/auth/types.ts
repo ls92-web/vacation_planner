@@ -18,6 +18,7 @@ export interface Preferences {
   with_children: boolean;
   children_ages: string | null;
   currency: string | null;
+  theme: string | null;
 }
 
 export interface SignupInput {
@@ -39,6 +40,7 @@ export interface OnboardingAnswers {
   pace: string;
   transport: string;
   family_friendly: boolean;
+  theme: string;
 }
 
 export type AuthResult = { ok: true } | { ok: false; error: string };

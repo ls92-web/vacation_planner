@@ -42,7 +42,7 @@ export function CityImage({
   }, [name, country, image]);
 
   return (
-    <div className={`relative overflow-hidden ${className}`} style={{ background: "#002B36" }}>
+    <div className={`relative overflow-hidden ${className}`} style={{ background: "var(--brand-deep)" }}>
       {src && (
         // eslint-disable-next-line @next/next/no-img-element
         <img

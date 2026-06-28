@@ -217,7 +217,7 @@ function useProvideAuth() {
         const uid = state.user.id;
         const [{ error: e1 }, { error: e2 }] = await Promise.all([
           sb.from("user_preferences").upsert(
-            { user_id: uid, traveler_type: a.traveler_type, travel_with: a.travel_with, pace: a.pace, transport: a.transport, family_friendly: a.family_friendly },
+            { user_id: uid, traveler_type: a.traveler_type, travel_with: a.travel_with, pace: a.pace, transport: a.transport, family_friendly: a.family_friendly, theme: a.theme },
             { onConflict: "user_id" }
           ),
           sb.from("profiles").update({ onboarded: true }).eq("user_id", uid),

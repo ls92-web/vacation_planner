@@ -23,7 +23,7 @@ function Stat({ icon: Icon, label, value }: { icon: typeof Clock; label: string;
 export function DaySummary({ analysis, units, dayLabel }: { analysis: DayAnalysis; units: "km" | "mi"; dayLabel: string }) {
   if (analysis.stops === 0) return null;
   return (
-    <div className="rounded-[18px] border border-line p-5 text-white relative overflow-hidden" style={{ background: "#002B36" }}>
+    <div className="rounded-[18px] border border-line p-5 text-white relative overflow-hidden" style={{ background: "var(--brand-deep)" }}>
       <div className="relative flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="font-display font-bold text-[40px] leading-none">{analysis.overall.toFixed(1)}<span className="text-[16px] opacity-70">/10</span></div>

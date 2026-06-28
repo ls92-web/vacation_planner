@@ -95,7 +95,7 @@ export function Sidebar() {
 
       {/* current trip */}
       {activeTrip && !collapsed && (
-        <div className="mx-3 mt-3 rounded-[14px] p-3 text-white" style={{ background: "#002B36" }}>
+        <div className="mx-3 mt-3 rounded-[14px] p-3 text-white" style={{ background: "var(--brand-deep)" }}>
           <div className="text-[10.5px] uppercase tracking-[.08em] opacity-70">Current trip</div>
           <div className="font-display font-bold text-[15px] leading-tight mt-0.5 truncate">{activeTrip.name}</div>
           <div className="text-[11.5px] opacity-80 truncate">{activeTrip.destination}</div>
