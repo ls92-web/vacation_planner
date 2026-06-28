@@ -159,7 +159,7 @@ export function AuthScreen() {
             Plan beautifully.<br />Travel effortlessly.
           </div>
           <p className="mt-[18px] max-w-[420px] text-[15.5px] leading-[1.6] text-white/80">
-            Your trips, schedules, saved places and AI day plans — in one private, beautifully organized place.
+            Create AI-powered itineraries, organize hotels, discover attractions, manage budgets, and export beautiful travel plans—all in one private workspace.
           </p>
           <div className="mt-[26px] flex gap-[22px] flex-wrap text-[13px] text-white/85">
             <div><div className="font-display text-[24px] font-bold">Private</div>your data, only yours</div>
