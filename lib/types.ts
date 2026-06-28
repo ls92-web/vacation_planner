@@ -19,6 +19,8 @@ export interface Accommodation {
   conf: string;
   address: string;
   notes: string;
+  /** Optional pasted link (map pin / booking) to reach this stay. */
+  locationUrl?: string;
 }
 
 export interface Destination {

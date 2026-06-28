@@ -16,7 +16,7 @@ import { GoogleMap, MapsApiProvider, DestinationMarkers, OpenInMapsButton } from
 import { CityImage } from "@/components/destinations/CityImage";
 import { useTrip } from "@/lib/store";
 import { withSave } from "@/lib/ui/saveStatus";
-import { Bed, CloudSun } from "lucide-react";
+import { Bed, CloudSun, ExternalLink, PenLine } from "lucide-react";
 import {
   ACCOM_ICONS,
   MODE_ICONS,
@@ -166,6 +166,10 @@ const metaChip = "inline-flex items-center gap-1.5 text-[12px] font-semibold bg-
 function AccommodationCard({ dest, accom }: { dest: Destination; accom: Accommodation }) {
   const { actions } = useTrip();
   const an = nightsBetween(accom.checkin, accom.checkout);
+  const [editingLoc, setEditingLoc] = useState(false);
+  const rawLoc = (accom.locationUrl ?? "").trim();
+  const locHref = rawLoc && !/^https?:\/\//i.test(rawLoc) ? `https://${rawLoc}` : rawLoc;
+  const locLooksValid = /^(https?:\/\/)?[^\s.]+\.[^\s]+/i.test(rawLoc);
   return (
     <div className="bg-[color:color-mix(in_oklab,var(--surface)_94%,var(--bg))] border border-line rounded-[14px] p-3.5 vp-slide-up">
       <div className="flex items-center gap-1.5 flex-wrap">
@@ -195,8 +199,42 @@ function AccommodationCard({ dest, accom }: { dest: Destination; accom: Accommod
           <span className="text-accent flex"><Moon size={14} strokeWidth={2} /></span>{an == null ? "—" : `${an} night${an !== 1 ? "s" : ""}`}
         </div>
       </div>
-      {isMapsConfigured() && accom.address && (
-        <div className="mt-2.5"><OpenInMapsButton href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(accom.address)}`} label="Open in Google Maps" size="sm" /></div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        {isMapsConfigured() && accom.address && (
+          <OpenInMapsButton href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(accom.address)}`} label="Open in Google Maps" size="sm" />
+        )}
+        {!editingLoc && rawLoc && (
+          <>
+            <a href={locHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[10px] border border-line bg-surface text-[12.5px] font-semibold text-accent cursor-pointer hover:border-accent">
+              <MapPin size={14} strokeWidth={2} />Open location<ExternalLink size={12} strokeWidth={2} />
+            </a>
+            <button onClick={() => setEditingLoc(true)} title="Edit location link" className="w-8 h-8 rounded-[10px] border border-line bg-surface text-muted grid place-items-center cursor-pointer hover:text-ink"><PenLine size={13} strokeWidth={2} /></button>
+          </>
+        )}
+        {!editingLoc && !rawLoc && (
+          <button onClick={() => setEditingLoc(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[10px] border border-dashed border-line bg-surface text-[12.5px] font-semibold text-muted cursor-pointer hover:border-accent hover:text-accent">
+            <MapPin size={14} strokeWidth={2} />Add location
+          </button>
+        )}
+      </div>
+      {editingLoc && (
+        <div className="mt-2.5 vp-slide-down">
+          <label className="text-[11.5px] font-semibold text-muted">Location link <span className="font-normal">(optional)</span></label>
+          <div className="flex gap-2 mt-1">
+            <input
+              value={accom.locationUrl ?? ""}
+              onChange={(e) => actions.updateAccom(dest.id, accom.id, "locationUrl", e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setEditingLoc(false); } }}
+              placeholder="Paste a Google Maps or booking link"
+              className="flex-1 px-[13px] py-2.5 border border-line rounded-[10px] text-[13.5px] bg-surface outline-none vp-input"
+              autoFocus
+            />
+            <button onClick={() => setEditingLoc(false)} className="px-3.5 py-2.5 rounded-[10px] bg-accent text-white text-[13px] font-bold cursor-pointer hover:brightness-[1.06]">Done</button>
+            {rawLoc && <button onClick={() => { actions.updateAccom(dest.id, accom.id, "locationUrl", ""); setEditingLoc(false); }} title="Remove link" className="px-3 py-2.5 rounded-[10px] border border-line text-muted text-[13px] font-semibold cursor-pointer hover:text-[#9A6512] hover:border-[#9A6512]">Remove</button>}
+          </div>
+          {rawLoc && !locLooksValid && <p className="text-[11.5px] mt-1" style={{ color: "#9A6512" }}>Enter a full link, e.g. https://maps.google.com/…</p>}
+          <p className="text-[11.5px] text-muted mt-1">Paste a map pin or booking link you can open later to reach this stay.</p>
+        </div>
       )}
     </div>
   );

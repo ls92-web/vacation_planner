@@ -314,7 +314,7 @@ export function useTripStore() {
           scrollId: "dest-" + id,
           destinations: [
             ...s.destinations.map((d) => ({ ...d, expanded: false })),
-            { id, name: "", country: "", saved: false, expanded: true, arrive: "", depart: "", accoms: [{ id: aid, type: "Hotel" as AccomType, name: "", checkin: "", checkout: "", conf: "", address: "", notes: "" }] },
+            { id, name: "", country: "", saved: false, expanded: true, arrive: "", depart: "", accoms: [{ id: aid, type: "Hotel" as AccomType, name: "", checkin: "", checkout: "", conf: "", address: "", notes: "", locationUrl: "" }] },
           ],
         }));
       },
@@ -363,7 +363,7 @@ export function useTripStore() {
         setState((s) => ({
           ...s,
           scrollId: "accom-" + aid,
-          destinations: s.destinations.map((d) => (d.id !== destId ? d : { ...d, accoms: [...d.accoms, { id: aid, type: "Hotel" as AccomType, name: "", checkin: d.arrive || "", checkout: d.depart || "", conf: "", address: "", notes: "" }] })),
+          destinations: s.destinations.map((d) => (d.id !== destId ? d : { ...d, accoms: [...d.accoms, { id: aid, type: "Hotel" as AccomType, name: "", checkin: d.arrive || "", checkout: d.depart || "", conf: "", address: "", notes: "", locationUrl: "" }] })),
         }));
       },
       removeAccom: (destId: number, accomId: number) =>
