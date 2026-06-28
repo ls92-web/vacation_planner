@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Check, ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, RotateCcw } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useTrip } from "@/lib/store";
 
 export const acctInput =
   "w-full px-3.5 py-2.5 border border-line rounded-[11px] text-[14px] bg-surface text-ink outline-none vp-input";
@@ -60,13 +61,14 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
   );
 }
 
-/** A rounded settings card that saves independently with a success animation. */
+/** A rounded settings card that saves independently, with reset + a success toast. */
 export function SettingCard({
   icon: Icon,
   title,
   description,
   dirty,
   onSave,
+  onReset,
   saveLabel = "Save changes",
   children,
   danger,
@@ -76,27 +78,25 @@ export function SettingCard({
   description?: string;
   dirty?: boolean;
   onSave?: () => Promise<boolean>;
+  onReset?: () => void;
   saveLabel?: string;
   children: ReactNode;
   danger?: boolean;
 }) {
+  const flash = useTrip().actions.flash;
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   async function handleSave() {
     if (!onSave) return;
     setSaving(true);
     const ok = await onSave();
     setSaving(false);
-    if (ok) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2400);
-    }
+    if (ok) flash("Saved successfully");
   }
 
   return (
     <section
-      className="rounded-[18px] border bg-surface p-5 sm:p-6"
+      className="rounded-[18px] border bg-surface p-5 sm:p-6 transition-shadow"
       style={{ borderColor: danger ? "color-mix(in oklab, #b3402f 45%, var(--line))" : "var(--line)", boxShadow: "0 6px 24px -18px rgba(0,0,0,.3)" }}
     >
       <div className="flex items-start gap-3">
@@ -114,7 +114,7 @@ export function SettingCard({
       <div className="mt-4">{children}</div>
 
       {onSave && (
-        <div className="mt-5 flex items-center gap-3">
+        <div className="mt-5 flex items-center gap-2.5 flex-wrap">
           <button
             onClick={handleSave}
             disabled={!dirty || saving}
@@ -122,21 +122,40 @@ export function SettingCard({
           >
             {saving ? <Loader2 size={15} className="vp-spin" /> : null}{saveLabel}
           </button>
-          {saved ? (
-            <span className="vp-pop inline-flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: "var(--color-ok)" }}><Check size={14} strokeWidth={2.5} />Saved successfully</span>
-          ) : dirty ? (
-            <span className="text-[12px] text-muted">Unsaved changes</span>
-          ) : null}
+          {onReset && dirty && !saving && (
+            <button
+              onClick={onReset}
+              className="vp-pop inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-muted text-[13.5px] font-bold cursor-pointer transition hover:text-ink hover:border-accent"
+            >
+              <RotateCcw size={14} strokeWidth={2.2} />Reset changes
+            </button>
+          )}
+          <span className="flex-1" />
+          {dirty && !saving && (
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-muted">
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#c08a2e" }} />Unsaved changes
+            </span>
+          )}
         </div>
       )}
     </section>
   );
 }
 
-export function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
+export function PageHeader({ title, subtitle, dirty }: { title: string; subtitle: string; dirty?: boolean }) {
   return (
     <div className="mb-6">
-      <h1 className="font-display font-bold text-[clamp(24px,3vw,32px)] tracking-[-.02em]">{title}</h1>
+      <div className="flex items-center gap-3 flex-wrap">
+        <h1 className="font-display font-bold text-[clamp(24px,3vw,32px)] tracking-[-.02em]">{title}</h1>
+        {dirty && (
+          <span
+            className="vp-pop inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold"
+            style={{ background: "#fbf0dd", color: "#8a5a12" }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#c08a2e" }} />You have unsaved changes
+          </span>
+        )}
+      </div>
       <p className="text-muted text-[14.5px] mt-1.5">{subtitle}</p>
     </div>
   );

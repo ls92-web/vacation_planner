@@ -82,19 +82,35 @@ export function SettingsPage() {
     return true;
   };
 
+  // ---- reset handlers (restore each card to its last-saved values) ----
+  const resetTheme = () => { setTheme(normalizeTheme(p?.theme)); applyThemeToDocument(p?.theme); };
+  const resetTravel = () => {
+    setPace(g(p?.pace, "Balanced")); setTransport(g(p?.transport, "Driving"));
+    setTravelers(p?.travelers != null ? String(p.travelers) : "2"); setCurrency(g(p?.currency, "KWD"));
+    setDistance(g(p?.distance_unit, "km")); setTemp(g(p?.temperature_unit, "C"));
+  };
+  const resetAI = () => {
+    setFamily(p?.family_friendly ?? true); setWithKids(p?.with_children ?? false); setKidsAges(g(p?.children_ages, ""));
+    setStyle(g(p?.travel_style, "Mid-range")); setAccom(g(p?.accommodation, "Hotel")); setFood(g(p?.food_pref, "No preference")); setAccess(g(p?.accessibility, ""));
+  };
+  const resetExport = () => {
+    setTemplate(g(p?.export_template, "Luxury")); setPaper(g(p?.paper_size, "A4"));
+    setLayout(g(p?.itinerary_layout, "Timeline")); setExLang(g(p?.export_language, "English"));
+  };
+
   return (
     <div className="vp-scroll min-h-full" style={{ background: "var(--bg)" }}>
       <div className="max-w-[820px] mx-auto px-[clamp(16px,3vw,28px)] py-6 vp-fade">
-        <PageHeader title="Settings" subtitle="Configure how Itinera looks and plans your trips." />
+        <PageHeader title="Settings" subtitle="Configure how Itinera looks and plans your trips." dirty={anyDirty} />
 
         <div className="flex flex-col gap-5">
           {/* appearance */}
-          <SettingCard icon={Palette} title="Appearance" description="Choose a colour theme for the whole app." dirty={themeDirty} saveLabel="Save theme" onSave={() => save({ theme })}>
+          <SettingCard icon={Palette} title="Appearance" description="Choose a colour theme for the whole app." dirty={themeDirty} saveLabel="Save theme" onSave={() => save({ theme })} onReset={resetTheme}>
             <ThemePicker value={theme} onChange={pickTheme} />
           </SettingCard>
 
           {/* travel defaults */}
-          <SettingCard icon={Route} title="Travel defaults" description="Sensible defaults applied to every new trip." dirty={travelDirty} onSave={() => save({ pace, transport, travelers: travelers ? Number(travelers) : null, currency, distance_unit: distance, temperature_unit: temp })}>
+          <SettingCard icon={Route} title="Travel defaults" description="Sensible defaults applied to every new trip." dirty={travelDirty} onReset={resetTravel} onSave={() => save({ pace, transport, travelers: travelers ? Number(travelers) : null, currency, distance_unit: distance, temperature_unit: temp })}>
             <div className="flex flex-col gap-4">
               <Field label="Preferred travel pace"><Segmented value={pace} onChange={setPace} options={PACE} /></Field>
               <Field label="Preferred transport"><Segmented value={transport} onChange={setTransport} options={TRANSPORT} /></Field>
@@ -110,7 +126,7 @@ export function SettingsPage() {
           </SettingCard>
 
           {/* AI preferences */}
-          <SettingCard icon={Sparkles} title="AI preferences" description="Shape the recommendations the AI makes for you." dirty={aiDirty} onSave={() => save({ family_friendly: family, with_children: withKids, children_ages: kidsAges.trim() || null, travel_style: style, accommodation: accom, food_pref: food, accessibility: access.trim() || null })}>
+          <SettingCard icon={Sparkles} title="AI preferences" description="Shape the recommendations the AI makes for you." dirty={aiDirty} onReset={resetAI} onSave={() => save({ family_friendly: family, with_children: withKids, children_ages: kidsAges.trim() || null, travel_style: style, accommodation: accom, food_pref: food, accessibility: access.trim() || null })}>
             <div className="flex flex-col gap-4">
               <div className="rounded-[12px] border border-line p-3.5 flex flex-col gap-3">
                 <Toggle on={family} onChange={setFamily} label="Family-friendly recommendations" />
@@ -126,7 +142,7 @@ export function SettingsPage() {
           </SettingCard>
 
           {/* export preferences */}
-          <SettingCard icon={FileDown} title="Export preferences" description="Defaults for your exported travel book." dirty={exportDirty} onSave={() => save({ export_template: template, paper_size: paper, itinerary_layout: layout, export_language: exLang })}>
+          <SettingCard icon={FileDown} title="Export preferences" description="Defaults for your exported travel book." dirty={exportDirty} onReset={resetExport} onSave={() => save({ export_template: template, paper_size: paper, itinerary_layout: layout, export_language: exLang })}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Default PDF template"><SelectInput value={template} onChange={setTemplate} options={TEMPLATES} /></Field>
               <Field label="Default language"><SelectInput value={exLang} onChange={setExLang} options={EXPORT_LANG} /></Field>

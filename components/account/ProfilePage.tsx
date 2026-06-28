@@ -64,6 +64,14 @@ export function ProfilePage() {
     return true;
   }
 
+  function resetPersonal() {
+    setFullName(profile?.full_name ?? "");
+    setUsername(profile?.username ?? "");
+    setCountry(profile?.country ?? "");
+    setLanguage(profile?.language ?? "English");
+    setTimezone(profile?.timezone ?? "Asia/Kuwait");
+  }
+
   async function onAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -110,7 +118,7 @@ export function ProfilePage() {
   return (
     <div className="vp-scroll min-h-full" style={{ background: "var(--bg)" }}>
       <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] py-6 vp-fade">
-        <PageHeader title="Profile" subtitle="Manage your personal account details and security." />
+        <PageHeader title="Profile" subtitle="Manage your personal account details and security." dirty={piDirty} />
 
         <div className="flex flex-col gap-5">
           {/* header card */}
@@ -147,7 +155,7 @@ export function ProfilePage() {
           </section>
 
           {/* personal information */}
-          <SettingCard icon={UserCircle} title="Personal information" description="Your name and where you're based." dirty={piDirty} onSave={savePersonal}>
+          <SettingCard icon={UserCircle} title="Personal information" description="Your name and where you're based." dirty={piDirty} onSave={savePersonal} onReset={resetPersonal}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Full name"><input value={fullName} onChange={(e) => setFullName(e.target.value)} className={acctInput} /></Field>
               <Field label="Username"><input value={username} onChange={(e) => setUsername(e.target.value)} className={acctInput} /></Field>

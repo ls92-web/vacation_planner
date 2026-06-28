@@ -24,9 +24,12 @@ function useProvideAuth() {
   const loadedFor = useRef<string | null>(null);
 
   const loadProfile = useCallback(
-    async (userId: string) => {
+    async (userId: string, opts?: { silent?: boolean }) => {
       if (!sb) return;
-      setState((s) => ({ ...s, profileLoaded: false }));
+      // A silent refresh (after saving profile/prefs) must NOT flip profileLoaded,
+      // or AuthGate would briefly show the splash and remount the whole app —
+      // bouncing the user off Profile/Settings and dropping the "Saved" toast.
+      if (!opts?.silent) setState((s) => ({ ...s, profileLoaded: false }));
       try {
         const work = Promise.all([
           sb.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
@@ -270,7 +273,7 @@ function useProvideAuth() {
         if (!sb || !state.user) return fail("Not signed in.");
         const { error } = await sb.from("profiles").update(patch).eq("user_id", state.user.id);
         if (error) return fail(error.message);
-        await loadProfile(state.user.id);
+        await loadProfile(state.user.id, { silent: true });
         return { ok: true };
       },
 
@@ -278,7 +281,7 @@ function useProvideAuth() {
         if (!sb || !state.user) return fail("Not signed in.");
         const { error } = await sb.from("user_preferences").upsert({ user_id: state.user.id, ...patch }, { onConflict: "user_id" });
         if (error) return fail(error.message);
-        await loadProfile(state.user.id);
+        await loadProfile(state.user.id, { silent: true });
         return { ok: true };
       },
 
