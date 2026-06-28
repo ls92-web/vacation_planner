@@ -209,6 +209,45 @@ function useProvideAuth() {
         const { error } = await sb.auth.updateUser({ password });
         if (error) return fail(error.message);
         setState((s) => ({ ...s, recovery: false }));
+        const uid = state.user?.id;
+        if (uid) {
+          await sb.from("profiles").update({ password_changed_at: new Date().toISOString() }).eq("user_id", uid);
+          await loadProfile(uid);
+        }
+        return { ok: true };
+      },
+
+      async changeEmail(email: string): Promise<AuthResult> {
+        if (!sb) return fail("Auth is not configured.");
+        const next = email.trim();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) return fail("Enter a valid email address.");
+        const { error } = await sb.auth.updateUser(
+          { email: next },
+          { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined }
+        );
+        return error ? fail(error.message) : { ok: true };
+      },
+
+      async uploadAvatar(file: File): Promise<AuthResult> {
+        if (!sb || !state.user) return fail("Not signed in.");
+        const uid = state.user.id;
+        const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+        const path = `${uid}/avatar_${Date.now()}.${ext}`;
+        const { error: upErr } = await sb.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
+        if (upErr) return fail(upErr.message);
+        const { data } = sb.storage.from("avatars").getPublicUrl(path);
+        const { error } = await sb.from("profiles").update({ avatar_url: data.publicUrl }).eq("user_id", uid);
+        if (error) return fail(error.message);
+        await loadProfile(uid);
+        return { ok: true };
+      },
+
+      async removeAvatar(): Promise<AuthResult> {
+        if (!sb || !state.user) return fail("Not signed in.");
+        const uid = state.user.id;
+        const { error } = await sb.from("profiles").update({ avatar_url: null }).eq("user_id", uid);
+        if (error) return fail(error.message);
+        await loadProfile(uid);
         return { ok: true };
       },
 
@@ -227,7 +266,7 @@ function useProvideAuth() {
         return { ok: true };
       },
 
-      async updateProfile(patch: Partial<Pick<Profile, "full_name" | "country" | "username">>): Promise<AuthResult> {
+      async updateProfile(patch: Partial<Pick<Profile, "full_name" | "country" | "username" | "language" | "timezone" | "avatar_url">>): Promise<AuthResult> {
         if (!sb || !state.user) return fail("Not signed in.");
         const { error } = await sb.from("profiles").update(patch).eq("user_id", state.user.id);
         if (error) return fail(error.message);

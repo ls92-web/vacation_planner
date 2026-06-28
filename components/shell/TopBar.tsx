@@ -15,6 +15,8 @@ const SCREEN_LABEL: Record<Screen, string> = {
   explore: "Explore & Plan",
   generating: "Generating",
   plan: "Itinerary",
+  profile: "Profile",
+  settings: "Settings",
 };
 
 function relativeTime(ts: number): string {
@@ -52,6 +54,7 @@ function SaveStatus() {
 export function TopBar() {
   const { state, actions } = useTrip();
   const { activeTrip } = useTrips();
+  const isAccount = state.screen === "profile" || state.screen === "settings";
 
   return (
     <header className="sticky top-0 z-40 h-[60px] border-b border-line flex items-center gap-4 px-4 sm:px-6" style={{ background: "color-mix(in oklab, var(--bg) 82%, #fff)", backdropFilter: "blur(12px)" }}>
@@ -59,20 +62,37 @@ export function TopBar() {
       <div className="min-w-0 flex-1">
         <div className="hidden sm:flex items-center gap-1.5 text-[11.5px] text-muted">
           <button onClick={actions.goTrips} className="hover:text-ink cursor-pointer">Dashboard</button>
-          <ChevronRight size={12} strokeWidth={2} />
-          <button onClick={actions.goTrips} className="hover:text-ink cursor-pointer">My Trips</button>
-          {activeTrip && (
+          {isAccount ? (
             <>
               <ChevronRight size={12} strokeWidth={2} />
-              <span className="text-ink font-semibold truncate max-w-[180px]">{activeTrip.name}</span>
+              <span>Account</span>
+              <ChevronRight size={12} strokeWidth={2} />
+              <span className="text-ink font-semibold">{SCREEN_LABEL[state.screen]}</span>
+            </>
+          ) : (
+            <>
+              <ChevronRight size={12} strokeWidth={2} />
+              <button onClick={actions.goTrips} className="hover:text-ink cursor-pointer">My Trips</button>
+              {activeTrip && (
+                <>
+                  <ChevronRight size={12} strokeWidth={2} />
+                  <span className="text-ink font-semibold truncate max-w-[180px]">{activeTrip.name}</span>
+                </>
+              )}
+              <ChevronRight size={12} strokeWidth={2} />
+              <span>{SCREEN_LABEL[state.screen]}</span>
             </>
           )}
-          <ChevronRight size={12} strokeWidth={2} />
-          <span>{SCREEN_LABEL[state.screen]}</span>
         </div>
         <div className="flex items-baseline gap-2 mt-0.5">
-          <span className={`truncate ${activeTrip ? "font-display font-bold text-[16px] tracking-[-.01em]" : "font-brand font-semibold text-[18px]"}`}>{activeTrip?.name ?? "Itinera"}</span>
-          {activeTrip && <span className="text-[12.5px] text-muted truncate hidden md:inline">· {activeTrip.destination}</span>}
+          {isAccount ? (
+            <span className="font-display font-bold text-[16px] tracking-[-.01em] truncate">{SCREEN_LABEL[state.screen]}</span>
+          ) : (
+            <>
+              <span className={`truncate ${activeTrip ? "font-display font-bold text-[16px] tracking-[-.01em]" : "font-brand font-semibold text-[18px]"}`}>{activeTrip?.name ?? "Itinera"}</span>
+              {activeTrip && <span className="text-[12.5px] text-muted truncate hidden md:inline">· {activeTrip.destination}</span>}
+            </>
+          )}
         </div>
       </div>
 

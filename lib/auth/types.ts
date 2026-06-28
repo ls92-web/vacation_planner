@@ -4,6 +4,10 @@ export interface Profile {
   full_name: string | null;
   username: string | null;
   country: string | null;
+  avatar_url: string | null;
+  language: string | null;
+  timezone: string | null;
+  password_changed_at: string | null;
   onboarded: boolean;
 }
 
@@ -19,6 +23,16 @@ export interface Preferences {
   children_ages: string | null;
   currency: string | null;
   theme: string | null;
+  distance_unit: string | null;
+  temperature_unit: string | null;
+  travel_style: string | null;
+  accommodation: string | null;
+  food_pref: string | null;
+  accessibility: string | null;
+  export_template: string | null;
+  paper_size: string | null;
+  itinerary_layout: string | null;
+  export_language: string | null;
 }
 
 export interface SignupInput {

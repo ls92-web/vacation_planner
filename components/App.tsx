@@ -12,6 +12,8 @@ import { RouteBuilder } from "./screens/RouteBuilder";
 import { ExploreExperience } from "./explore/ExploreExperience";
 import { GeneratingScreen } from "./screens/Generating";
 import { Itinerary } from "./screens/Itinerary";
+import { ProfilePage } from "./account/ProfilePage";
+import { SettingsPage } from "./account/SettingsPage";
 import { Toast } from "./Toast";
 
 function Screens() {
@@ -23,6 +25,8 @@ function Screens() {
       {state.screen === "explore" && <ExploreExperience />}
       {state.screen === "generating" && <GeneratingScreen />}
       {state.screen === "plan" && <Itinerary />}
+      {state.screen === "profile" && <ProfilePage />}
+      {state.screen === "settings" && <SettingsPage />}
       <Toast />
     </>
   );

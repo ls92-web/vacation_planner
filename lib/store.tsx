@@ -253,6 +253,14 @@ export function useTripStore() {
       // auth
       toggleAuth: () => set((s) => ({ authMode: s.authMode === "signin" ? "signup" : "signin" })),
       goForm: () => set({ screen: "form" }),
+      goProfile: () => {
+        set({ screen: "profile" });
+        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+      },
+      goSettings: () => {
+        set({ screen: "settings" });
+        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+      },
       goTrips: () => {
         set({ screen: "trips" });
         requestAnimationFrame(() => window.scrollTo({ top: 0 }));
