@@ -14,9 +14,14 @@ import type { Accommodation, Destination } from "@/lib/types";
 import { destinationCoords, isMapsConfigured, useGeocode, type LatLng, type MapMarker } from "@/lib/maps";
 import { GoogleMap, MapsApiProvider, DestinationMarkers, OpenInMapsButton } from "@/components/maps";
 import { CityImage } from "@/components/destinations/CityImage";
+import { BudgetPanel } from "@/components/destinations/BudgetPanel";
+import { WeatherPanel } from "@/components/destinations/WeatherPanel";
 import { useTrip } from "@/lib/store";
 import { withSave } from "@/lib/ui/saveStatus";
-import { Bed, CloudSun, ExternalLink, PenLine } from "lucide-react";
+import { addBreakdowns, computeBudget, fmtMoney, EMPTY_BREAKDOWN, BUDGET_LEVELS } from "@/lib/budget/estimate";
+import { useWeather } from "@/lib/weather/client";
+import { describeWeather } from "@/lib/weather/codes";
+import { Bed, Cloud, ExternalLink, Loader2, PenLine, Wallet } from "lucide-react";
 import {
   ACCOM_ICONS,
   MODE_ICONS,
@@ -48,10 +53,6 @@ function statusFor(dn: number | null, booked: number): Status {
 const STEPS = ["Route", "Travelers", "Preferences", "Explore", "Build Schedule", "Review", "Export"];
 const fieldLabel = "text-[12px] font-semibold text-muted";
 const fieldInput = "w-full mt-1.5 px-3 py-2.5 border border-line rounded-[11px] text-[14px] bg-surface outline-none vp-input";
-
-function estBudget(nights: number, travelers: number): number {
-  return Math.round((nights * 130 + 60) * Math.max(1, travelers / 2) / 10) * 10;
-}
 
 /* ============================ stepper ============================ */
 
@@ -106,8 +107,15 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
+const BUDGET_CATS: { key: "hotels" | "activities" | "food" | "transport"; label: string }[] = [
+  { key: "hotels", label: "Hotels" },
+  { key: "activities", label: "Activities" },
+  { key: "food", label: "Food" },
+  { key: "transport", label: "Transport" },
+];
+
 function TripOverview() {
-  const { state } = useTrip();
+  const { state, actions } = useTrip();
   const dests = state.destinations;
   const saved = dests.filter((d) => d.saved);
   const totalNights = dests.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
@@ -116,9 +124,16 @@ function TripOverview() {
   const arrives = dests.map((d) => d.arrive).filter(Boolean).sort();
   const departs = dests.map((d) => d.depart).filter(Boolean).sort();
   const span = arrives[0] && departs.length ? `${fmtMonthDay(arrives[0])} – ${fmtMonthDay(departs[departs.length - 1])}` : "Set dates";
-  const budget = estBudget(totalNights, travelers);
 
-  // completion: dates + accommodation coverage across saved destinations
+  // aggregate budget breakdown (per-destination overrides respected in the total)
+  let agg = EMPTY_BREAKDOWN;
+  let budgetTotal = 0;
+  for (const d of dests) {
+    const b = computeBudget({ travelers, nights: nightsBetween(d.arrive, d.depart) || 0, hotels: d.accoms.length, level: state.budgetLevel });
+    agg = addBreakdowns(agg, b);
+    budgetTotal += typeof d.budgetOverride === "number" ? d.budgetOverride : b.total;
+  }
+
   let completion = 0;
   if (dests.length) {
     let pts = 0;
@@ -146,9 +161,31 @@ function TripOverview() {
           <Stat label="Nights" value={String(totalNights)} />
           <Stat label="Hotels" value={String(hotels)} />
           <Stat label="Travelers" value={String(travelers)} />
-          <Stat label="Est. budget" value={`€${budget}`} />
+          <Stat label="Est. budget" value={fmtMoney(budgetTotal)} />
         </div>
       </div>
+
+      {/* estimated budget breakdown + level */}
+      <div className="mt-4 pt-4 border-t" style={{ borderColor: "color-mix(in oklab, var(--accent) 16%, transparent)" }}>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="text-[11.5px] font-bold uppercase tracking-[.06em] text-muted flex items-center gap-1.5"><Wallet size={13} strokeWidth={2} className="text-accent" />Estimated budget</div>
+          <div className="flex items-center gap-1 p-0.5 rounded-[10px] bg-surface border border-line">
+            {BUDGET_LEVELS.map((l) => {
+              const on = l.key === state.budgetLevel;
+              return (
+                <button key={l.key} onClick={() => actions.setBudgetLevel(l.key)} title={l.hint} className="px-2.5 py-1 rounded-[8px] text-[11.5px] font-bold cursor-pointer transition" style={{ background: on ? "var(--accent)" : "transparent", color: on ? "#fff" : "var(--muted)" }}>{l.label}</button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          {BUDGET_CATS.map((c) => (
+            <span key={c.key} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-surface border border-line text-[12px] text-ink"><span className="text-muted">{c.label}</span><span className="font-bold tabular-nums">{fmtMoney(agg[c.key])}</span></span>
+          ))}
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-accent text-white text-[12px] font-bold tabular-nums">Total {fmtMoney(budgetTotal)}</span>
+        </div>
+      </div>
+
       <div className="mt-4 pt-4 border-t flex items-center gap-2" style={{ borderColor: "color-mix(in oklab, var(--accent) 16%, transparent)" }}>
         <Sparkle size={15} strokeWidth={1.7} className="text-accent shrink-0" />
         <span className="text-[12.5px] text-ink leading-snug">
@@ -291,7 +328,13 @@ function DestinationCard({ dest, index, last }: { dest: Destination; index: numb
   const booked = dest.accoms.reduce((s, a) => s + (nightsBetween(a.checkin, a.checkout) || 0), 0);
   const st = statusFor(n, booked);
   const canSave = !!(dest.name && dest.arrive && dest.depart && n != null);
-  const budget = estBudget(n || 0, state.adults + state.kids);
+
+  const travelers = state.adults + state.kids;
+  const breakdown = computeBudget({ travelers, nights: n || 0, hotels: dest.accoms.length, level: state.budgetLevel });
+  const budgetTotal = typeof dest.budgetOverride === "number" ? dest.budgetOverride : breakdown.total;
+  const hasCoords = typeof dest.lat === "number" && typeof dest.lng === "number" && !(dest.lat === 0 && dest.lng === 0);
+  const [panel, setPanel] = useState<"budget" | "weather" | null>(null);
+  const weather = useWeather(hasCoords ? dest.lat : undefined, hasCoords ? dest.lng : undefined, dest.arrive, dest.depart);
 
   return (
     <>
@@ -342,16 +385,61 @@ function DestinationCard({ dest, index, last }: { dest: Destination; index: numb
                 </div>
               </button>
 
-              {/* badges */}
+              {/* badges + interactive chips */}
               <div className="px-4 py-3 flex items-center gap-2 flex-wrap border-b border-line">
                 <span className={metaChip}><Moon size={13} strokeWidth={2} className="text-accent" />{n ?? 0} night{n !== 1 ? "s" : ""}</span>
                 <span className={metaChip}><Building size={13} strokeWidth={2} className="text-accent" />{dest.accoms.length} hotel{dest.accoms.length !== 1 ? "s" : ""}</span>
-                <span className={metaChip}><CreditCard size={13} strokeWidth={2} className="text-accent" />~€{budget}</span>
-                <span className={metaChip}><CloudSun size={13} strokeWidth={2} className="text-accent" />Weather —</span>
-                <span className={metaChip}><Star size={13} strokeWidth={2} className="text-accent" />0 activities</span>
+
+                {/* budget chip */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setPanel((p) => (p === "budget" ? null : "budget")); }}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-[5px] rounded-lg cursor-pointer transition border"
+                  style={{ background: panel === "budget" ? "var(--surface)" : "var(--tint)", borderColor: panel === "budget" ? "var(--accent)" : "transparent", color: "var(--ink)" }}
+                >
+                  <Wallet size={13} strokeWidth={2} className="text-accent" />{fmtMoney(budgetTotal)}
+                  {typeof dest.budgetOverride === "number" && <span className="text-accent">*</span>}
+                </button>
+
+                {/* weather chip */}
+                {hasCoords && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPanel((p) => (p === "weather" ? null : "weather")); }}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-[5px] rounded-lg cursor-pointer transition border"
+                    style={{ background: panel === "weather" ? "var(--surface)" : "var(--tint)", borderColor: panel === "weather" ? "var(--accent)" : "transparent", color: "var(--ink)" }}
+                  >
+                    {weather.state === "ready" && weather.data ? (
+                      (() => { const Icon = describeWeather(weather.data.summary.code).icon; const temp = weather.data.current?.temp ?? weather.data.summary.tMax; return <><Icon size={13} strokeWidth={2} className="text-accent" />{temp}°{weather.data.mode === "seasonal" ? " avg" : ""}</>; })()
+                    ) : weather.state === "loading" ? (
+                      <><Loader2 size={13} className="vp-spin text-accent" />Weather</>
+                    ) : (
+                      <><Cloud size={13} strokeWidth={2} className="text-muted" />Weather</>
+                    )}
+                  </button>
+                )}
+
                 <div className="flex-1" />
                 <button onClick={(e) => { e.stopPropagation(); actions.removeDest(dest.id); }} title="Remove" className="w-[30px] h-[30px] rounded-[9px] border border-line bg-surface text-muted grid place-items-center cursor-pointer hover:border-[#d9534f] hover:text-[#d9534f]"><Trash2 size={15} strokeWidth={2} /></button>
               </div>
+
+              {/* budget / weather detail panel */}
+              {panel && (
+                <div className="px-4 py-3 border-b border-line">
+                  {panel === "budget" && (
+                    <BudgetPanel
+                      breakdown={breakdown}
+                      level={state.budgetLevel}
+                      override={dest.budgetOverride}
+                      travelers={travelers}
+                      nights={n || 0}
+                      onLevel={actions.setBudgetLevel}
+                      onOverride={(v) => actions.setDestBudget(dest.id, v)}
+                    />
+                  )}
+                  {panel === "weather" && hasCoords && (
+                    <WeatherPanel lat={dest.lat} lng={dest.lng} arrive={dest.arrive} depart={dest.depart} />
+                  )}
+                </div>
+              )}
 
               {/* expanded */}
               {dest.expanded && (

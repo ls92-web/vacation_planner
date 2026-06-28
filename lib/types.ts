@@ -36,6 +36,8 @@ export interface Destination {
   arrive: string;
   depart: string;
   accoms: Accommodation[];
+  /** Manual budget override (EUR). When set, replaces the estimated total. */
+  budgetOverride?: number | null;
 }
 
 export interface Place {

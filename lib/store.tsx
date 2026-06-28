@@ -33,6 +33,7 @@ import type {
 } from "./types";
 import type { AIMessage, TripContext } from "./ai";
 import type { SelectedDestination } from "./geo";
+import type { BudgetLevel } from "./budget/estimate";
 import { fetchItinerary, streamAssistantReply } from "./ai-client";
 import { placeCoords } from "./maps/coords";
 import type { PlaceResult } from "./maps/types";
@@ -47,6 +48,7 @@ interface AppState {
   kids: number;
   pace: string;
   destinations: Destination[];
+  budgetLevel: BudgetLevel;
   transports: Record<string, TransportMode>;
   dragId: number | null;
   dragOverId: number | null;
@@ -86,6 +88,7 @@ const INITIAL: AppState = {
   kids: 2,
   pace: "balanced",
   destinations: INITIAL_DESTINATIONS,
+  budgetLevel: "standard",
   transports: {},
   dragId: null,
   dragOverId: null,
@@ -302,6 +305,11 @@ export function useTripStore() {
       /** Collapse every saved destination card. */
       collapseAllDests: () =>
         setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.saved ? { ...d, expanded: false } : d)) })),
+      /** Trip-wide budget level — recalculates every estimate. */
+      setBudgetLevel: (level: BudgetLevel) => setState((s) => ({ ...s, budgetLevel: level })),
+      /** Manual per-destination budget override (null clears it). */
+      setDestBudget: (id: number, value: number | null) =>
+        setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.id === id ? { ...d, budgetOverride: value } : d)) })),
       saveDest: (id: number) => {
         setState((s) => ({ ...s, scrollId: "dest-" + id, destinations: s.destinations.map((d) => (d.id === id ? { ...d, saved: true, expanded: true } : d)) }));
         pulseRouting();
