@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Check, ChevronDown, LogOut, Settings, TrashIcon, User, X } from "@/components/icons";
 import { useAuth } from "@/lib/auth/store";
 import { subscribeAccount } from "@/lib/ui/account";
+import { CURRENCIES, DEFAULT_CURRENCY } from "@/lib/budget/estimate";
 
 const fieldLabel = "text-[12px] font-semibold text-muted";
 const field = "w-full mt-1.5 px-3 py-2.5 border border-line rounded-[10px] text-[14px] bg-white outline-none vp-input";
@@ -38,6 +39,7 @@ function Panel({ onClose }: { onClose: () => void }) {
   const [travelers, setTravelers] = useState(state.preferences?.travelers != null ? String(state.preferences.travelers) : "");
   const [withChildren, setWithChildren] = useState(state.preferences?.with_children ?? false);
   const [childrenAges, setChildrenAges] = useState(state.preferences?.children_ages ?? "");
+  const [currency, setCurrency] = useState(state.preferences?.currency ?? DEFAULT_CURRENCY);
   const [savingP, setSavingP] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -53,7 +55,7 @@ function Panel({ onClose }: { onClose: () => void }) {
   }
   async function savePrefs() {
     setSavingPrefs(true);
-    await actions.updatePreferences({ pace, transport, family_friendly: family, travelers: travelers ? Number(travelers) : null, with_children: withChildren, children_ages: childrenAges.trim() || null });
+    await actions.updatePreferences({ pace, transport, family_friendly: family, travelers: travelers ? Number(travelers) : null, with_children: withChildren, children_ages: childrenAges.trim() || null, currency });
     setSavingPrefs(false);
     flash("Preferences saved");
   }
@@ -99,6 +101,16 @@ function Panel({ onClose }: { onClose: () => void }) {
               <div><label className={fieldLabel}>Transport</label><Select value={transport} onChange={setTransport} options={["Walking", "Driving", "Public transport"]} /></div>
             </div>
             <div className="mt-3"><label className={fieldLabel}>Number of travelers</label><input type="number" min={1} max={12} value={travelers} onChange={(e) => setTravelers(e.target.value)} className={field} /></div>
+            <div className="mt-3">
+              <label className={fieldLabel}>Currency</label>
+              <div className="relative mt-1.5">
+                <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full px-3 py-2.5 border border-line rounded-[10px] text-[14px] bg-white outline-none appearance-none cursor-pointer vp-input">
+                  {Object.values(CURRENCIES).map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+                </select>
+                <ChevronDown size={14} strokeWidth={2} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+              </div>
+              <p className="text-[11.5px] text-muted mt-1">All budgets and costs are shown in this currency.</p>
+            </div>
             <div className="mt-3 flex items-center justify-between">
               <span className="text-[13px] text-ink">Family-friendly AI suggestions</span>
               <Toggle on={family} onClick={() => setFamily((v) => !v)} />

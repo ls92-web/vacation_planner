@@ -20,7 +20,8 @@ import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { saveTrip } from "@/lib/destinations/repository";
 import { withSave } from "@/lib/ui/saveStatus";
-import { addBreakdowns, computeBudget, fmtMoney, EMPTY_BREAKDOWN, BUDGET_LEVELS } from "@/lib/budget/estimate";
+import { addBreakdowns, computeBudget, convertCostText, formatMoney, EMPTY_BREAKDOWN, BUDGET_LEVELS } from "@/lib/budget/estimate";
+import { useCurrency } from "@/lib/budget/useCurrency";
 import { useWeather } from "@/lib/weather/client";
 import { describeWeather } from "@/lib/weather/codes";
 import { Bed, Cloud, ExternalLink, Loader2, PenLine, Wallet } from "lucide-react";
@@ -118,6 +119,7 @@ const BUDGET_CATS: { key: "hotels" | "activities" | "food" | "transport"; label:
 
 function TripOverview() {
   const { state, actions } = useTrip();
+  const currency = useCurrency();
   const dests = state.destinations;
   const saved = dests.filter((d) => d.saved);
   const totalNights = dests.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
@@ -163,7 +165,7 @@ function TripOverview() {
           <Stat label="Nights" value={String(totalNights)} />
           <Stat label="Hotels" value={String(hotels)} />
           <Stat label="Travelers" value={String(travelers)} />
-          <Stat label="Est. budget" value={fmtMoney(budgetTotal)} />
+          <Stat label="Est. budget" value={formatMoney(budgetTotal, currency)} />
         </div>
       </div>
 
@@ -182,9 +184,9 @@ function TripOverview() {
         </div>
         <div className="mt-2.5 flex flex-wrap gap-2">
           {BUDGET_CATS.map((c) => (
-            <span key={c.key} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-surface border border-line text-[12px] text-ink"><span className="text-muted">{c.label}</span><span className="font-bold tabular-nums">{fmtMoney(agg[c.key])}</span></span>
+            <span key={c.key} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-surface border border-line text-[12px] text-ink"><span className="text-muted">{c.label}</span><span className="font-bold tabular-nums">{formatMoney(agg[c.key], currency)}</span></span>
           ))}
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-accent text-white text-[12px] font-bold tabular-nums">Total {fmtMoney(budgetTotal)}</span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-accent text-white text-[12px] font-bold tabular-nums">Total {formatMoney(budgetTotal, currency)}</span>
         </div>
       </div>
 
@@ -283,6 +285,7 @@ function AccommodationCard({ dest, accom }: { dest: Destination; accom: Accommod
 
 function TransportConnector({ from, to }: { from: Destination; to: Destination }) {
   const { state, actions } = useTrip();
+  const currency = useCurrency();
   const rec = recommend(from, to);
   const chosen = state.transports[rec.key] || rec.recMode;
   const tpl = rec.override && rec.override.mode === chosen ? rec.override : MODE_TEMPLATES[chosen];
@@ -301,10 +304,10 @@ function TransportConnector({ from, to }: { from: Destination; to: Destination }
         ) : (
           <>
             <div className="flex items-center gap-2 mb-2"><span className="text-accent flex"><Sparkle size={14} strokeWidth={1.8} /></span><span className="text-[11px] font-bold tracking-[.04em] uppercase text-accent">Suggested route</span></div>
-            <div className="flex items-baseline gap-2.5 flex-wrap"><div className="font-display font-bold text-[18px]">{chosen}</div><div className="text-[13.5px] text-muted">{tpl.duration} · {tpl.cost}</div></div>
+            <div className="flex items-baseline gap-2.5 flex-wrap"><div className="font-display font-bold text-[18px]">{chosen}</div><div className="text-[13.5px] text-muted">{tpl.duration} · {convertCostText(tpl.cost, currency)}</div></div>
             <div className="mt-2.5 flex flex-wrap gap-[7px] items-center">
               <span className={metaChip}><Clock size={13} strokeWidth={2} className="text-accent" />{tpl.duration}</span>
-              <span className={metaChip}><CreditCard size={13} strokeWidth={2} className="text-accent" />{tpl.cost}</span>
+              <span className={metaChip}><CreditCard size={13} strokeWidth={2} className="text-accent" />{convertCostText(tpl.cost, currency)}</span>
               {scenicOn && <span className="inline-flex items-center gap-1 text-[12px] font-semibold px-2 py-[5px]"><span className="text-muted text-[11px]">Scenic</span>{[0, 1, 2, 3, 4].map((k) => <Star key={k} size={12} fill={k < (tpl.scenic || 0) ? "var(--accent)" : "#ddd5c9"} stroke="none" />)}</span>}
             </div>
             <div className="mt-3 flex gap-1.5 flex-wrap">
@@ -331,6 +334,7 @@ function DestinationCard({ dest, index, last }: { dest: Destination; index: numb
   const st = statusFor(n, booked);
   const canSave = !!(dest.name && dest.arrive && dest.depart && n != null);
 
+  const currency = useCurrency();
   const travelers = state.adults + state.kids;
   const breakdown = computeBudget({ travelers, nights: n || 0, hotels: dest.accoms.length, level: state.budgetLevel });
   const budgetTotal = typeof dest.budgetOverride === "number" ? dest.budgetOverride : breakdown.total;
@@ -398,7 +402,7 @@ function DestinationCard({ dest, index, last }: { dest: Destination; index: numb
                   className="inline-flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-[5px] rounded-lg cursor-pointer transition border"
                   style={{ background: panel === "budget" ? "var(--surface)" : "var(--tint)", borderColor: panel === "budget" ? "var(--accent)" : "transparent", color: "var(--ink)" }}
                 >
-                  <Wallet size={13} strokeWidth={2} className="text-accent" />{fmtMoney(budgetTotal)}
+                  <Wallet size={13} strokeWidth={2} className="text-accent" />{formatMoney(budgetTotal, currency)}
                   {typeof dest.budgetOverride === "number" && <span className="text-accent">*</span>}
                 </button>
 

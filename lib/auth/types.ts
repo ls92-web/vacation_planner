@@ -17,6 +17,7 @@ export interface Preferences {
   travelers: number | null;
   with_children: boolean;
   children_ages: string | null;
+  currency: string | null;
 }
 
 export interface SignupInput {
