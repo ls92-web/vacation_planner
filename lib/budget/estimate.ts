@@ -87,17 +87,16 @@ export interface Currency {
 
 export const DEFAULT_CURRENCY = "KWD";
 
+// GCC currencies + EUR and USD. Approximate reference rates (units per 1 EUR).
 export const CURRENCIES: Record<string, Currency> = {
-  KWD: { code: "KWD", label: "Kuwaiti Dinar (KWD)", symbol: "KD ", rate: 0.34 },
-  USD: { code: "USD", label: "US Dollar (USD)", symbol: "$", rate: 1.08 },
-  EUR: { code: "EUR", label: "Euro (EUR)", symbol: "€", rate: 1 },
-  GBP: { code: "GBP", label: "British Pound (GBP)", symbol: "£", rate: 0.85 },
-  AED: { code: "AED", label: "UAE Dirham (AED)", symbol: "AED ", rate: 3.95 },
+  KWD: { code: "KWD", label: "Kuwaiti Dinar (KWD)", symbol: "KD ", rate: 0.33 },
   SAR: { code: "SAR", label: "Saudi Riyal (SAR)", symbol: "SAR ", rate: 4.05 },
+  AED: { code: "AED", label: "UAE Dirham (AED)", symbol: "AED ", rate: 3.97 },
   QAR: { code: "QAR", label: "Qatari Riyal (QAR)", symbol: "QAR ", rate: 3.93 },
   BHD: { code: "BHD", label: "Bahraini Dinar (BHD)", symbol: "BD ", rate: 0.41 },
-  OMR: { code: "OMR", label: "Omani Rial (OMR)", symbol: "OMR ", rate: 0.41 },
-  EGP: { code: "EGP", label: "Egyptian Pound (EGP)", symbol: "E£", rate: 53 },
+  OMR: { code: "OMR", label: "Omani Rial (OMR)", symbol: "OMR ", rate: 0.42 },
+  USD: { code: "USD", label: "US Dollar (USD)", symbol: "$", rate: 1.08 },
+  EUR: { code: "EUR", label: "Euro (EUR)", symbol: "€", rate: 1 },
 };
 
 export function getCurrency(code?: string | null): Currency {
