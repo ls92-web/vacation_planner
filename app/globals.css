@@ -1,45 +1,59 @@
 @import "tailwindcss";
 
-/* ===== Itinera theme palettes. Three luxury layouts; "classic" is the default.
-   Every surface uses these tokens, so switching data-theme retints the whole app. */
+/* ===== Itinera theme palettes. ONE design system, four colour identities;
+   "formal" is the default. Every surface uses these tokens, so switching
+   data-theme retints the whole app — nothing else changes. */
 :root,
-[data-theme="classic"] {
-  /* Classic Luxury — ivory, deep navy, soft gold */
-  --accent: #9A7B33;   /* soft gold (buttons/highlights) */
+[data-theme="formal"] {
+  /* Formal — deep navy, warm gold, soft ivory, light stone grey */
+  --accent: #9A7B33;   /* warm gold (buttons/highlights) */
   --accent2: #20304D;  /* deep navy */
-  --ink: #20304D;      /* deep navy text + deep surfaces */
-  --muted: #7B7264;
-  --bg: #F6F1E7;       /* warm ivory */
+  --ink: #1F2D49;      /* deep navy text + deep surfaces */
+  --muted: #76705F;    /* warm stone grey */
+  --bg: #F7F2E8;       /* soft ivory */
   --surface: #ffffff;
-  --tint: #F1E7CE;     /* light gold */
-  --line: #E7DECB;
-  --brand-deep: #20304D;
+  --tint: #F0E6CC;     /* light gold (nav highlight) */
+  --line: #E7DECB;     /* light stone */
+  --brand-deep: #1F2D49;
 }
 
-[data-theme="desert"] {
-  /* Desert Luxe — sand, terracotta, olive */
-  --accent: #AC5A39;   /* terracotta */
-  --accent2: #6E7A4E;  /* olive / muted green */
-  --ink: #3B2E24;      /* warm dark brown */
-  --muted: #8C7860;
-  --bg: #F2E7D6;       /* sand / beige */
-  --surface: #fffdf9;
-  --tint: #EFDFC9;     /* light terracotta sand */
-  --line: #E6D6BF;
-  --brand-deep: #5A4232;
+[data-theme="girlie"] {
+  /* Girlie — blush, dusty rose, soft lavender, champagne */
+  --accent: #B26E7C;   /* dusty rose */
+  --accent2: #9182BE;  /* soft lavender */
+  --ink: #43303A;      /* deep plum text */
+  --muted: #92808A;    /* mauve grey */
+  --bg: #FBF3F2;       /* blush / champagne white */
+  --surface: #ffffff;
+  --tint: #F6E6E8;     /* light blush (nav highlight) */
+  --line: #F0E0E2;     /* soft pink line */
+  --brand-deep: #5E3C49; /* deep plum */
 }
 
-[data-theme="minimal"] {
-  /* Modern Minimal — clean white, charcoal, soft sage */
-  --accent: #50745F;   /* soft sage */
-  --accent2: #5C7C9C;  /* muted blue */
-  --ink: #2B2F36;      /* charcoal */
-  --muted: #6B7280;
-  --bg: #F6F7F8;       /* clean near-white */
+[data-theme="funky"] {
+  /* Funky — deep teal, coral, golden yellow, aqua, warm white */
+  --accent: #DD6450;   /* coral */
+  --accent2: #E0A43A;  /* golden yellow */
+  --ink: #1C3A3D;      /* deep teal ink */
+  --muted: #6E8587;    /* muted teal grey */
+  --bg: #FBF6EE;       /* warm white */
+  --surface: #ffffff;
+  --tint: #DCEFEB;     /* soft aqua (nav highlight) */
+  --line: #E2E8E3;
+  --brand-deep: #134E52; /* deep teal */
+}
+
+[data-theme="modern"] {
+  /* Modern — white, charcoal, sage green, cool grey, silver */
+  --accent: #5C7861;   /* sage green */
+  --accent2: #6E7B86;  /* cool slate grey */
+  --ink: #2A2E33;      /* charcoal */
+  --muted: #6B7280;    /* cool grey */
+  --bg: #F7F8F8;       /* near-white */
   --surface: #ffffff;
   --tint: #E9EFEA;     /* light sage */
-  --line: #E6E8EB;
-  --brand-deep: #2B2F36;
+  --line: #E5E8EA;     /* silver */
+  --brand-deep: #2A2E33; /* charcoal */
 }
 
 /* Expose tokens to Tailwind utilities (bg-accent, text-ink, border-line, font-display…) */
