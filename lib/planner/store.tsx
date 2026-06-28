@@ -104,6 +104,9 @@ function useProvidePlanner(trip: TripRef) {
       resetFilters: () => setState((s) => ({ ...s, filters: { ...DEFAULT_FILTERS } })),
       setUnits: (u: "km" | "mi") => setState((s) => ({ ...s, units: u })),
       setCenter: (center: LatLng) => setState((s) => ({ ...s, center })),
+      /** Focus exploration on a specific chosen destination (scopes attractions to it). */
+      focusDestination: (destination: string, center: LatLng) =>
+        setState((s) => (s.destination === destination ? { ...s, center } : { ...s, destination, center, search: "" })),
       setTransportMode: (m: TransportMode) => setState((s) => ({ ...s, transportMode: m })),
       setDay: (d: number) => setState((s) => ({ ...s, day: d })),
       setHovered: (id: string | null) => setState((s) => (s.hoveredId === id ? s : { ...s, hoveredId: id })),

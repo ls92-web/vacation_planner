@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Heart, Search } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Heart, MapPin, Search } from "lucide-react";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { PlannerProvider, usePlanner } from "@/lib/planner/store";
@@ -19,6 +19,7 @@ import { DaySummary } from "./DaySummary";
 import { NearbyOpportunities } from "./NearbyOpportunities";
 import { CompareTray } from "./CompareTray";
 import { useDebounced } from "./useDebounced";
+import type { Destination } from "@/lib/types";
 import { ExportButton } from "@/components/export/ExportButton";
 import { analyzeDay, type RecAction } from "@/lib/planner/dayAnalysis";
 
@@ -84,20 +85,37 @@ function PlanDayMap() {
 
 function ExploreInner() {
   const { state, actions } = usePlanner();
+  const trip = useTrip();
   const [view, setView] = useState<"explore" | "plan">("explore");
   const debouncedSearch = useDebounced(state.search, 350);
   const geocode = useGeocode();
 
-  // For destinations we don't have seed coords for, geocode to center the map/search.
+  // The destinations the user chose for this trip (in travel order).
+  const savedDests = useMemo(() => trip.state.destinations.filter((d) => d.saved && d.name.trim()), [trip.state.destinations]);
+  const multi = savedDests.length > 1;
+  const [destIdx, setDestIdx] = useState(0);
+  const activeDest = savedDests[Math.min(destIdx, Math.max(0, savedDests.length - 1))];
+
+  // Focus exploration on the active destination so attractions are scoped to it.
   useEffect(() => {
-    if (destinationCoords(state.destination.split(",")[0])) return;
     let cancelled = false;
-    geocode(state.destination).then((loc) => {
-      if (!cancelled && loc) actions.setCenter(loc);
-    });
+    (async () => {
+      if (activeDest) {
+        const hasCoords = typeof activeDest.lat === "number" && typeof activeDest.lng === "number" && !(activeDest.lat === 0 && activeDest.lng === 0);
+        const center = hasCoords
+          ? { lat: activeDest.lat as number, lng: activeDest.lng as number }
+          : destinationCoords(activeDest.name.split(",")[0]) ?? (await geocode(`${activeDest.name}${activeDest.country ? `, ${activeDest.country}` : ""}`));
+        if (!cancelled && center) actions.focusDestination(activeDest.name, center);
+      } else {
+        if (destinationCoords(state.destination.split(",")[0])) return;
+        const loc = await geocode(state.destination);
+        if (!cancelled && loc) actions.setCenter(loc);
+      }
+    })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.destination]);
+  }, [destIdx, savedDests.length, activeDest?.name]);
+
   const { places, loading, source } = usePlaces({ center: state.center, categoryKey: state.categoryKey, search: debouncedSearch });
   const filtered = useMemo(() => applyFilters(places, state.filters, state.center), [places, state.filters, state.center]);
   const pool = useMemo(() => [...places, ...state.favorites, ...state.itinerary.map((i) => i.place)], [places, state.favorites, state.itinerary]);
@@ -106,6 +124,23 @@ function ExploreInner() {
     <div className="vp-scroll min-h-screen" style={{ background: "var(--bg)" }}>
       {/* header */}
       <Header view={view} setView={setView} />
+
+      {multi && view === "explore" && (
+        <DestinationSwitcher
+          dests={savedDests}
+          index={destIdx}
+          onPick={setDestIdx}
+          onContinue={() => {
+            if (destIdx < savedDests.length - 1) {
+              const next = savedDests[destIdx + 1];
+              setDestIdx(destIdx + 1);
+              actions.flash(`Now exploring attractions in ${next.name.split(",")[0]}.`);
+            } else {
+              setView("plan");
+            }
+          }}
+        />
+      )}
 
       {view === "explore" ? (
         <div className="max-w-[1320px] mx-auto px-[clamp(16px,3vw,28px)] pb-24">
@@ -192,6 +227,45 @@ function PlanView({ setView }: { setView: (v: "explore" | "plan") => void }) {
       </div>
       <DayAnalysis analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} onAction={onAction} />
       <DaySummary analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} />
+    </div>
+  );
+}
+
+function DestinationSwitcher({ dests, index, onPick, onContinue }: { dests: Destination[]; index: number; onPick: (i: number) => void; onContinue: () => void }) {
+  const last = index >= dests.length - 1;
+  const nextCity = !last ? dests[index + 1].name.split(",")[0] : null;
+  return (
+    <div className="border-b border-line" style={{ background: "color-mix(in oklab, var(--bg) 70%, #fff)" }}>
+      <div className="max-w-[1320px] mx-auto px-[clamp(16px,3vw,28px)] py-2.5 flex items-center gap-3 flex-wrap">
+        <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-muted shrink-0"><MapPin size={14} strokeWidth={2} className="text-accent" />Attractions in</span>
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          {dests.map((d, i) => {
+            const on = i === index;
+            const done = i < index;
+            return (
+              <button
+                key={d.id}
+                onClick={() => onPick(i)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12.5px] font-semibold cursor-pointer transition border"
+                style={{ borderColor: on ? "var(--accent)" : "var(--line)", background: on ? "var(--accent)" : "var(--surface)", color: on ? "#fff" : "var(--muted)" }}
+              >
+                <span className="grid place-items-center w-4 h-4 rounded-full text-[10px] font-bold" style={{ background: on ? "rgba(255,255,255,.25)" : done ? "var(--accent)" : "var(--tint)", color: on ? "#fff" : done ? "#fff" : "var(--accent)" }}>
+                  {done ? <Check size={10} strokeWidth={3} /> : i + 1}
+                </span>
+                {d.name.split(",")[0]}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex-1" />
+        <span className="text-[12px] text-muted hidden sm:inline">{index + 1} of {dests.length}</span>
+        <div className="flex items-center gap-1">
+          <button onClick={() => onPick(Math.max(0, index - 1))} disabled={index === 0} title="Previous destination" className="w-8 h-8 rounded-[9px] border border-line bg-surface grid place-items-center text-muted cursor-pointer hover:text-ink disabled:opacity-40 disabled:cursor-default"><ChevronLeft size={16} strokeWidth={2} /></button>
+          <button onClick={onContinue} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] bg-accent text-white text-[12.5px] font-bold cursor-pointer hover:brightness-[1.06]">
+            {last ? "Review plan" : `Next: ${nextCity}`}{last ? <ArrowRight size={14} strokeWidth={2} /> : <ChevronRight size={14} strokeWidth={2} />}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
