@@ -178,19 +178,38 @@ function useProvideAuth() {
 
       async signIn(identifier: string, password: string, remember: boolean): Promise<AuthResult> {
         if (!sb) return fail("Auth is not configured.");
-        let email = identifier.trim();
-        if (!email.includes("@")) {
-          const { data, error } = await sb.rpc("get_email_for_username", { p_username: email });
-          if (error || !data) return fail("We couldn't find an account with that username.");
-          email = data as string;
-        }
+        const id = identifier.trim();
         if (typeof window !== "undefined") {
           window.localStorage.setItem(REMEMBER_KEY, remember ? "1" : "0");
           window.sessionStorage.setItem(ACTIVE_KEY, "1");
         }
-        const { error } = await sb.auth.signInWithPassword({ email, password });
-        if (error) return fail(error.message);
-        return { ok: true };
+
+        // Email login: sign in directly (Supabase already returns a generic error).
+        if (id.includes("@")) {
+          const { error } = await sb.auth.signInWithPassword({ email: id, password });
+          if (error) return fail(error.message);
+          return { ok: true };
+        }
+
+        // Username login goes through the server route, which resolves the email
+        // with the service-role key — the username→email mapping is never exposed
+        // to the browser, and failures return one generic message.
+        try {
+          const res = await fetch("/api/auth/username-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: id, password }),
+          });
+          const data = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; error?: string };
+          if (!res.ok || !data.access_token || !data.refresh_token) {
+            return fail(data.error || "Invalid username or password.");
+          }
+          const { error } = await sb.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+          if (error) return fail("Invalid username or password.");
+          return { ok: true };
+        } catch {
+          return fail("Couldn't sign in. Please try again.");
+        }
       },
 
       async signOut() {
