@@ -25,6 +25,7 @@ Do **not** change these unless the user explicitly asks:
 - Google Maps opens externally (no in-app navigation).
 - OpenRouter powers AI features.
 - Supabase stores only user-selected places, never world datasets.
+- **Never render sample/demo destinations inside a user's trip.** While a trip's plan is loading, show a skeleton; if it has no destinations, show the empty state. Sample routes belong only to an explicit demo mode.
 
 ## Architecture
 - **Stack:** Next.js 16 (App Router, Turbopack) + React 19 + TypeScript + Tailwind CSS v4 (CSS-variable tokens). Icons: `lucide-react`. No router — a single page (`app/page.tsx` → `components/App.tsx`) swaps "screens" via `TripProvider.state.screen`.
@@ -98,6 +99,7 @@ lib/supabase/client.ts            Supabase singleton (on globalThis, HMR-safe)
 - **Geo data is API-driven, never stored wholesale.** Only the user's *selected* destinations are persisted. Countries come from the `world-countries` npm package (REST Countries v3.1 was deprecated mid-build). All geo lookups cached in memory + localStorage (`lib/geo/cache`).
 - **Itinerary is grouped by destination** (`ItineraryItem.destId` = city name), with continuous global day numbering and auto travel cards between cities. This is the foundation for all itinerary generation. Attractions stay in the city they were browsed in.
 - **Full trip plan persists** via `saveTrip/loadTrip`; saves are **serialized + coalesced per trip** (delete+insert) to prevent duplicate rows from overlapping auto-save + explicit save.
+- **No sample data in a real trip (project rule).** The store starts with `destinations: []` (no demo content). Opening a trip calls `beginTripLoad()` (sets `tripLoading`, clears any prior plan) → shows a **skeleton** → `hydrateTrip(list)` reflects exactly what loaded; an empty list yields the **empty state**, never sample destinations. `hydrateTrip` must never fall back to `s.destinations`. `INITIAL_DESTINATIONS` in `lib/data.ts` is reserved for a future explicit demo mode only — never wire it into trip state.
 - **Currency:** budget rates are EUR internally and converted for display (default **KWD**); options limited to GCC + EUR + USD; manual overrides stored in the base unit. Conversion uses **live FX** (`/api/fx` → `lib/budget/rates.ts`, cached 12h via localStorage), overriding the static reference rates in `estimate.ts` — which remain only as a fallback. `useCurrency()` substitutes the live rate transparently.
 - **Theming:** one luxury palette expanded to 3 themes via `[data-theme]` on `<html>`; persisted in prefs; smooth transition.
 - **Auth:** email is auto-confirmed (DB trigger) and signup auto-signs-in; the splash can never hang (timeouts + globalThis Supabase singleton).

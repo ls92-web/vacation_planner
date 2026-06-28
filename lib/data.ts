@@ -37,6 +37,8 @@ export const ALL_INTERESTS = [
   "Nightlife",
 ];
 
+// DEMO ONLY — sample route for a future explicit demo mode. Never wire this into
+// trip state; a user's trip must show a skeleton/empty state, not sample data.
 export const INITIAL_DESTINATIONS: Destination[] = [
   {
     id: 1,

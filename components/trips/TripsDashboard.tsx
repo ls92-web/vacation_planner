@@ -153,9 +153,10 @@ export function TripsDashboard() {
   const openTrip = async (t: Trip) => {
     actions.select(t.id);
     trip.actions.setDestination(t.destination);
+    trip.actions.beginTripLoad(); // clear prior plan + show skeleton (never sample data)
+    trip.actions.goForm();
     const plan = await loadTrip(t.id);
     trip.actions.hydrateTrip(plan.destinations, plan.budgetLevel);
-    trip.actions.goForm();
   };
 
   return (

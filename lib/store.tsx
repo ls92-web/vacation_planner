@@ -13,7 +13,6 @@ import {
 import {
   DAYS,
   INITIAL_CHAT,
-  INITIAL_DESTINATIONS,
   PLACES,
   replyFor,
 } from "./data";
@@ -50,6 +49,8 @@ interface AppState {
   kids: number;
   pace: string;
   destinations: Destination[];
+  /** True while a trip's saved plan is loading — show a skeleton, never sample data. */
+  tripLoading: boolean;
   budgetLevel: BudgetLevel;
   transports: Record<string, TransportMode>;
   dragId: number | null;
@@ -89,7 +90,8 @@ const INITIAL: AppState = {
   adults: 2,
   kids: 2,
   pace: "balanced",
-  destinations: INITIAL_DESTINATIONS,
+  destinations: [],
+  tripLoading: false,
   budgetLevel: "standard",
   transports: {},
   dragId: null,
@@ -291,28 +293,33 @@ export function useTripStore() {
               }))
             : s.destinations,
         })),
-      /** Restore a full saved trip plan (destinations + accommodations + budget). */
+      /** Begin loading a trip: clear any prior plan and show the loading state (never sample data). */
+      beginTripLoad: () => set({ tripLoading: true, destinations: [] }),
+      /**
+       * Restore a full saved trip plan (destinations + accommodations + budget).
+       * Always reflects exactly what was loaded — an empty list yields an empty
+       * trip (the empty state), never a fallback to sample/demo destinations.
+       */
       hydrateTrip: (list: LoadedDestination[], budgetLevel: BudgetLevel) =>
         setState((s) => ({
           ...s,
+          tripLoading: false,
           budgetLevel: budgetLevel || s.budgetLevel,
-          destinations: list.length
-            ? list.map((d) => ({
-                id: ++uid.current,
-                name: d.cityName,
-                country: d.countryName,
-                countryCode: d.countryCode,
-                lat: d.lat,
-                lng: d.lng,
-                image: d.image ?? null,
-                saved: true,
-                expanded: false,
-                arrive: d.arrive ?? "",
-                depart: d.depart ?? "",
-                budgetOverride: d.budgetOverride ?? null,
-                accoms: (d.accoms ?? []).map((a) => ({ id: ++uid.current, ...a })),
-              }))
-            : s.destinations,
+          destinations: list.map((d) => ({
+            id: ++uid.current,
+            name: d.cityName,
+            country: d.countryName,
+            countryCode: d.countryCode,
+            lat: d.lat,
+            lng: d.lng,
+            image: d.image ?? null,
+            saved: true,
+            expanded: false,
+            arrive: d.arrive ?? "",
+            depart: d.depart ?? "",
+            budgetOverride: d.budgetOverride ?? null,
+            accoms: (d.accoms ?? []).map((a) => ({ id: ++uid.current, ...a })),
+          })),
         })),
       // navigation between explore subviews / pages
       goExplore: () =>

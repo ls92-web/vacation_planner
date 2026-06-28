@@ -658,12 +658,27 @@ function useAutoSaveRoute() {
 
 /* ============================ page ============================ */
 
+/** Skeleton shown while a trip's saved plan is loading — never sample/demo content. */
+function RouteSkeleton() {
+  return (
+    <div className="vp-fade-fast" aria-busy="true" aria-label="Loading your trip">
+      <div className="h-[150px] rounded-[18px] border border-line vp-shimmer" />
+      <div className="mt-6 flex flex-col gap-4">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="h-[110px] rounded-[16px] border border-line vp-shimmer" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function RouteBuilder() {
   const { state } = useTrip();
   const [panelOpen, setPanelOpen] = useState(true);
   useAutoSaveRoute();
   const dests = state.destinations;
   const lastIdx = dests.length - 1;
+  const loading = state.tripLoading;
 
   return (
     <div className="vp-scroll min-h-full">
@@ -683,23 +698,29 @@ export function RouteBuilder() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* main */}
           <div className="flex-1 min-w-0">
-            <TripOverview />
-            <div className="mt-6">
-              {dests.length === 0 ? (
-                <EmptyState />
-              ) : (
-                <>
-                  {dests.map((d, i) => <DestinationCard key={d.id} dest={d} index={i} last={i === lastIdx} />)}
-                  <div className="flex gap-4">
-                    <div className="w-[38px] shrink-0 flex justify-center">
-                      <div className="w-[38px] h-[38px] rounded-full grid place-items-center text-accent border-2 border-dashed" style={{ borderColor: "color-mix(in oklab, var(--accent) 45%, transparent)" }}><Plus size={18} strokeWidth={2} /></div>
-                    </div>
-                    <AddDestinationButton />
-                  </div>
-                </>
-              )}
-            </div>
-            <FloatingActionBar />
+            {loading ? (
+              <RouteSkeleton />
+            ) : (
+              <>
+                <TripOverview />
+                <div className="mt-6">
+                  {dests.length === 0 ? (
+                    <EmptyState />
+                  ) : (
+                    <>
+                      {dests.map((d, i) => <DestinationCard key={d.id} dest={d} index={i} last={i === lastIdx} />)}
+                      <div className="flex gap-4">
+                        <div className="w-[38px] shrink-0 flex justify-center">
+                          <div className="w-[38px] h-[38px] rounded-full grid place-items-center text-accent border-2 border-dashed" style={{ borderColor: "color-mix(in oklab, var(--accent) 45%, transparent)" }}><Plus size={18} strokeWidth={2} /></div>
+                        </div>
+                        <AddDestinationButton />
+                      </div>
+                    </>
+                  )}
+                </div>
+                <FloatingActionBar />
+              </>
+            )}
           </div>
 
           {/* right panel */}

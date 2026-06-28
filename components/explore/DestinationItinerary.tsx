@@ -211,6 +211,14 @@ export function DestinationItinerary() {
   const refs = useRef<Record<number, HTMLDivElement | null>>({});
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
 
+  if (state.tripLoading) {
+    return (
+      <div className="flex flex-col gap-4 py-2" aria-busy="true" aria-label="Loading your itinerary">
+        {Array.from({ length: 2 }).map((_, i) => <div key={i} className="h-[180px] rounded-[18px] border border-line vp-shimmer" />)}
+      </div>
+    );
+  }
+
   if (!dests.length) {
     return <div className="py-16 text-center text-muted"><div className="font-bold text-ink">No destinations yet</div><div className="text-[13px] mt-1">Add destinations in the Planner first.</div></div>;
   }
