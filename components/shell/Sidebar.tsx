@@ -6,6 +6,7 @@ import {
   Heart,
   HelpCircle,
   LayoutDashboard,
+  LogOut,
   Map as MapIcon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -17,7 +18,9 @@ import {
 } from "lucide-react";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
+import { useAuth } from "@/lib/auth/store";
 import { useUI } from "@/lib/ui/store";
+import { requestNavigation } from "@/lib/ui/unsavedGuard";
 import { Logo } from "@/components/Logo";
 import type { Screen } from "@/lib/types";
 
@@ -77,9 +80,16 @@ function activeKeyFor(screen: Screen): string | null {
 export function Sidebar() {
   const { state, actions } = useTrip();
   const { activeTrip } = useTrips();
+  const { state: auth, actions: authActions } = useAuth();
   const { collapsed, toggleSidebar } = useUI();
   const activeKey = activeKeyFor(state.screen);
   const width = collapsed ? "w-[72px]" : "w-[248px]";
+
+  const profile = auth.profile;
+  const email = auth.user?.email ?? "";
+  const initial = (profile?.full_name || profile?.username || email || "?").slice(0, 1).toUpperCase();
+  // Route sign-out through the unsaved-changes guard so in-progress edits prompt first.
+  const signOut = () => requestNavigation(() => authActions.signOut());
 
   const Item = ({ item }: { item: NavItem }) => {
     const Icon = item.icon;
@@ -144,9 +154,42 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* footer */}
+      {/* footer: account + sign out */}
       <div className="border-t border-line p-3">
-        {!collapsed ? (
+        {auth.session ? (
+          collapsed ? (
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="w-full h-9 rounded-[10px] grid place-items-center text-muted hover:text-[#b3402f] hover:bg-tint cursor-pointer transition-colors"
+            >
+              <LogOut size={18} strokeWidth={2} />
+            </button>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full overflow-hidden grid place-items-center text-white font-display font-bold text-[14px] shrink-0" style={{ background: "var(--brand-deep)" }}>
+                {profile?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  initial
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-[13px] text-ink truncate">{profile?.full_name || "Your account"}</div>
+                <div className="text-[11.5px] text-muted truncate">{email}</div>
+              </div>
+              <button
+                onClick={signOut}
+                title="Sign out"
+                aria-label="Sign out"
+                className="w-8 h-8 rounded-[9px] grid place-items-center text-muted hover:text-[#b3402f] hover:bg-tint cursor-pointer shrink-0 transition-colors"
+              >
+                <LogOut size={17} strokeWidth={2} />
+              </button>
+            </div>
+          )
+        ) : !collapsed ? (
           <div className="font-brand text-[12px] text-muted leading-snug">Every journey,<br />perfectly planned.</div>
         ) : (
           <div className="flex justify-center"><Logo size={26} /></div>
