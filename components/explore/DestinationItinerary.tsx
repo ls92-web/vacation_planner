@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Building2, Check, ChevronDown, Clock, CreditCard, MapPin, Moon, Sparkles, Trash2, Wallet, X } from "lucide-react";
+import { Building2, Check, ChevronDown, ChevronUp, Clock, CreditCard, Gauge, MapPin, Moon, Sparkles, Trash2, Wallet, X } from "lucide-react";
 import { useTrip } from "@/lib/store";
 import { usePlanner } from "@/lib/planner/store";
 import { fmtMonthDay, MODE_TEMPLATES, nightsBetween, recommend } from "@/lib/data";
@@ -12,6 +12,11 @@ import { useCurrency } from "@/lib/budget/useCurrency";
 import { useWeather } from "@/lib/weather/client";
 import { describeWeather } from "@/lib/weather/codes";
 import { CityImage } from "@/components/destinations/CityImage";
+import { analyzeDay, type RecAction } from "@/lib/planner/dayAnalysis";
+import { DayAnalysis } from "./DayAnalysis";
+import { DaySummary } from "./DaySummary";
+import { NearbyOpportunities } from "./NearbyOpportunities";
+import type { LatLng } from "@/lib/maps";
 import type { Destination } from "@/lib/types";
 
 const cityKey = (name: string) => name.split(",")[0].trim().toLowerCase();
@@ -93,6 +98,7 @@ function DestinationSection({
   setRef: (el: HTMLDivElement | null) => void;
 }) {
   const trip = useTrip();
+  const planner = usePlanner();
   const currency = useCurrency();
   const travelers = trip.state.adults + trip.state.kids;
   const nights = nightsBetween(dest.arrive, dest.depart) || 0;
@@ -103,6 +109,20 @@ function DestinationSection({
   const WIcon = weather.data ? describeWeather(weather.data.summary.code).icon : null;
   const ar = fmtMonthDay(dest.arrive);
   const de = fmtMonthDay(dest.depart);
+
+  // AI analysis context for this destination.
+  const destId = dest.name.split(",")[0].trim();
+  const destCenter: LatLng = hasCoords ? { lat: dest.lat as number, lng: dest.lng as number } : planner.state.center;
+  const mode = planner.state.transportMode;
+  const units = planner.state.units;
+  const [openAnalysis, setOpenAnalysis] = useState<Set<number>>(new Set());
+  const onAction = (day: number) => (a: RecAction) => {
+    const dayItems = items.filter((it) => it.day === day);
+    if (a.kind === "optimize") planner.actions.optimizeDay(destId, day);
+    else if (a.kind === "shorten") planner.actions.setItemDuration(a.placeId, a.toMin);
+    else if (a.kind === "moveDay") planner.actions.moveItemToDay(a.placeId, day + 1 < days ? day + 1 : Math.max(0, day - 1));
+    else planner.actions.flash(dayItems.length ? "Browse Explore to add more to this day." : "Add a few stops first.");
+  };
 
   return (
     <div ref={setRef} className="rounded-[18px] border border-line bg-surface overflow-hidden scroll-mt-[72px]" style={{ boxShadow: "0 6px 24px -18px rgba(0,0,0,.3)" }}>
@@ -140,6 +160,8 @@ function DestinationSection({
           {Array.from({ length: days }).map((_, d) => {
             const dayItems = items.filter((it) => it.day === d).sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || a.position - b.position);
             const date = dayDate(dest.arrive, d);
+            const analysis = dayItems.length ? analyzeDay(dayItems, destCenter, mode) : null;
+            const full = openAnalysis.has(d);
             return (
               <div key={d}>
                 <div className="flex items-baseline gap-2 mb-2">
@@ -153,9 +175,28 @@ function DestinationSection({
                 ) : (
                   <div className="text-[12.5px] text-muted px-3 py-3 rounded-[12px] border border-dashed border-line">No stops yet — browse {dest.name.split(",")[0]} in Explore to add attractions.</div>
                 )}
+                {analysis && (
+                  <div className="mt-2.5 flex flex-col gap-2.5">
+                    {full ? (
+                      <DayAnalysis analysis={analysis} units={units} dayLabel={`Day ${dayOffset + d + 1}`} currency={currency} onAction={onAction(d)} />
+                    ) : (
+                      <DaySummary analysis={analysis} units={units} dayLabel={`Day ${dayOffset + d + 1}`} currency={currency} />
+                    )}
+                    <button
+                      onClick={() => setOpenAnalysis((s) => { const n = new Set(s); n.has(d) ? n.delete(d) : n.add(d); return n; })}
+                      className="self-start inline-flex items-center gap-1.5 text-[12.5px] font-bold text-accent cursor-pointer hover:underline"
+                    >
+                      <Gauge size={14} strokeWidth={2} />
+                      {full ? "Hide AI analysis" : "AI analysis & tips"}
+                      {full ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
+
+          <NearbyOpportunities destId={destId} center={destCenter} items={items} day={0} units={units} />
         </div>
       )}
     </div>

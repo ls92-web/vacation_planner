@@ -75,8 +75,9 @@ export const EMPTY_BREAKDOWN: BudgetBreakdown = { hotels: 0, activities: 0, food
 
 // ===== Currency =====
 // Budget rates above are in EUR (the internal base unit). Amounts are converted
-// to the user's chosen display currency (default KWD). Rates are approximate
-// reference rates for estimates, not live FX. `rate` = units per 1 EUR.
+// to the user's chosen display currency (default KWD). The `rate` values below are
+// static reference rates used only as a fallback — useCurrency() overrides them
+// with live FX (lib/budget/rates.ts) whenever available. `rate` = units per 1 EUR.
 
 export interface Currency {
   code: string;

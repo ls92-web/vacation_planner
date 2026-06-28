@@ -2,6 +2,7 @@
 
 import { Camera, Clock, Footprints, Route, Utensils, Wallet } from "lucide-react";
 import { formatDurationMin, formatKm } from "@/lib/places";
+import { CURRENCIES, formatMoney, type Currency } from "@/lib/budget/estimate";
 import type { DayAnalysis } from "@/lib/planner/dayAnalysis";
 
 const PACE_LABEL = { relaxed: "Relaxed", balanced: "Balanced", busy: "Busy", overloaded: "Overloaded" } as const;
@@ -20,7 +21,7 @@ function Stat({ icon: Icon, label, value }: { icon: typeof Clock; label: string;
   );
 }
 
-export function DaySummary({ analysis, units, dayLabel }: { analysis: DayAnalysis; units: "km" | "mi"; dayLabel: string }) {
+export function DaySummary({ analysis, units, dayLabel, currency = CURRENCIES.EUR }: { analysis: DayAnalysis; units: "km" | "mi"; dayLabel: string; currency?: Currency }) {
   if (analysis.stops === 0) return null;
   return (
     <div className="rounded-[18px] border border-line p-5 text-white relative overflow-hidden" style={{ background: "var(--brand-deep)" }}>
@@ -37,7 +38,7 @@ export function DaySummary({ analysis, units, dayLabel }: { analysis: DayAnalysi
           <Stat icon={Clock} label="Sightseeing" value={formatDurationMin(analysis.visitMin)} />
           <Stat icon={Footprints} label="Walking" value={formatKm(analysis.walkingKm, units)} />
           <Stat icon={Route} label="Travel time" value={formatDurationMin(analysis.walkingMin + analysis.transportMin)} />
-          <Stat icon={Wallet} label="Est. budget" value={`€${analysis.costMin}–${analysis.costMax}`} />
+          <Stat icon={Wallet} label="Est. budget" value={`${formatMoney(analysis.costMin, currency)}–${formatMoney(analysis.costMax, currency)}`} />
           <Stat icon={Camera} label={analysis.attractions === 1 ? "Attraction" : "Attractions"} value={String(analysis.attractions)} />
           <Stat icon={Utensils} label={analysis.restaurants === 1 ? "Restaurant" : "Restaurants"} value={String(analysis.restaurants)} />
         </div>

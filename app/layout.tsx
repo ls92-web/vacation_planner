@@ -1,23 +1,19 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Lora, Plus_Jakarta_Sans, Spline_Sans_Mono } from "next/font/google";
+import { DM_Serif_Display, Outfit, Spline_Sans_Mono } from "next/font/google";
 import "./globals.css";
 
-const lora = Lora({
-  variable: "--font-lora",
+// Branding (wordmark + hero serif) — DM Serif Display.
+const dmSerif = DM_Serif_Display({
+  variable: "--font-dm-serif",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["400"],
 });
 
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-bricolage",
+// UI typeface (body + display headings) — Outfit.
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
-});
-
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
 });
 
 const splineMono = Spline_Sans_Mono({
@@ -40,7 +36,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${bricolage.variable} ${lora.variable} ${jakarta.variable} ${splineMono.variable} antialiased`}
+      className={`${outfit.variable} ${dmSerif.variable} ${splineMono.variable} antialiased`}
     >
       <body>{children}</body>
     </html>

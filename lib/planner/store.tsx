@@ -147,6 +147,17 @@ function useProvidePlanner(trip: TripRef) {
         persistItinerary([...s.itinerary, { place, destId, day, slot, position }]);
         flash(`Added ${place.name} to ${destId} · ${["Morning", "Afternoon", "Evening"][["morning", "afternoon", "evening"].indexOf(slot)]}.`);
       },
+      /** Add a place directly to a specific destination (used by per-destination suggestions in the grouped planner). */
+      addPlaceTo: (place: ExplorePlace, destId: string, day: number, slot: Slot) => {
+        const s = stateRef.current;
+        if (s.itinerary.some((it) => it.place.id === place.id)) {
+          flash(`${place.name} is already in your plan.`);
+          return;
+        }
+        const position = s.itinerary.filter((it) => it.destId === destId && it.day === day && it.slot === slot).length;
+        persistItinerary([...s.itinerary, { place, destId, day, slot, position }]);
+        flash(`Added ${place.name} to ${destId}.`);
+      },
       removeFromItinerary: (placeId: string) => {
         persistItinerary(stateRef.current.itinerary.filter((it) => it.place.id !== placeId));
       },

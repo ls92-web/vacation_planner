@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Plus, Sparkle, Star } from "lucide-react";
-import { isMapsConfigured } from "@/lib/maps";
-import { formatKm, haversineKm, useNearby, type Slot } from "@/lib/places";
+import { isMapsConfigured, type LatLng } from "@/lib/maps";
+import { formatKm, haversineKm, useNearby, type ItineraryItem, type Slot } from "@/lib/places";
 import { inItinerary, usePlanner } from "@/lib/planner/store";
 
 interface Opp {
@@ -23,22 +23,36 @@ const OPPORTUNITIES: Opp[] = [
   { key: "gem", label: "Hidden Gem", includedTypes: ["tourist_attraction", "point_of_interest"], categoryKey: "hidden", slot: "afternoon" },
 ];
 
-/** Real Places suggestions near the day's stops — never auto-added; the user chooses. */
-export function NearbyOpportunities() {
+/**
+ * Real Places suggestions for one destination — never auto-added; the user chooses.
+ * Scoped to a destination (its center + items) so it works inside the grouped planner.
+ */
+export function NearbyOpportunities({
+  destId,
+  center,
+  items,
+  day,
+  units = "km",
+}: {
+  destId: string;
+  center: LatLng;
+  items: ItineraryItem[];
+  day: number;
+  units?: "km" | "mi";
+}) {
   const { state, actions } = usePlanner();
   const [oppKey, setOppKey] = useState("coffee");
   const opp = OPPORTUNITIES.find((o) => o.key === oppKey)!;
 
-  const dayItems = state.itinerary.filter((it) => it.day === state.day);
-  const center = useMemo(() => {
-    if (!dayItems.length) return state.center;
-    const lat = dayItems.reduce((s, it) => s + it.place.position.lat, 0) / dayItems.length;
-    const lng = dayItems.reduce((s, it) => s + it.place.position.lng, 0) / dayItems.length;
+  // Bias the search toward the destination's planned stops, falling back to its center.
+  const searchCenter = useMemo(() => {
+    if (!items.length) return center;
+    const lat = items.reduce((s, it) => s + it.place.position.lat, 0) / items.length;
+    const lng = items.reduce((s, it) => s + it.place.position.lng, 0) / items.length;
     return { lat, lng };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayItems.length, state.center]);
+  }, [items, center]);
 
-  const { places, loading } = useNearby({ center, includedTypes: opp.includedTypes, categoryKey: opp.categoryKey, enabled: isMapsConfigured() });
+  const { places, loading } = useNearby({ center: searchCenter, includedTypes: opp.includedTypes, categoryKey: opp.categoryKey, enabled: isMapsConfigured() });
   const suggestions = places.filter((p) => !inItinerary(state, p.id)).slice(0, 3);
 
   if (!isMapsConfigured()) return null;
@@ -47,9 +61,9 @@ export function NearbyOpportunities() {
     <div className="bg-surface border border-line rounded-[18px] p-4">
       <div className="flex items-center gap-1.5 font-display font-bold text-[15px]">
         <span className="text-accent flex"><Sparkle size={16} strokeWidth={1.7} /></span>
-        Nearby opportunities
+        Nearby in {destId}
       </div>
-      <div className="text-[12px] text-muted mt-0.5">Real spots near your day&apos;s stops — add any you like.</div>
+      <div className="text-[12px] text-muted mt-0.5">Real spots near your {destId} stops — add any you like.</div>
 
       <div className="vp-scroll flex gap-1.5 overflow-x-auto mt-3 pb-1">
         {OPPORTUNITIES.map((o) => {
@@ -82,12 +96,12 @@ export function NearbyOpportunities() {
                       <span className="text-ink font-semibold">{p.rating.toFixed(1)}</span>
                     </span>
                   )}
-                  <span>{formatKm(haversineKm(center, p.position), state.units)} away</span>
+                  <span>{formatKm(haversineKm(searchCenter, p.position), units)} away</span>
                 </div>
               </div>
               <button
-                onClick={() => actions.addToItinerary(p, state.day, opp.slot)}
-                title="Add to plan"
+                onClick={() => actions.addPlaceTo(p, destId, day, opp.slot)}
+                title={`Add to ${destId}`}
                 className="shrink-0 w-[30px] h-[30px] rounded-lg border border-accent bg-white text-accent grid place-items-center cursor-pointer hover:bg-tint"
               >
                 <Plus size={15} strokeWidth={2.5} />

@@ -19,6 +19,7 @@ import {
   CloudSun,
 } from "lucide-react";
 import { formatDurationMin, formatKm } from "@/lib/places";
+import { CURRENCIES, formatMoney, type Currency } from "@/lib/budget/estimate";
 import type { DayAnalysis as DayAnalysisData, Grade, RecAction, Recommendation, Warning } from "@/lib/planner/dayAnalysis";
 
 const ACTION_LABEL: Record<RecAction["kind"], string> = {
@@ -147,7 +148,7 @@ const DIFF_LABEL = { easy: "Easy", moderate: "Moderate", high: "High" } as const
 const paceGrade = (p: DayAnalysisData["pace"]): Grade => (p === "relaxed" || p === "balanced" ? "good" : p === "busy" ? "good" : "attention");
 const diffGrade = (d: DayAnalysisData["walkingDifficulty"]): Grade => (d === "easy" ? "excellent" : d === "moderate" ? "good" : "attention");
 
-export function DayAnalysis({ analysis, units, dayLabel, onAction }: { analysis: DayAnalysisData; units: "km" | "mi"; dayLabel: string; onAction?: (a: RecAction) => void }) {
+export function DayAnalysis({ analysis, units, dayLabel, onAction, currency = CURRENCIES.EUR }: { analysis: DayAnalysisData; units: "km" | "mi"; dayLabel: string; onAction?: (a: RecAction) => void; currency?: Currency }) {
   if (analysis.stops === 0) {
     return (
       <div className="bg-surface border border-line rounded-[18px] p-5 vp-fade-fast">
@@ -205,7 +206,7 @@ export function DayAnalysis({ analysis, units, dayLabel, onAction }: { analysis:
           <div className="text-[12px] text-muted">{analysis.freeMin >= 60 ? "Great for shopping or a rest" : analysis.freeMin >= 0 ? "Tight but doable" : "Trim a stop"}</div>
         </Metric>
         <Metric icon={Wallet} label="Est. daily cost">
-          <div className="font-display font-bold text-[18px]">€{analysis.costMin}–{analysis.costMax}</div>
+          <div className="font-display font-bold text-[18px]">{formatMoney(analysis.costMin, currency)}–{formatMoney(analysis.costMax, currency)}</div>
           <div className="text-[12px] text-muted">family of 4 · estimate</div>
         </Metric>
         <Metric icon={Layers} label="Variety">
