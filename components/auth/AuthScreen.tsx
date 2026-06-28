@@ -167,7 +167,6 @@ export function AuthScreen() {
             <div><div className="font-display text-[24px] font-bold">PDF</div>premium exports</div>
           </div>
         </div>
-        <div className="relative text-[12.5px] text-white/60">Secured with Supabase authentication & row-level security.</div>
       </div>
 
       {/* form panel */}
