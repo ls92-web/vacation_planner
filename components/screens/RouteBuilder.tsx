@@ -374,6 +374,12 @@ function DestinationCard({ dest, index, last }: { dest: Destination; index: numb
                     {dest.accoms.map((a) => <AccommodationCard key={a.id} dest={dest} accom={a} />)}
                   </div>
                   <button onClick={() => actions.addAccom(dest.id)} className="mt-[11px] w-full py-[11px] border-[1.5px] border-dashed border-line rounded-xl bg-transparent text-accent text-[13.5px] font-bold cursor-pointer flex items-center justify-center gap-1.5 hover:border-accent hover:bg-tint"><Plus size={16} strokeWidth={2} />Add accommodation</button>
+
+                  <div className="mt-4 pt-4 border-t border-line flex items-center justify-end">
+                    <button onClick={() => { actions.collapseDest(dest.id); withSave(Promise.resolve()); }} className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-[11px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06]" style={{ boxShadow: "0 8px 18px -8px var(--accent)" }}>
+                      <Check size={15} strokeWidth={2} />Save
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -513,7 +519,7 @@ function FloatingActionBar() {
         <button onClick={actions.addDest} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent hover:text-accent"><Plus size={16} strokeWidth={2} />Add destination</button>
         <button onClick={() => { const d = state.destinations.find((x) => x.expanded && x.saved); if (d) actions.addAccom(d.id); else actions.flash("Open a destination to add a hotel."); }} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent hover:text-accent"><Bed size={16} strokeWidth={2} />Add hotel</button>
         <div className="flex-1 min-w-0 text-[12.5px] text-muted px-2 hidden sm:block">{state.destinations.length} destination{state.destinations.length !== 1 ? "s" : ""} · {totalNights} night{totalNights !== 1 ? "s" : ""}</div>
-        <button onClick={() => withSave(Promise.resolve())} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent hover:text-accent"><Check size={16} strokeWidth={2} />Save</button>
+        <button onClick={() => { actions.collapseAllDests(); withSave(Promise.resolve()); }} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent hover:text-accent"><Check size={16} strokeWidth={2} />Save</button>
         <button onClick={() => actions.goExplore()} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[11px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06]" style={{ boxShadow: "0 8px 20px -10px var(--accent)" }}>Continue<ArrowRight size={16} strokeWidth={2} /></button>
       </div>
     </div>

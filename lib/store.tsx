@@ -296,6 +296,12 @@ export function useTripStore() {
         setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.id === id ? { ...d, [field]: val } : d)) })),
       toggleDest: (id: number) =>
         setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.id === id ? { ...d, expanded: !d.expanded } : d)) })),
+      /** Collapse a saved destination card (after the user saves it). */
+      collapseDest: (id: number) =>
+        setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.id === id ? { ...d, expanded: false } : d)) })),
+      /** Collapse every saved destination card. */
+      collapseAllDests: () =>
+        setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.saved ? { ...d, expanded: false } : d)) })),
       saveDest: (id: number) => {
         setState((s) => ({ ...s, scrollId: "dest-" + id, destinations: s.destinations.map((d) => (d.id === id ? { ...d, saved: true, expanded: true } : d)) }));
         pulseRouting();
