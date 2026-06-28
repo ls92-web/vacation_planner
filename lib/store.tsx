@@ -300,11 +300,12 @@ export function useTripStore() {
        * Always reflects exactly what was loaded — an empty list yields an empty
        * trip (the empty state), never a fallback to sample/demo destinations.
        */
-      hydrateTrip: (list: LoadedDestination[], budgetLevel: BudgetLevel) =>
+      hydrateTrip: (list: LoadedDestination[], budgetLevel: BudgetLevel, transports: Record<string, TransportMode> = {}) =>
         setState((s) => ({
           ...s,
           tripLoading: false,
           budgetLevel: budgetLevel || s.budgetLevel,
+          transports,
           destinations: list.map((d) => ({
             id: ++uid.current,
             name: d.cityName,

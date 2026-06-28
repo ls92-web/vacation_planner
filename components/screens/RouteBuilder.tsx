@@ -609,7 +609,7 @@ function FloatingActionBar() {
   const { activeTrip } = useTrips();
   const totalNights = state.destinations.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
   const persist = () => {
-    if (activeTrip?.id) withSave(saveTrip(activeTrip.id, state.destinations, state.budgetLevel));
+    if (activeTrip?.id) withSave(saveTrip(activeTrip.id, state.destinations, state.budgetLevel, state.transports));
     else withSave(Promise.resolve());
   };
   return (
@@ -637,6 +637,8 @@ function useAutoSaveRoute() {
   const sig =
     state.budgetLevel +
     "::" +
+    JSON.stringify(state.transports) +
+    "::" +
     state.destinations
       .map(
         (d) =>
@@ -650,7 +652,7 @@ function useAutoSaveRoute() {
       return;
     }
     if (!tripId) return;
-    const t = setTimeout(() => withSave(saveTrip(tripId, state.destinations, state.budgetLevel)), 800);
+    const t = setTimeout(() => withSave(saveTrip(tripId, state.destinations, state.budgetLevel, state.transports)), 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig, tripId]);

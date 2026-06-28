@@ -10,6 +10,7 @@ import { CityImage } from "@/components/destinations/CityImage";
 import { loadTrip, saveDestinations } from "@/lib/destinations/repository";
 import { loadCityImage } from "@/lib/geo";
 import type { SelectedDestination } from "@/lib/geo";
+import type { TransportMode } from "@/lib/types";
 
 function NewTripModal({
   onClose,
@@ -156,7 +157,7 @@ export function TripsDashboard() {
     trip.actions.beginTripLoad(); // clear prior plan + show skeleton (never sample data)
     trip.actions.goForm();
     const plan = await loadTrip(t.id);
-    trip.actions.hydrateTrip(plan.destinations, plan.budgetLevel);
+    trip.actions.hydrateTrip(plan.destinations, plan.budgetLevel, plan.transports as Record<string, TransportMode>);
   };
 
   return (

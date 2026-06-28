@@ -34,7 +34,7 @@ Do **not** change these unless the user explicitly asks:
 - **Data layer (Supabase, all owner-only RLS `user_id = auth.uid()`):**
   - `profiles` — full_name, username, country, avatar_url, language, timezone, password_changed_at, onboarded
   - `user_preferences` — pace, transport, travelers, family_friendly, with_children, children_ages, **currency** (default KWD), **theme** (default classic), distance_unit, temperature_unit, travel_style, accommodation, food_pref, accessibility, export_*
-  - `trips` — name, destination, budget_level
+  - `trips` — name, destination, budget_level, start_date, end_date, **transports** (jsonb: chosen travel mode per inter-city leg, keyed `"fromCity|toCity"`)
   - `destinations` — trip_id, name, country, country_code, lat, lng, image_url, arrive, depart, budget_override, position
   - `accommodations` — trip_id, destination_id, type, name, address, checkin, checkout, confirmation, notes, location_url, position
   - `schedule_items` — trip_id, **destination** (= itinerary item's destId/city), day, slot, position, duration_min, data(jsonb place)
@@ -81,7 +81,7 @@ lib/ui/store.tsx                  UIProvider: sidebar collapse
 lib/ui/{saveStatus,account,unsavedGuard,useUnsavedChanges}.ts  Module signals + unsaved-changes guard
 lib/planner/store.tsx             PlannerProvider: per-destination itinerary (destId+day), favorites, focusDestination
 lib/planner/{travel,dayAnalysis}.ts  Timeline/route math; per-day analysis
-lib/destinations/repository.ts    saveTrip/loadTrip (destinations+accoms+budget), serialized+coalesced
+lib/destinations/repository.ts    saveTrip/loadTrip (destinations+accoms+budget+transports), serialized+coalesced
 lib/itinerary/repository.ts       Favorites + schedule_items persistence (destId via `destination` col)
 lib/budget/{estimate,useCurrency,rates}.ts  Budget breakdown + CURRENCIES (EUR base → display, default KWD; GCC+EUR+USD) + live FX loader
 lib/geo/*                         Countries/cities/geocode/cityImage/weather loaders + cache + popular + validation
@@ -99,6 +99,7 @@ lib/supabase/client.ts            Supabase singleton (on globalThis, HMR-safe)
 - **Geo data is API-driven, never stored wholesale.** Only the user's *selected* destinations are persisted. Countries come from the `world-countries` npm package (REST Countries v3.1 was deprecated mid-build). All geo lookups cached in memory + localStorage (`lib/geo/cache`).
 - **Itinerary is grouped by destination** (`ItineraryItem.destId` = city name), with continuous global day numbering and auto travel cards between cities. This is the foundation for all itinerary generation. Attractions stay in the city they were browsed in.
 - **Full trip plan persists** via `saveTrip/loadTrip`; saves are **serialized + coalesced per trip** (delete+insert) to prevent duplicate rows from overlapping auto-save + explicit save.
+- **Everything the user enters persists per-account and reloads (project rule).** Profile + personal info (`profiles`), settings/preferences (`user_preferences`), trips (`trips`), full plan — destinations, hotels, dates, budget level + overrides, **and travel modes** (`destinations`/`accommodations`/`trips.transports`), the day-by-day schedule (`schedule_items`), and saved places (`saved_places`) all save to Supabase under the owner's `user_id` and rehydrate when they return. No user-entered value may live only in React/in-memory state. When adding new user-editable state: persist it via a `lib/*/repository.ts` and restore it in the matching load/hydrate path; if it's keyed, the key must be **stable across reloads** (e.g. travel modes are keyed by city name, never by the ephemeral destination `id`).
 - **No sample data in a real trip (project rule).** The store starts with `destinations: []` (no demo content). Opening a trip calls `beginTripLoad()` (sets `tripLoading`, clears any prior plan) → shows a **skeleton** → `hydrateTrip(list)` reflects exactly what loaded; an empty list yields the **empty state**, never sample destinations. `hydrateTrip` must never fall back to `s.destinations`. `INITIAL_DESTINATIONS` in `lib/data.ts` is reserved for a future explicit demo mode only — never wire it into trip state.
 - **Currency:** budget rates are EUR internally and converted for display (default **KWD**); options limited to GCC + EUR + USD; manual overrides stored in the base unit. Conversion uses **live FX** (`/api/fx` → `lib/budget/rates.ts`, cached 12h via localStorage), overriding the static reference rates in `estimate.ts` — which remain only as a fallback. `useCurrency()` substitutes the live rate transparently.
 - **Theming:** one luxury palette expanded to 3 themes via `[data-theme]` on `<html>`; persisted in prefs; smooth transition.

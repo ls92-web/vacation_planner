@@ -268,7 +268,9 @@ export function replyFor(text: string): string {
 }
 
 export function recommend(a: Destination, b: Destination) {
+  // Key by city names (stable across reloads) so the user's chosen travel mode can
+  // be persisted — destination `id`s are ephemeral and regenerate on every load.
   const key = (a.name || "").trim().toLowerCase() + "|" + (b.name || "").trim().toLowerCase();
   const ov = TRANSPORT_PAIRS[key];
-  return { key: a.id + "-" + b.id, override: ov, recMode: (ov ? ov.mode : "Train") as TransportMode };
+  return { key, override: ov, recMode: (ov ? ov.mode : "Train") as TransportMode };
 }
