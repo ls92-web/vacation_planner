@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMap } from "@vis.gl/react-google-maps";
 import {
   ACCOM_TYPES,
@@ -17,6 +17,8 @@ import { CityImage } from "@/components/destinations/CityImage";
 import { BudgetPanel } from "@/components/destinations/BudgetPanel";
 import { WeatherPanel } from "@/components/destinations/WeatherPanel";
 import { useTrip } from "@/lib/store";
+import { useTrips } from "@/lib/trips/store";
+import { saveTripDestinations } from "@/lib/destinations/repository";
 import { withSave } from "@/lib/ui/saveStatus";
 import { addBreakdowns, computeBudget, fmtMoney, EMPTY_BREAKDOWN, BUDGET_LEVELS } from "@/lib/budget/estimate";
 import { useWeather } from "@/lib/weather/client";
@@ -600,18 +602,47 @@ function EmptyState() {
 
 function FloatingActionBar() {
   const { state, actions } = useTrip();
+  const { activeTrip } = useTrips();
   const totalNights = state.destinations.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
+  const persist = () => {
+    if (activeTrip?.id) withSave(saveTripDestinations(activeTrip.id, state.destinations));
+    else withSave(Promise.resolve());
+  };
   return (
     <div className="sticky bottom-4 z-30 mt-4">
       <div className="mx-auto max-w-[1100px] rounded-[16px] border border-line p-2.5 flex items-center gap-2 flex-wrap" style={{ background: "color-mix(in oklab, var(--surface) 80%, var(--bg))", backdropFilter: "blur(12px)", boxShadow: "0 16px 40px -18px rgba(0,0,0,.35)" }}>
         <button onClick={actions.addDest} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent hover:text-accent"><Plus size={16} strokeWidth={2} />Add destination</button>
         <button onClick={() => { const d = state.destinations.find((x) => x.expanded && x.saved); if (d) actions.addAccom(d.id); else actions.flash("Open a destination to add a hotel."); }} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent hover:text-accent"><Bed size={16} strokeWidth={2} />Add hotel</button>
         <div className="flex-1 min-w-0 text-[12.5px] text-muted px-2 hidden sm:block">{state.destinations.length} destination{state.destinations.length !== 1 ? "s" : ""} · {totalNights} night{totalNights !== 1 ? "s" : ""}</div>
-        <button onClick={() => { actions.collapseAllDests(); withSave(Promise.resolve()); }} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent hover:text-accent"><Check size={16} strokeWidth={2} />Save</button>
-        <button onClick={() => actions.goExplore()} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[11px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06]" style={{ boxShadow: "0 8px 20px -10px var(--accent)" }}>Continue<ArrowRight size={16} strokeWidth={2} /></button>
+        <button onClick={() => { actions.collapseAllDests(); persist(); }} className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent hover:text-accent"><Check size={16} strokeWidth={2} />Save</button>
+        <button onClick={() => { persist(); actions.goExplore(); }} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[11px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06]" style={{ boxShadow: "0 8px 20px -10px var(--accent)" }}>Continue<ArrowRight size={16} strokeWidth={2} /></button>
       </div>
     </div>
   );
+}
+
+/* ============================ persistence ============================ */
+
+// Auto-save the route (destinations + dates) to the active trip whenever it
+// changes. Skips the first run so loading a trip never re-writes/overwrites it.
+function useAutoSaveRoute() {
+  const { state } = useTrip();
+  const { activeTrip } = useTrips();
+  const tripId = activeTrip?.id;
+  const first = useRef(true);
+  const sig = state.destinations
+    .map((d) => `${d.saved ? 1 : 0}|${d.name}|${d.country}|${d.countryCode ?? ""}|${d.lat ?? ""}|${d.lng ?? ""}|${d.arrive}|${d.depart}|${d.image ?? ""}`)
+    .join("~");
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (!tripId) return;
+    const t = setTimeout(() => withSave(saveTripDestinations(tripId, state.destinations)), 800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig, tripId]);
 }
 
 /* ============================ page ============================ */
@@ -619,6 +650,7 @@ function FloatingActionBar() {
 export function RouteBuilder() {
   const { state } = useTrip();
   const [panelOpen, setPanelOpen] = useState(true);
+  useAutoSaveRoute();
   const dests = state.destinations;
   const lastIdx = dests.length - 1;
 

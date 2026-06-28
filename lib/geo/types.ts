@@ -34,4 +34,6 @@ export interface SelectedDestination {
   lat: number;
   lng: number;
   image?: string | null;
+  arrive?: string; // YYYY-MM-DD
+  depart?: string; // YYYY-MM-DD
 }

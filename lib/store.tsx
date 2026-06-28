@@ -272,8 +272,8 @@ export function useTripStore() {
                 image: d.image ?? null,
                 saved: true,
                 expanded: false,
-                arrive: "",
-                depart: "",
+                arrive: d.arrive ?? "",
+                depart: d.depart ?? "",
                 accoms: [],
               }))
             : s.destinations,

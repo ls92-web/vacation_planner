@@ -2,6 +2,7 @@
 
 import { getSupabase } from "@/lib/supabase/client";
 import type { SelectedDestination } from "@/lib/geo";
+import type { Destination } from "@/lib/types";
 
 // ===== Selected-destination persistence, scoped per TRIP. =====
 // Only the destinations the user picks are stored (city + country + coords +
@@ -34,6 +35,8 @@ interface DestRow {
   lat: number | null;
   lng: number | null;
   image_url: string | null;
+  arrive: string | null;
+  depart: string | null;
 }
 
 export async function listDestinations(tripId: string): Promise<SelectedDestination[]> {
@@ -44,7 +47,7 @@ export async function listDestinations(tripId: string): Promise<SelectedDestinat
   if (!uid) return lsRead(tripId);
   const { data, error } = await sb
     .from("destinations")
-    .select("name,country,country_code,lat,lng,image_url")
+    .select("name,country,country_code,lat,lng,image_url,arrive,depart")
     .eq("trip_id", tripId)
     .order("position", { ascending: true });
   if (error || !data) return [];
@@ -56,6 +59,8 @@ export async function listDestinations(tripId: string): Promise<SelectedDestinat
     lat: r.lat ?? 0,
     lng: r.lng ?? 0,
     image: r.image_url,
+    arrive: r.arrive ?? "",
+    depart: r.depart ?? "",
   }));
 }
 
@@ -84,7 +89,27 @@ export async function saveDestinations(tripId: string, dests: SelectedDestinatio
       lat: d.lat,
       lng: d.lng,
       image_url: d.image ?? null,
+      arrive: d.arrive || null,
+      depart: d.depart || null,
       position: i,
     }))
   );
+}
+
+/** Persist the Route Builder's saved destinations (with their dates) for a trip. */
+export async function saveTripDestinations(tripId: string, destinations: Destination[]): Promise<void> {
+  const dests: SelectedDestination[] = destinations
+    .filter((d) => d.saved && d.name.trim())
+    .map((d) => ({
+      id: String(d.id),
+      cityName: d.name,
+      countryName: d.country,
+      countryCode: d.countryCode ?? "",
+      lat: d.lat ?? 0,
+      lng: d.lng ?? 0,
+      image: d.image ?? null,
+      arrive: d.arrive || "",
+      depart: d.depart || "",
+    }));
+  await saveDestinations(tripId, dests);
 }
