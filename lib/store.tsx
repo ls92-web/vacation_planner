@@ -34,6 +34,7 @@ import type {
 import type { AIMessage, TripContext } from "./ai";
 import type { SelectedDestination } from "./geo";
 import type { BudgetLevel } from "./budget/estimate";
+import type { LoadedDestination } from "./destinations/repository";
 import { fetchItinerary, streamAssistantReply } from "./ai-client";
 import { placeCoords } from "./maps/coords";
 import type { PlaceResult } from "./maps/types";
@@ -275,6 +276,29 @@ export function useTripStore() {
                 arrive: d.arrive ?? "",
                 depart: d.depart ?? "",
                 accoms: [],
+              }))
+            : s.destinations,
+        })),
+      /** Restore a full saved trip plan (destinations + accommodations + budget). */
+      hydrateTrip: (list: LoadedDestination[], budgetLevel: BudgetLevel) =>
+        setState((s) => ({
+          ...s,
+          budgetLevel: budgetLevel || s.budgetLevel,
+          destinations: list.length
+            ? list.map((d) => ({
+                id: ++uid.current,
+                name: d.cityName,
+                country: d.countryName,
+                countryCode: d.countryCode,
+                lat: d.lat,
+                lng: d.lng,
+                image: d.image ?? null,
+                saved: true,
+                expanded: false,
+                arrive: d.arrive ?? "",
+                depart: d.depart ?? "",
+                budgetOverride: d.budgetOverride ?? null,
+                accoms: (d.accoms ?? []).map((a) => ({ id: ++uid.current, ...a })),
               }))
             : s.destinations,
         })),

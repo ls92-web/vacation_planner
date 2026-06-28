@@ -18,7 +18,7 @@ import { BudgetPanel } from "@/components/destinations/BudgetPanel";
 import { WeatherPanel } from "@/components/destinations/WeatherPanel";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
-import { saveTripDestinations } from "@/lib/destinations/repository";
+import { saveTrip } from "@/lib/destinations/repository";
 import { withSave } from "@/lib/ui/saveStatus";
 import { addBreakdowns, computeBudget, fmtMoney, EMPTY_BREAKDOWN, BUDGET_LEVELS } from "@/lib/budget/estimate";
 import { useWeather } from "@/lib/weather/client";
@@ -605,7 +605,7 @@ function FloatingActionBar() {
   const { activeTrip } = useTrips();
   const totalNights = state.destinations.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
   const persist = () => {
-    if (activeTrip?.id) withSave(saveTripDestinations(activeTrip.id, state.destinations));
+    if (activeTrip?.id) withSave(saveTrip(activeTrip.id, state.destinations, state.budgetLevel));
     else withSave(Promise.resolve());
   };
   return (
@@ -630,16 +630,23 @@ function useAutoSaveRoute() {
   const { activeTrip } = useTrips();
   const tripId = activeTrip?.id;
   const first = useRef(true);
-  const sig = state.destinations
-    .map((d) => `${d.saved ? 1 : 0}|${d.name}|${d.country}|${d.countryCode ?? ""}|${d.lat ?? ""}|${d.lng ?? ""}|${d.arrive}|${d.depart}|${d.image ?? ""}`)
-    .join("~");
+  const sig =
+    state.budgetLevel +
+    "::" +
+    state.destinations
+      .map(
+        (d) =>
+          `${d.saved ? 1 : 0}|${d.name}|${d.country}|${d.countryCode ?? ""}|${d.lat ?? ""}|${d.lng ?? ""}|${d.arrive}|${d.depart}|${d.image ?? ""}|${d.budgetOverride ?? ""}|` +
+          d.accoms.map((a) => `${a.type},${a.name},${a.checkin},${a.checkout},${a.conf},${a.address},${a.notes},${a.locationUrl ?? ""}`).join(";")
+      )
+      .join("~");
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
     if (!tripId) return;
-    const t = setTimeout(() => withSave(saveTripDestinations(tripId, state.destinations)), 800);
+    const t = setTimeout(() => withSave(saveTrip(tripId, state.destinations, state.budgetLevel)), 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig, tripId]);

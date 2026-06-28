@@ -7,7 +7,7 @@ import { useTrip } from "@/lib/store";
 import { useTrips, type Trip } from "@/lib/trips/store";
 import { DestinationPicker } from "@/components/destinations/DestinationPicker";
 import { CityImage } from "@/components/destinations/CityImage";
-import { listDestinations, saveDestinations } from "@/lib/destinations/repository";
+import { loadTrip, saveDestinations } from "@/lib/destinations/repository";
 import { loadCityImage } from "@/lib/geo";
 import type { SelectedDestination } from "@/lib/geo";
 
@@ -150,11 +150,11 @@ export function TripsDashboard() {
   const trip = useTrip();
   const [creating, setCreating] = useState(false);
 
-  const openTrip = async (t: Trip, pre?: SelectedDestination[]) => {
+  const openTrip = async (t: Trip) => {
     actions.select(t.id);
     trip.actions.setDestination(t.destination);
-    const dests = pre ?? (await listDestinations(t.id));
-    trip.actions.setDestinations(dests);
+    const plan = await loadTrip(t.id);
+    trip.actions.hydrateTrip(plan.destinations, plan.budgetLevel);
     trip.actions.goForm();
   };
 
@@ -195,9 +195,9 @@ export function TripsDashboard() {
       {creating && (
         <NewTripModal
           onClose={() => setCreating(false)}
-          onCreated={(t, dests) => {
+          onCreated={(t) => {
             setCreating(false);
-            openTrip(t, dests);
+            openTrip(t);
           }}
         />
       )}

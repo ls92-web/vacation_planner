@@ -2,7 +2,8 @@
 
 import { getSupabase } from "@/lib/supabase/client";
 import type { SelectedDestination } from "@/lib/geo";
-import type { Destination } from "@/lib/types";
+import type { Accommodation, AccomType, Destination } from "@/lib/types";
+import type { BudgetLevel } from "@/lib/budget/estimate";
 
 // ===== Selected-destination persistence, scoped per TRIP. =====
 // Only the destinations the user picks are stored (city + country + coords +
@@ -96,12 +97,49 @@ export async function saveDestinations(tripId: string, dests: SelectedDestinatio
   );
 }
 
-/** Persist the Route Builder's saved destinations (with their dates) for a trip. */
-export async function saveTripDestinations(tripId: string, destinations: Destination[]): Promise<void> {
-  const dests: SelectedDestination[] = destinations
+// ===== Full trip plan: destinations + accommodations + budget. =====
+
+export type LoadedAccommodation = Omit<Accommodation, "id">;
+export interface LoadedDestination {
+  cityName: string;
+  countryName: string;
+  countryCode: string;
+  lat: number;
+  lng: number;
+  image: string | null;
+  arrive: string;
+  depart: string;
+  budgetOverride: number | null;
+  accoms: LoadedAccommodation[];
+}
+export interface LoadedTrip {
+  destinations: LoadedDestination[];
+  budgetLevel: BudgetLevel;
+}
+
+const planKey = (tripId: string) => `itinera_plan_${tripId}`;
+function lsPlanRead(tripId: string): LoadedTrip | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(planKey(tripId));
+    return raw ? (JSON.parse(raw) as LoadedTrip) : null;
+  } catch {
+    return null;
+  }
+}
+function lsPlanWrite(tripId: string, plan: LoadedTrip) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(planKey(tripId), JSON.stringify(plan));
+  } catch {
+    /* ignore */
+  }
+}
+
+function toLoaded(destinations: Destination[]): LoadedDestination[] {
+  return destinations
     .filter((d) => d.saved && d.name.trim())
     .map((d) => ({
-      id: String(d.id),
       cityName: d.name,
       countryName: d.country,
       countryCode: d.countryCode ?? "",
@@ -110,6 +148,172 @@ export async function saveTripDestinations(tripId: string, destinations: Destina
       image: d.image ?? null,
       arrive: d.arrive || "",
       depart: d.depart || "",
+      budgetOverride: typeof d.budgetOverride === "number" ? d.budgetOverride : null,
+      accoms: d.accoms.map((a) => ({
+        type: a.type,
+        name: a.name,
+        checkin: a.checkin,
+        checkout: a.checkout,
+        conf: a.conf,
+        address: a.address,
+        notes: a.notes,
+        locationUrl: a.locationUrl ?? "",
+      })),
     }));
-  await saveDestinations(tripId, dests);
+}
+
+interface AccomRow {
+  destination_id: string;
+  type: string | null;
+  name: string | null;
+  checkin: string | null;
+  checkout: string | null;
+  confirmation: string | null;
+  address: string | null;
+  notes: string | null;
+  location_url: string | null;
+}
+
+// Serialize + coalesce saves per trip. The debounced auto-save and an explicit
+// Save can otherwise run concurrently and, since each does delete-then-insert,
+// produce duplicate rows. Runs at most one save at a time per trip; if more
+// arrive while one is running, only the latest is run next.
+const saveState = new Map<string, { running: boolean; next: (() => Promise<void>) | null }>();
+
+export function saveTrip(tripId: string, destinations: Destination[], budgetLevel: BudgetLevel): Promise<void> {
+  const run = () => doSaveTrip(tripId, destinations, budgetLevel);
+  const q = saveState.get(tripId) ?? { running: false, next: null };
+  saveState.set(tripId, q);
+  if (q.running) {
+    q.next = run;
+    return Promise.resolve();
+  }
+  q.running = true;
+  return (async () => {
+    try {
+      await run();
+      while (q.next) {
+        const next = q.next;
+        q.next = null;
+        await next();
+      }
+    } finally {
+      q.running = false;
+    }
+  })();
+}
+
+/** Replace the whole trip plan (destinations + accommodations + budget). */
+async function doSaveTrip(tripId: string, destinations: Destination[], budgetLevel: BudgetLevel): Promise<void> {
+  const loaded = toLoaded(destinations);
+  const sb = getSupabase();
+  if (!sb) {
+    lsPlanWrite(tripId, { destinations: loaded, budgetLevel });
+    return;
+  }
+  const { data: sess } = await sb.auth.getSession();
+  const uid = sess.session?.user?.id;
+  if (!uid) {
+    lsPlanWrite(tripId, { destinations: loaded, budgetLevel });
+    return;
+  }
+
+  await sb.from("trips").update({ budget_level: budgetLevel }).eq("id", tripId);
+  // accommodations reference destinations — clear them first.
+  await sb.from("accommodations").delete().eq("trip_id", tripId);
+  await sb.from("destinations").delete().eq("trip_id", tripId);
+  if (!loaded.length) return;
+
+  const { data: inserted, error } = await sb
+    .from("destinations")
+    .insert(
+      loaded.map((d, i) => ({
+        user_id: uid,
+        trip_id: tripId,
+        name: d.cityName,
+        country: d.countryName,
+        country_code: d.countryCode,
+        lat: d.lat,
+        lng: d.lng,
+        image_url: d.image ?? null,
+        arrive: d.arrive || null,
+        depart: d.depart || null,
+        budget_override: d.budgetOverride,
+        position: i,
+      }))
+    )
+    .select("id,position");
+  if (error || !inserted) return;
+
+  const idByPosition = new Map<number, string>();
+  for (const row of inserted as { id: string; position: number }[]) idByPosition.set(row.position, row.id);
+
+  const accomRows = loaded.flatMap((d, i) => {
+    const destId = idByPosition.get(i);
+    if (!destId) return [];
+    return d.accoms.map((a, ai) => ({
+      user_id: uid,
+      trip_id: tripId,
+      destination_id: destId,
+      type: a.type,
+      name: a.name,
+      checkin: a.checkin || null,
+      checkout: a.checkout || null,
+      confirmation: a.conf,
+      address: a.address,
+      notes: a.notes,
+      location_url: a.locationUrl || null,
+      position: ai,
+    }));
+  });
+  if (accomRows.length) await sb.from("accommodations").insert(accomRows);
+}
+
+/** Load the full trip plan for hydration. */
+export async function loadTrip(tripId: string): Promise<LoadedTrip> {
+  const sb = getSupabase();
+  if (!sb) return lsPlanRead(tripId) ?? { destinations: [], budgetLevel: "standard" };
+  const { data: sess } = await sb.auth.getSession();
+  const uid = sess.session?.user?.id;
+  if (!uid) return lsPlanRead(tripId) ?? { destinations: [], budgetLevel: "standard" };
+
+  const [destsRes, accomsRes, tripRes] = await Promise.all([
+    sb.from("destinations").select("id,name,country,country_code,lat,lng,image_url,arrive,depart,budget_override").eq("trip_id", tripId).order("position", { ascending: true }),
+    sb.from("accommodations").select("destination_id,type,name,checkin,checkout,confirmation,address,notes,location_url").eq("trip_id", tripId).order("position", { ascending: true }),
+    sb.from("trips").select("budget_level").eq("id", tripId).maybeSingle(),
+  ]);
+
+  const budgetLevel = ((tripRes.data?.budget_level as BudgetLevel) || "standard") as BudgetLevel;
+  if (destsRes.error || !destsRes.data) return { destinations: [], budgetLevel };
+
+  const accomsByDest = new Map<string, LoadedAccommodation[]>();
+  for (const a of (accomsRes.data as AccomRow[]) ?? []) {
+    const list = accomsByDest.get(a.destination_id) ?? [];
+    list.push({
+      type: (a.type as AccomType) || "Hotel",
+      name: a.name ?? "",
+      checkin: a.checkin ?? "",
+      checkout: a.checkout ?? "",
+      conf: a.confirmation ?? "",
+      address: a.address ?? "",
+      notes: a.notes ?? "",
+      locationUrl: a.location_url ?? "",
+    });
+    accomsByDest.set(a.destination_id, list);
+  }
+
+  const destinations: LoadedDestination[] = (destsRes.data as (DestRow & { id: string; budget_override: number | null })[]).map((r) => ({
+    cityName: r.name,
+    countryName: r.country ?? "",
+    countryCode: r.country_code ?? "",
+    lat: r.lat ?? 0,
+    lng: r.lng ?? 0,
+    image: r.image_url,
+    arrive: r.arrive ?? "",
+    depart: r.depart ?? "",
+    budgetOverride: typeof r.budget_override === "number" ? r.budget_override : null,
+    accoms: accomsByDest.get(r.id) ?? [],
+  }));
+
+  return { destinations, budgetLevel };
 }
