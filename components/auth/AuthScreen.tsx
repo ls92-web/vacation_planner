@@ -156,7 +156,7 @@ export function AuthScreen() {
         </div>
         <div className="relative">
           <div className="font-brand font-semibold leading-[1.08] tracking-[-.01em] text-balance" style={{ fontSize: "clamp(30px,3.4vw,46px)" }}>
-            Every journey,<br />perfectly planned.
+            Plan beautifully.<br />Travel effortlessly.
           </div>
           <p className="mt-[18px] max-w-[420px] text-[15.5px] leading-[1.6] text-white/80">
             Your trips, schedules, saved places and AI day plans — in one private, beautifully organized place.
