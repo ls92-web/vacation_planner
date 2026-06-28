@@ -6,22 +6,19 @@ import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { PlannerProvider, usePlanner } from "@/lib/planner/store";
 import { haversineKm, usePlaces, type ExploreFilters, type ExplorePlace } from "@/lib/places";
-import { GoogleMap, MapsApiProvider, PlaceMarkers } from "@/components/maps";
-import { destinationCoords, useGeocode, type MapMarker } from "@/lib/maps";
+import { MapsApiProvider } from "@/components/maps";
+import { destinationCoords, useGeocode } from "@/lib/maps";
+import { nightsBetween } from "@/lib/data";
 import { Brand } from "@/components/AppNav";
 import { CategoryRail } from "./CategoryRail";
 import { FilterBar } from "./FilterBar";
 import { PlaceCard } from "./PlaceCard";
 import { ExploreMap } from "./ExploreMap";
-import { ItineraryTimeline } from "./ItineraryTimeline";
-import { DayAnalysis } from "./DayAnalysis";
-import { DaySummary } from "./DaySummary";
-import { NearbyOpportunities } from "./NearbyOpportunities";
+import { DestinationItinerary } from "./DestinationItinerary";
 import { CompareTray } from "./CompareTray";
 import { useDebounced } from "./useDebounced";
 import type { Destination } from "@/lib/types";
 import { ExportButton } from "@/components/export/ExportButton";
-import { analyzeDay, type RecAction } from "@/lib/planner/dayAnalysis";
 
 function applyFilters(places: ExplorePlace[], f: ExploreFilters, center: { lat: number; lng: number }): ExplorePlace[] {
   return places.filter((p) => {
@@ -63,26 +60,6 @@ function CardGridSkeleton() {
   );
 }
 
-function PlanDayMap() {
-  const { state } = usePlanner();
-  const items = state.itinerary
-    .filter((it) => it.day === state.day)
-    .sort((a, b) => a.position - b.position);
-  const markers: MapMarker[] = items.map((it) => ({
-    id: it.place.id,
-    name: it.place.name,
-    kind: ["restaurants", "cafes", "breakfast"].includes(it.place.category) ? "restaurant" : "attraction",
-    position: it.place.position,
-    category: it.place.category,
-  }));
-  const center = items[0]?.place.position ?? state.center;
-  return (
-    <GoogleMap center={center} zoom={13} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px]">Map unavailable</div>}>
-      <PlaceMarkers markers={markers} selectedId={null} onSelect={() => {}} />
-    </GoogleMap>
-  );
-}
-
 function ExploreInner() {
   const { state, actions } = usePlanner();
   const trip = useTrip();
@@ -105,7 +82,8 @@ function ExploreInner() {
         const center = hasCoords
           ? { lat: activeDest.lat as number, lng: activeDest.lng as number }
           : destinationCoords(activeDest.name.split(",")[0]) ?? (await geocode(`${activeDest.name}${activeDest.country ? `, ${activeDest.country}` : ""}`));
-        if (!cancelled && center) actions.focusDestination(activeDest.name, center);
+        const days = Math.max(1, nightsBetween(activeDest.arrive, activeDest.depart) || 1);
+        if (!cancelled && center) actions.focusDestination(activeDest.name, center, days);
       } else {
         if (destinationCoords(state.destination.split(",")[0])) return;
         const loc = await geocode(state.destination);
@@ -185,7 +163,7 @@ function ExploreInner() {
           </div>
         </div>
       ) : (
-        <PlanView setView={setView} />
+        <PlanView />
       )}
 
       <CompareTray pool={pool} />
@@ -194,39 +172,12 @@ function ExploreInner() {
   );
 }
 
-function PlanView({ setView }: { setView: (v: "explore" | "plan") => void }) {
-  const { state, actions } = usePlanner();
-  const dayItems = useMemo(() => state.itinerary.filter((it) => it.day === state.day), [state.itinerary, state.day]);
-  const analysis = useMemo(
-    () => analyzeDay(dayItems, state.center, state.transportMode),
-    [dayItems, state.center, state.transportMode]
-  );
-
-  const onAction = (a: RecAction) => {
-    if (a.kind === "optimize") actions.optimizeDay(state.day);
-    else if (a.kind === "shorten") actions.setItemDuration(a.placeId, a.toMin);
-    else if (a.kind === "moveDay") actions.moveItemToDay(a.placeId);
-    else if (a.kind === "addCafe") { actions.setCategory("cafes"); setView("explore"); actions.flash("Browse cafés near your route, then add one."); }
-    else if (a.kind === "findSimilar") { actions.setCategory("hidden"); setView("explore"); actions.flash("Here are some different picks nearby."); }
-  };
-
+function PlanView() {
   return (
-    <div className="max-w-[1320px] mx-auto px-[clamp(16px,3vw,28px)] py-5 pb-24 flex flex-col gap-5">
-      <div className="flex flex-col lg:flex-row gap-5">
-        <div className="flex-1 min-w-0">
-          <div className="font-display font-bold text-[24px] tracking-[-.02em] mb-1">Your itinerary</div>
-          <p className="text-muted text-[13.5px] mb-4">A continuous, timed plan. Drag stops to reorder, tune visit times, switch transport — the analysis updates live.</p>
-          <ItineraryTimeline />
-        </div>
-        <aside className="lg:w-[360px] shrink-0 flex flex-col gap-4">
-          <div className="relative rounded-[18px] overflow-hidden border border-line h-[260px]">
-            <PlanDayMap />
-          </div>
-          <NearbyOpportunities />
-        </aside>
-      </div>
-      <DayAnalysis analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} onAction={onAction} />
-      <DaySummary analysis={analysis} units={state.units} dayLabel={`Day ${state.day + 1}`} />
+    <div className="max-w-[1100px] mx-auto px-[clamp(16px,3vw,28px)] py-5 pb-24">
+      <div className="font-display font-bold text-[24px] tracking-[-.02em] mb-1">Your itinerary</div>
+      <p className="text-muted text-[13.5px] mb-4">Grouped by destination in your travel order. Open each city in Explore to fill its days — stops stay with the city you added them in.</p>
+      <DestinationItinerary />
     </div>
   );
 }

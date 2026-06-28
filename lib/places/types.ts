@@ -61,6 +61,9 @@ export const DEFAULT_FILTERS: ExploreFilters = {
 
 export interface ItineraryItem {
   place: ExplorePlace;
+  /** The destination this stop belongs to (city name) — the planner is grouped by destination. */
+  destId: string;
+  /** Day index within the destination (0-based). */
   day: number;
   slot: Slot;
   position: number;

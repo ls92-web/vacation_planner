@@ -165,9 +165,9 @@ export function PlaceCard({
                 onClick={(e) => e.stopPropagation()}
                 className="absolute z-30 left-0 right-0 bottom-[calc(100%+6px)] bg-surface border border-line rounded-xl shadow-lg p-2.5 vp-pop"
               >
-                <div className="text-[11px] font-bold uppercase tracking-[.04em] text-muted px-1 mb-1.5">Add to day</div>
-                <div className="flex gap-1.5 mb-2">
-                  {Array.from({ length: state.dayCount }).map((_, d) => (
+                <div className="text-[11px] font-bold uppercase tracking-[.04em] text-muted px-1 mb-1.5">Add to {state.destination.split(",")[0]} · day</div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {Array.from({ length: state.focusDays }).map((_, d) => (
                     <button
                       key={d}
                       onClick={() => actions.setDay(d)}

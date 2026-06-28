@@ -28,6 +28,8 @@ interface PlannerState {
   selectedId: string | null;
   day: number;
   dayCount: number;
+  /** Days available in the currently-focused destination (its number of nights). */
+  focusDays: number;
   units: "km" | "mi";
   transportMode: TransportMode;
   loaded: boolean;
@@ -57,6 +59,7 @@ function makeInitial(trip: TripRef): PlannerState {
     selectedId: null,
     day: 0,
     dayCount: NUM_DAYS,
+    focusDays: NUM_DAYS,
     units: "km",
     transportMode: "walk",
     loaded: false,
@@ -104,9 +107,13 @@ function useProvidePlanner(trip: TripRef) {
       resetFilters: () => setState((s) => ({ ...s, filters: { ...DEFAULT_FILTERS } })),
       setUnits: (u: "km" | "mi") => setState((s) => ({ ...s, units: u })),
       setCenter: (center: LatLng) => setState((s) => ({ ...s, center })),
-      /** Focus exploration on a specific chosen destination (scopes attractions to it). */
-      focusDestination: (destination: string, center: LatLng) =>
-        setState((s) => (s.destination === destination ? { ...s, center } : { ...s, destination, center, search: "" })),
+      /** Focus exploration on a specific chosen destination (scopes attractions + plan days to it). */
+      focusDestination: (destination: string, center: LatLng, days: number) =>
+        setState((s) =>
+          s.destination === destination
+            ? { ...s, center, focusDays: Math.max(1, days) }
+            : { ...s, destination, center, focusDays: Math.max(1, days), search: "", day: 0 }
+        ),
       setTransportMode: (m: TransportMode) => setState((s) => ({ ...s, transportMode: m })),
       setDay: (d: number) => setState((s) => ({ ...s, day: d })),
       setHovered: (id: string | null) => setState((s) => (s.hoveredId === id ? s : { ...s, hoveredId: id })),
@@ -128,15 +135,17 @@ function useProvidePlanner(trip: TripRef) {
         })),
       clearCompare: () => setState((s) => ({ ...s, compare: [] })),
 
+      /** Add a place to the currently-focused destination on a given day + slot. */
       addToItinerary: (place: ExplorePlace, day: number, slot: Slot) => {
         const s = stateRef.current;
         if (s.itinerary.some((it) => it.place.id === place.id)) {
           flash(`${place.name} is already in your plan.`);
           return;
         }
-        const position = s.itinerary.filter((it) => it.day === day && it.slot === slot).length;
-        persistItinerary([...s.itinerary, { place, day, slot, position }]);
-        flash(`Added ${place.name} to ${["Morning", "Afternoon", "Evening"][["morning", "afternoon", "evening"].indexOf(slot)]}.`);
+        const destId = s.destination.split(",")[0].trim();
+        const position = s.itinerary.filter((it) => it.destId === destId && it.day === day && it.slot === slot).length;
+        persistItinerary([...s.itinerary, { place, destId, day, slot, position }]);
+        flash(`Added ${place.name} to ${destId} · ${["Morning", "Afternoon", "Evening"][["morning", "afternoon", "evening"].indexOf(slot)]}.`);
       },
       removeFromItinerary: (placeId: string) => {
         persistItinerary(stateRef.current.itinerary.filter((it) => it.place.id !== placeId));
@@ -149,29 +158,23 @@ function useProvidePlanner(trip: TripRef) {
           stateRef.current.itinerary.map((it) => (it.place.id === placeId ? { ...it, durationMin: Math.max(15, Math.round(min)) } : it))
         );
       },
-      moveItemToDay: (placeId: string, toDay?: number) => {
+      /** Move a stop to another day within its own destination (never across destinations). */
+      moveItemToDay: (placeId: string, toDay: number) => {
         const s = stateRef.current;
         const item = s.itinerary.find((it) => it.place.id === placeId);
-        if (!item) return;
-        const target = toDay ?? (item.day + 1) % s.dayCount;
-        if (target === item.day) return;
-        const pos = s.itinerary.filter((it) => it.day === target && it.slot === item.slot).length;
-        persistItinerary(s.itinerary.map((it) => (it.place.id === placeId ? { ...it, day: target, position: pos } : it)));
-        flash(`Moved ${item.place.name} to Day ${target + 1}.`);
+        if (!item || toDay === item.day) return;
+        const pos = s.itinerary.filter((it) => it.destId === item.destId && it.day === toDay && it.slot === item.slot).length;
+        persistItinerary(s.itinerary.map((it) => (it.place.id === placeId ? { ...it, day: toDay, position: pos } : it)));
+        flash(`Moved ${item.place.name} to Day ${toDay + 1}.`);
       },
-      optimizeDay: (day: number) => {
+      /** Re-sequence one day of one destination for the shortest route. */
+      optimizeDay: (destId: string, day: number) => {
         const s = stateRef.current;
-        const dayItems = s.itinerary.filter((it) => it.day === day);
+        const dayItems = s.itinerary.filter((it) => it.destId === destId && it.day === day);
         if (dayItems.length < 2) return;
-        const optimized = resequence(optimizeOrder(dayItems, s.center), s.center, s.transportMode).map((it) => ({ ...it, day }));
-        persistItinerary([...s.itinerary.filter((it) => it.day !== day), ...optimized]);
+        const optimized = resequence(optimizeOrder(dayItems, s.center), s.center, s.transportMode).map((it) => ({ ...it, destId, day }));
+        persistItinerary([...s.itinerary.filter((it) => !(it.destId === destId && it.day === day)), ...optimized]);
         flash("Reordered for a shorter route.");
-      },
-      /** Re-sequence a day from a new visit order (drag-and-drop). */
-      reorderDay: (day: number, orderedDay: ItineraryItem[]) => {
-        const s = stateRef.current;
-        const reseq = resequence(orderedDay, s.center, s.transportMode).map((it) => ({ ...it, day }));
-        persistItinerary([...s.itinerary.filter((it) => it.day !== day), ...reseq]);
       },
 
       flash,

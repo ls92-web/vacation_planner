@@ -36,7 +36,7 @@ export function ExportButton() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const city = state.destination.split(",")[0];
-  const days = new Set(state.itinerary.map((it) => it.day)).size;
+  const days = new Set(state.itinerary.map((it) => `${it.destId}|${it.day}`)).size;
 
   // Overlays are portaled to <body> so the header's backdrop-filter can't trap position:fixed.
   const overlays = (

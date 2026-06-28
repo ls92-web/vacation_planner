@@ -67,6 +67,7 @@ interface SavedRow {
 }
 interface ItemRow {
   data: ExplorePlace | null;
+  destination: string | null;
   day: number;
   slot: string;
   position: number;
@@ -119,7 +120,7 @@ const userRepo: ItineraryRepository = {
     if (!uid) return localRepo.listItinerary(tripId);
     const { data, error } = await sb
       .from("schedule_items")
-      .select("data, day, slot, position, duration_min")
+      .select("data, destination, day, slot, position, duration_min")
       .eq("trip_id", tripId)
       .order("day", { ascending: true })
       .order("slot", { ascending: true })
@@ -127,7 +128,7 @@ const userRepo: ItineraryRepository = {
     if (error) return [];
     return (data as ItemRow[])
       .map((r): ItineraryItem | null =>
-        r.data ? { place: r.data, day: r.day, slot: r.slot as Slot, position: r.position, durationMin: r.duration_min ?? undefined } : null
+        r.data ? { place: r.data, destId: r.destination ?? "", day: r.day, slot: r.slot as Slot, position: r.position, durationMin: r.duration_min ?? undefined } : null
       )
       .filter((i): i is ItineraryItem => i !== null);
   },
@@ -143,7 +144,7 @@ const userRepo: ItineraryRepository = {
         items.map((it) => ({
           user_id: uid,
           trip_id: tripId,
-          destination,
+          destination: it.destId || destination,
           place_id: it.place.id,
           name: it.place.name,
           category: it.place.category,
