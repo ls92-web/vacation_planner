@@ -51,6 +51,8 @@ interface AppState {
   destinations: Destination[];
   /** True while a trip's saved plan is loading — show a skeleton, never sample data. */
   tripLoading: boolean;
+  /** True when the last trip load failed (auth/network) — show a retryable error, never an empty plan. */
+  tripLoadError: boolean;
   budgetLevel: BudgetLevel;
   transports: Record<string, TransportMode>;
   dragId: number | null;
@@ -92,6 +94,7 @@ const INITIAL: AppState = {
   pace: "balanced",
   destinations: [],
   tripLoading: false,
+  tripLoadError: false,
   budgetLevel: "standard",
   transports: {},
   dragId: null,
@@ -294,7 +297,9 @@ export function useTripStore() {
             : s.destinations,
         })),
       /** Begin loading a trip: clear any prior plan and show the loading state (never sample data). */
-      beginTripLoad: () => set({ tripLoading: true, destinations: [] }),
+      beginTripLoad: () => set({ tripLoading: true, tripLoadError: false, destinations: [] }),
+      /** Mark the trip load as failed (transient auth/network) so the UI offers a retry instead of an empty plan. */
+      failTripLoad: () => set({ tripLoading: false, tripLoadError: true }),
       /**
        * Restore a full saved trip plan (destinations + accommodations + budget).
        * Always reflects exactly what was loaded — an empty list yields an empty
@@ -304,6 +309,7 @@ export function useTripStore() {
         setState((s) => ({
           ...s,
           tripLoading: false,
+          tripLoadError: false,
           budgetLevel: budgetLevel || s.budgetLevel,
           transports,
           destinations: list.map((d) => ({

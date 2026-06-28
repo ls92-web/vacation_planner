@@ -7,10 +7,10 @@ import { useTrip } from "@/lib/store";
 import { useTrips, type Trip } from "@/lib/trips/store";
 import { DestinationPicker } from "@/components/destinations/DestinationPicker";
 import { CityImage } from "@/components/destinations/CityImage";
-import { loadTrip, saveDestinations } from "@/lib/destinations/repository";
+import { saveDestinations } from "@/lib/destinations/repository";
+import { useTripLoader } from "@/lib/trips/useTripLoader";
 import { loadCityImage } from "@/lib/geo";
 import type { SelectedDestination } from "@/lib/geo";
-import type { TransportMode } from "@/lib/types";
 
 function NewTripModal({
   onClose,
@@ -151,13 +151,11 @@ export function TripsDashboard() {
   const trip = useTrip();
   const [creating, setCreating] = useState(false);
 
+  const loadPlan = useTripLoader();
   const openTrip = async (t: Trip) => {
     actions.select(t.id);
-    trip.actions.setDestination(t.destination);
-    trip.actions.beginTripLoad(); // clear prior plan + show skeleton (never sample data)
-    trip.actions.goForm();
-    const plan = await loadTrip(t.id);
-    trip.actions.hydrateTrip(plan.destinations, plan.budgetLevel, plan.transports as Record<string, TransportMode>);
+    trip.actions.goForm(); // show the route screen (skeleton while loading)
+    await loadPlan(t.id, t.destination); // skeleton → hydrate, or → retryable error
   };
 
   return (

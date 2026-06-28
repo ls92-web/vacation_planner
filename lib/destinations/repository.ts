@@ -1,5 +1,6 @@
 "use client";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
 import type { SelectedDestination } from "@/lib/geo";
 import type { Accommodation, AccomType, Destination } from "@/lib/types";
@@ -271,13 +272,51 @@ async function doSaveTrip(tripId: string, destinations: Destination[], budgetLev
   if (accomRows.length) await sb.from("accommodations").insert(accomRows);
 }
 
-/** Load the full trip plan for hydration. */
+/** Thrown when a trip's plan can't be loaded (auth not ready / network) — distinct from a genuinely empty trip. */
+export class TripLoadError extends Error {
+  constructor(public reason: "auth-unavailable" | "query-failed") {
+    super(`Trip load failed: ${reason}`);
+    this.name = "TripLoadError";
+  }
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Resolve the signed-in user id, tolerating a session that hasn't hydrated yet.
+ * getSession() reads the locally-stored session and can momentarily return null
+ * right after a load, so we poll briefly before giving up; getUser() (network)
+ * is a final fallback. Returns null only when there is genuinely no session.
+ */
+async function getReadyUserId(sb: SupabaseClient): Promise<string | null> {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const { data } = await sb.auth.getSession();
+    const uid = data.session?.user?.id;
+    if (uid) return uid;
+    await sleep(150);
+  }
+  const { data } = await sb.auth.getUser();
+  return data.user?.id ?? null;
+}
+
+/**
+ * Load the full trip plan for hydration.
+ *
+ * Throws TripLoadError instead of returning an empty plan when the user is
+ * (likely) signed in but the session/DB is temporarily unavailable — so a
+ * transient auth hiccup surfaces as a retryable error, never as silent data
+ * loss. A genuinely empty trip (query succeeds, zero rows) still returns
+ * normally. Unauthenticated localStorage mode (no Supabase) is unchanged.
+ */
 export async function loadTrip(tripId: string): Promise<LoadedTrip> {
   const sb = getSupabase();
   if (!sb) return lsPlanRead(tripId) ?? { destinations: [], budgetLevel: "standard", transports: {} };
-  const { data: sess } = await sb.auth.getSession();
-  const uid = sess.session?.user?.id;
-  if (!uid) return lsPlanRead(tripId) ?? { destinations: [], budgetLevel: "standard", transports: {} };
+  const uid = await getReadyUserId(sb);
+  if (!uid) {
+    // Supabase is configured (the app runs signed-in), yet no session became
+    // available after retrying — treat as a transient failure, not "no data".
+    throw new TripLoadError("auth-unavailable");
+  }
 
   const [destsRes, accomsRes, tripRes] = await Promise.all([
     sb.from("destinations").select("id,name,country,country_code,lat,lng,image_url,arrive,depart,budget_override").eq("trip_id", tripId).order("position", { ascending: true }),
@@ -285,9 +324,11 @@ export async function loadTrip(tripId: string): Promise<LoadedTrip> {
     sb.from("trips").select("budget_level,transports").eq("id", tripId).maybeSingle(),
   ]);
 
+  // A query error (or a missing trip row) is a load failure, not an empty trip.
+  if (destsRes.error || !destsRes.data || tripRes.error) throw new TripLoadError("query-failed");
+
   const budgetLevel = ((tripRes.data?.budget_level as BudgetLevel) || "standard") as BudgetLevel;
   const transports = (tripRes.data?.transports as Record<string, string> | null) ?? {};
-  if (destsRes.error || !destsRes.data) return { destinations: [], budgetLevel, transports };
 
   const accomsByDest = new Map<string, LoadedAccommodation[]>();
   for (const a of (accomsRes.data as AccomRow[]) ?? []) {

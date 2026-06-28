@@ -24,7 +24,8 @@ import { addBreakdowns, computeBudget, convertCostText, formatMoney, EMPTY_BREAK
 import { useCurrency } from "@/lib/budget/useCurrency";
 import { useWeather } from "@/lib/weather/client";
 import { describeWeather } from "@/lib/weather/codes";
-import { Bed, Cloud, ExternalLink, Loader2, PenLine, Wallet } from "lucide-react";
+import { Bed, Cloud, ExternalLink, Loader2, PenLine, RefreshCw, TriangleAlert, Wallet } from "lucide-react";
+import { useTripLoader } from "@/lib/trips/useTripLoader";
 import {
   ACCOM_ICONS,
   MODE_ICONS,
@@ -652,10 +653,14 @@ function useAutoSaveRoute() {
       return;
     }
     if (!tripId) return;
+    // Never persist while a trip is loading or failed to load: in those states the
+    // plan is intentionally empty (skeleton/retry), and saving it would wipe the
+    // user's saved destinations. Only auto-save real, loaded/edited plans.
+    if (state.tripLoading || state.tripLoadError) return;
     const t = setTimeout(() => withSave(saveTrip(tripId, state.destinations, state.budgetLevel, state.transports)), 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig, tripId]);
+  }, [sig, tripId, state.tripLoading, state.tripLoadError]);
 }
 
 /* ============================ page ============================ */
@@ -674,13 +679,49 @@ function RouteSkeleton() {
   );
 }
 
+/** Shown when a trip's plan couldn't be loaded (transient auth/network). Offers a retry — never an empty plan. */
+function RouteLoadError({ onRetry, retrying }: { onRetry: () => void; retrying: boolean }) {
+  return (
+    <div className="rounded-[18px] border border-line bg-surface p-8 text-center vp-fade-fast">
+      <div className="w-12 h-12 rounded-full grid place-items-center mx-auto" style={{ background: "#f7e7e3", color: "#b3402f" }}>
+        <TriangleAlert size={22} strokeWidth={2} />
+      </div>
+      <div className="font-display font-bold text-[17px] mt-3.5">Couldn&apos;t load this trip</div>
+      <p className="text-[13.5px] text-muted mt-1.5 max-w-[380px] mx-auto leading-relaxed">
+        We had trouble reaching your saved plan. Your data is safe — this is usually a brief connection or sign-in hiccup.
+      </p>
+      <button
+        onClick={onRetry}
+        disabled={retrying}
+        className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-[11px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06] transition disabled:opacity-70 disabled:cursor-default"
+      >
+        <RefreshCw size={15} strokeWidth={2.4} className={retrying ? "animate-spin" : ""} />
+        {retrying ? "Retrying…" : "Retry"}
+      </button>
+    </div>
+  );
+}
+
 export function RouteBuilder() {
   const { state } = useTrip();
+  const { activeTrip } = useTrips();
+  const loadPlan = useTripLoader();
   const [panelOpen, setPanelOpen] = useState(true);
+  const [retrying, setRetrying] = useState(false);
   useAutoSaveRoute();
   const dests = state.destinations;
   const lastIdx = dests.length - 1;
   const loading = state.tripLoading;
+  const loadError = state.tripLoadError;
+  const retry = async () => {
+    if (!activeTrip || retrying) return;
+    setRetrying(true);
+    try {
+      await loadPlan(activeTrip.id, activeTrip.destination);
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   return (
     <div className="vp-scroll min-h-full">
@@ -702,6 +743,8 @@ export function RouteBuilder() {
           <div className="flex-1 min-w-0">
             {loading ? (
               <RouteSkeleton />
+            ) : loadError ? (
+              <RouteLoadError onRetry={retry} retrying={retrying} />
             ) : (
               <>
                 <TripOverview />
