@@ -46,9 +46,14 @@ export function ItineraryBook({ template: t, onClose }: { template: BookTemplate
     let budget = 0;
     const tot = { attractions: 0, restaurants: 0, sightseeing: 0, stops: 0 };
     const secs = dests.map((d) => {
-      const dayCount = Math.max(1, nightsBetween(d.arrive, d.depart) || 1);
       const dcenter: LatLng = typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0) ? { lat: d.lat, lng: d.lng } : state.center;
       const items = state.itinerary.filter((it) => (it.destId ? cityKey(it.destId) : firstKey) === cityKey(d.name));
+      // Day count is the destination's nights, but never fewer than the days that
+      // actually hold stops — otherwise a stop placed on a day later trimmed off by a
+      // shortened date range would be silently dropped from the book (and its counts),
+      // so the cover totals would no longer match the stops the user actually planned.
+      const maxItemDay = items.reduce((m, it) => Math.max(m, it.day), -1);
+      const dayCount = Math.max(1, nightsBetween(d.arrive, d.depart) || 1, maxItemDay + 1);
       const dayList = Array.from({ length: dayCount }, (_, di) => {
         const dayItems: ItineraryItem[] = items.filter((it) => it.day === di);
         const seq = orderItems(dayItems);
