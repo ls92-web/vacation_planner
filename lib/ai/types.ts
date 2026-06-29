@@ -1,4 +1,6 @@
-// ===== Shared AI types — provider-agnostic so other providers can be added. =====
+// ===== Shared AI types used by the client when calling the `ai` edge function. =====
+// (The OpenRouter client, prompts, and service now live in the Deno edge function
+// at supabase/functions/ai — not in the Next.js bundle.)
 
 export type AIRole = "system" | "user" | "assistant";
 
@@ -7,42 +9,17 @@ export interface AIMessage {
   content: string;
 }
 
-export interface ChatRequest {
-  messages: AIMessage[];
-  temperature?: number;
-  maxTokens?: number;
-  /** Ask the model for a strict JSON object response. */
-  json?: boolean;
-  signal?: AbortSignal;
+export interface TripContext {
+  destination: string;
+  travelers: string;
+  numDays: number;
+  selected?: { name: string; category: string; type: string; priority?: string; lat?: number; lng?: number }[];
+  /** Places the user discovered via Google Places and added to the trip. */
+  discovered?: { name: string; category: string }[];
 }
 
-/**
- * A chat provider. OpenRouter is the only implementation today, but the app
- * talks to this interface only — a future provider (a direct Anthropic/OpenAI
- * client, a local model, etc.) just needs to satisfy this shape.
- */
-export interface ChatProvider {
-  readonly name: string;
-  isConfigured(): boolean;
-  modelId(): string | undefined;
-  chat(req: ChatRequest): Promise<string>;
-  stream(req: ChatRequest): AsyncGenerator<string>;
-}
-
-export class AIConfigError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AIConfigError";
-  }
-}
-
-export class AIRequestError extends Error {
-  status?: number;
-  detail?: string;
-  constructor(message: string, status?: number, detail?: string) {
-    super(message);
-    this.name = "AIRequestError";
-    this.status = status;
-    this.detail = detail;
-  }
+export interface Recommendation {
+  name: string;
+  ai: number;
+  why: string;
 }
