@@ -1,6 +1,6 @@
 // ===== Domain types for the Vacation Planner (mirrors the prototype state model) =====
 
-export type Screen = "auth" | "trips" | "form" | "explore" | "generating" | "plan" | "profile" | "settings";
+export type Screen = "auth" | "dashboard" | "trips" | "form" | "explore" | "generating" | "plan" | "saved" | "profile" | "settings";
 export type AuthMode = "signin" | "signup";
 export type ThemeName = "Ocean" | "Sunset" | "Forest";
 export type Units = "km" | "mi";

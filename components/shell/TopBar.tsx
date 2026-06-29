@@ -10,11 +10,13 @@ import { AccountButton } from "@/components/auth/AccountButton";
 
 const SCREEN_LABEL: Record<Screen, string> = {
   auth: "Sign in",
+  dashboard: "Dashboard",
   trips: "My Trips",
   form: "Route Planner",
   explore: "Explore & Plan",
   generating: "Generating",
   plan: "Itinerary",
+  saved: "Saved Places",
   profile: "Profile",
   settings: "Settings",
 };
@@ -55,13 +57,15 @@ export function TopBar() {
   const { state, actions } = useTrip();
   const { activeTrip } = useTrips();
   const isAccount = state.screen === "profile" || state.screen === "settings";
+  const isTripContext = state.screen === "form" || state.screen === "explore" || state.screen === "generating" || state.screen === "plan";
+  const isDashboard = state.screen === "dashboard";
 
   return (
     <header className="sticky top-0 z-40 h-[60px] border-b border-line flex items-center gap-4 px-4 sm:px-6" style={{ background: "color-mix(in oklab, var(--bg) 82%, #fff)", backdropFilter: "blur(12px)" }}>
       {/* breadcrumb + title */}
       <div className="min-w-0 flex-1">
         <div className="hidden sm:flex items-center gap-1.5 text-[11.5px] text-muted">
-          <button onClick={actions.goTrips} className="hover:text-ink cursor-pointer">Dashboard</button>
+          <button onClick={actions.goDashboard} className={`hover:text-ink cursor-pointer ${isDashboard ? "text-ink font-semibold" : ""}`}>Dashboard</button>
           {isAccount ? (
             <>
               <ChevronRight size={12} strokeWidth={2} />
@@ -69,7 +73,7 @@ export function TopBar() {
               <ChevronRight size={12} strokeWidth={2} />
               <span className="text-ink font-semibold">{SCREEN_LABEL[state.screen]}</span>
             </>
-          ) : (
+          ) : isTripContext ? (
             <>
               <ChevronRight size={12} strokeWidth={2} />
               <button onClick={actions.goTrips} className="hover:text-ink cursor-pointer">My Trips</button>
@@ -82,16 +86,21 @@ export function TopBar() {
               <ChevronRight size={12} strokeWidth={2} />
               <span>{SCREEN_LABEL[state.screen]}</span>
             </>
-          )}
+          ) : !isDashboard ? (
+            <>
+              <ChevronRight size={12} strokeWidth={2} />
+              <span className="text-ink font-semibold">{SCREEN_LABEL[state.screen]}</span>
+            </>
+          ) : null}
         </div>
         <div className="flex items-baseline gap-2 mt-0.5">
-          {isAccount ? (
-            <span className="font-display font-bold text-[16px] tracking-[-.01em] truncate">{SCREEN_LABEL[state.screen]}</span>
-          ) : (
+          {isTripContext && activeTrip ? (
             <>
-              <span className={`truncate ${activeTrip ? "font-display font-bold text-[16px] tracking-[-.01em]" : "font-brand font-semibold text-[18px]"}`}>{activeTrip?.name ?? "Itinera"}</span>
-              {activeTrip && <span className="text-[12.5px] text-muted truncate hidden md:inline">· {activeTrip.destination}</span>}
+              <span className="truncate font-display font-bold text-[16px] tracking-[-.01em]">{activeTrip.name}</span>
+              <span className="text-[12.5px] text-muted truncate hidden md:inline">· {activeTrip.destination}</span>
             </>
+          ) : (
+            <span className="font-display font-bold text-[16px] tracking-[-.01em] truncate">{SCREEN_LABEL[state.screen]}</span>
           )}
         </div>
       </div>

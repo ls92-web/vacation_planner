@@ -9,11 +9,20 @@ import type { ExplorePlace, ItineraryItem, Slot } from "@/lib/places";
 // scoped by trip_id, so each named trip's saved places and schedule are private to
 // the account and reload on any device. No auth → localStorage fallback.
 
+/** A saved place with the trip + destination it belongs to (for the Saved Places page). */
+export interface SavedEntry {
+  tripId: string;
+  destination: string;
+  place: ExplorePlace;
+}
+
 export interface ItineraryRepository {
   listFavorites(tripId: string): Promise<ExplorePlace[]>;
   setFavorite(tripId: string, destination: string, place: ExplorePlace, on: boolean): Promise<void>;
   listItinerary(tripId: string): Promise<ItineraryItem[]>;
   saveItinerary(tripId: string, destination: string, items: ItineraryItem[]): Promise<void>;
+  /** Every saved place across all of the user's trips (newest first). */
+  listAllSaved(): Promise<SavedEntry[]>;
 }
 
 // ---------- localStorage fallback (no auth) ----------
@@ -52,6 +61,9 @@ const localRepo: ItineraryRepository = {
   },
   async saveItinerary(tripId, _destination, items) {
     lsWrite(lsKey("itin", tripId), items);
+  },
+  async listAllSaved() {
+    return []; // no-auth fallback: per-trip localStorage isn't aggregated here
   },
 };
 
@@ -159,6 +171,22 @@ const userRepo: ItineraryRepository = {
         }))
       );
     }
+  },
+
+  async listAllSaved() {
+    const sb = getSupabase();
+    if (!sb) return localRepo.listAllSaved();
+    const uid = await currentUserId(sb);
+    if (!uid) return [];
+    // RLS scopes this to the signed-in user's rows across every trip.
+    const { data, error } = await sb
+      .from("saved_places")
+      .select("data, trip_id, destination")
+      .order("created_at", { ascending: false });
+    if (error || !data) return [];
+    return (data as { data: ExplorePlace | null; trip_id: string; destination: string | null }[])
+      .filter((r) => !!r.data)
+      .map((r) => ({ tripId: r.trip_id, destination: r.destination ?? "", place: r.data as ExplorePlace }));
   },
 };
 

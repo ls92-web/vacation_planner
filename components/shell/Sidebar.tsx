@@ -37,10 +37,10 @@ const SECTIONS: { group: string; items: NavItem[] }[] = [
   {
     group: "Main",
     items: [
-      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, onClick: (a) => a.goTrips() },
+      { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, onClick: (a) => a.goDashboard() },
       { key: "mytrips", label: "My Trips", icon: Plane, onClick: (a) => a.goTrips() },
       { key: "planner", label: "Planner", icon: MapIcon, onClick: (a) => a.goForm() },
-      { key: "saved", label: "Saved Places", icon: Heart, onClick: (a) => a.goExplore() },
+      { key: "saved", label: "Saved Places", icon: Heart, onClick: (a) => a.goSaved() },
     ],
   },
   {
@@ -66,7 +66,9 @@ const SECTIONS: { group: string; items: NavItem[] }[] = [
 
 function activeKeyFor(screen: Screen): string | null {
   switch (screen) {
+    case "dashboard": return "dashboard";
     case "trips": return "mytrips";
+    case "saved": return "saved";
     case "form":
     case "explore":
     case "generating":

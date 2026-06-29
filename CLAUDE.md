@@ -56,7 +56,9 @@ app/api/geo/city-image/route.ts   City photo via Wikipedia page images
 app/api/geo/weather/route.ts      Open-Meteo forecast (≤16d) else seasonal averages
 app/api/maps/routes/route.ts      Dormant Google Routes proxy (in-app routing disabled)
 
-components/App.tsx                 Provider nesting + screen switch (trips/form/explore/generating/plan/profile/settings)
+components/App.tsx                 Provider nesting + screen switch (dashboard/trips/form/explore/generating/plan/saved/profile/settings); default screen = dashboard
+components/screens/Dashboard.tsx                 Home/overview: greeting, stat tiles, continue/active trip, recent trips, quick actions
+components/screens/SavedPlaces.tsx               Saved attractions across all trips (grouped by trip→destination) with Open-in-Maps
 components/shell/{AppShell,Sidebar,TopBar}.tsx  Shell: grouped sidebar, breadcrumb+save-status, mounts UnsavedChangesDialog
 components/trips/TripsDashboard.tsx             Trips grid + New Trip modal (DestinationPicker)
 components/screens/RouteBuilder.tsx             "Plan your route": destination cards (dates/hotels/budget/weather), travel connectors, auto-save
@@ -82,7 +84,7 @@ lib/ui/{saveStatus,account,unsavedGuard,useUnsavedChanges}.ts  Module signals + 
 lib/planner/store.tsx             PlannerProvider: per-destination itinerary (destId+day), favorites, focusDestination
 lib/planner/{travel,dayAnalysis}.ts  Timeline/route math; per-day analysis
 lib/destinations/repository.ts    saveTrip/loadTrip (destinations+accoms+budget+transports), serialized+coalesced
-lib/itinerary/repository.ts       Favorites + schedule_items persistence (destId via `destination` col)
+lib/itinerary/repository.ts       Favorites + schedule_items persistence (destId via `destination` col); listAllSaved() aggregates saved places across trips for the Saved Places page
 lib/budget/{estimate,useCurrency,rates}.ts  Budget breakdown + CURRENCIES (EUR base → display, default KWD; GCC+EUR+USD) + live FX loader
 lib/geo/*                         Countries/cities/geocode/cityImage/weather loaders + cache + popular + validation
 lib/weather/{client,codes}.ts     useWeather hook + WMO code→icon

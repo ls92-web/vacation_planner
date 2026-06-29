@@ -84,7 +84,7 @@ interface AppState {
 }
 
 const INITIAL: AppState = {
-  screen: "trips",
+  screen: "dashboard",
   authMode: "signin",
   theme: "Ocean",
   dest: "Barcelona, Spain",
@@ -272,6 +272,16 @@ export function useTripStore() {
       goTrips: () =>
         requestNavigation(() => {
           set({ screen: "trips" });
+          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+        }),
+      goDashboard: () =>
+        requestNavigation(() => {
+          set({ screen: "dashboard" });
+          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+        }),
+      goSaved: () =>
+        requestNavigation(() => {
+          set({ screen: "saved" });
           requestAnimationFrame(() => window.scrollTo({ top: 0 }));
         }),
       setDestination: (dest: string) => set({ dest }),
