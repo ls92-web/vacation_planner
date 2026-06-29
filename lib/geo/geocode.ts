@@ -1,6 +1,7 @@
-// ===== Geocode a manually-typed city via /api/geo/geocode (cached). =====
+// ===== Geocode a manually-typed city via the geo-geocode edge function (cached). =====
 
 import { cachedGeo, GEO_TTL } from "./cache";
+import { callFn } from "@/lib/edge";
 
 export interface GeocodeResult {
   name: string;
@@ -13,12 +14,7 @@ export interface GeocodeResult {
 export function geocodeCity(name: string, country = "", code = ""): Promise<GeocodeResult | null> {
   const key = `geocode:${code}:${name}`.toLowerCase();
   return cachedGeo(key, GEO_TTL.cities, async () => {
-    const params = new URLSearchParams({ name });
-    if (country) params.set("country", country);
-    if (code) params.set("code", code);
-    const res = await fetch(`/api/geo/geocode?${params.toString()}`);
-    if (!res.ok) return null;
-    const data = (await res.json()) as { result: GeocodeResult | null };
-    return data.result;
+    const data = await callFn<{ result: GeocodeResult | null }>("geo-geocode", { name, country, code });
+    return data?.result ?? null;
   });
 }

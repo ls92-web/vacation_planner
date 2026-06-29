@@ -2,6 +2,7 @@
 
 import { cached, TTL } from "./cache";
 import { mapsConfig } from "./config";
+import { callFn } from "@/lib/edge";
 import type { LatLng, RouteResult, TravelMode } from "./types";
 
 const waypoint = (p: LatLng) => ({ location: { latLng: { latitude: p.lat, longitude: p.lng } } });
@@ -67,14 +68,8 @@ export async function fetchRoute(
       const direct = await viaRoutesApi(origin, destination, intermediates, travelMode);
       if (direct) return direct;
 
-      const res = await fetch("/api/maps/routes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ origin, destination, intermediates, travelMode }),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      return (data?.route as RouteResult) ?? null;
+      const data = await callFn<{ route?: RouteResult }>("maps-routes", { origin, destination, intermediates, travelMode });
+      return data?.route ?? null;
     });
   } catch {
     return null;

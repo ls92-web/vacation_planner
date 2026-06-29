@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { callFn } from "@/lib/edge";
 
 // ===== Live exchange rates (base EUR) =====
-// Fetched once per session from /api/fx, cached in localStorage for 12h, and
+// Fetched once per session from the fx edge function, cached in localStorage 12h, and
 // exposed via useLiveRates(). When unavailable, callers fall back to the static
 // reference rates in estimate.ts. `rates[code]` = units of `code` per 1 EUR.
 
@@ -41,19 +42,15 @@ async function loadLiveRates() {
     emit();
     return;
   }
-  try {
-    const res = await fetch("/api/fx");
-    const data = (await res.json()) as { rates: Rates | null };
-    if (data?.rates) {
-      rates = data.rates;
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), rates }));
-      } catch {}
-      emit();
-    }
-  } catch {
-    // keep rates null → static fallback
+  const data = await callFn<{ rates: Rates | null }>("fx");
+  if (data?.rates) {
+    rates = data.rates;
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), rates }));
+    } catch {}
+    emit();
   }
+  // else keep rates null → static fallback
 }
 
 function subscribe(l: () => void) {

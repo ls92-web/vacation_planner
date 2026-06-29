@@ -2,43 +2,20 @@
 
 import type { DayPlan } from "./types";
 import type { Recommendation, TripContext, AIMessage } from "./ai";
-import { getSupabase } from "./supabase/client";
+import { callFn, fnHeaders, fnUrl } from "./edge";
 
-// ===== Browser helpers that call the server AI routes. =====
-// Each returns null / throws on failure so callers can fall back to the
-// built-in simulated behavior — the app always works, with or without a key.
-
-// The AI routes require a valid session (they spend a paid server-side key), so
-// every request carries the user's Supabase access token.
-async function authHeaders(): Promise<Record<string, string>> {
-  const sb = getSupabase();
-  if (!sb) return {};
-  const { data } = await sb.auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-async function postJson<T>(url: string, body: unknown): Promise<T | null> {
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) return null; // 401/429/503/502 → fall back to built-in behavior
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
-}
+// ===== Browser helpers that call the `ai` Supabase Edge Function. =====
+// Each returns null / throws on failure so callers fall back to the built-in
+// simulated behavior — the app always works, with or without an AI key. The edge
+// function requires a signed-in user; callFn/fnHeaders attach the session token.
 
 export async function fetchItinerary(context: TripContext): Promise<DayPlan[] | null> {
-  const data = await postJson<{ days: DayPlan[] }>("/api/ai/itinerary", { context });
+  const data = await callFn<{ days: DayPlan[] }>("ai", { action: "itinerary", context });
   return data?.days?.length ? data.days : null;
 }
 
 export async function fetchInsights(context: TripContext): Promise<string[] | null> {
-  const data = await postJson<{ insights: string[] }>("/api/ai/insights", { context });
+  const data = await callFn<{ insights: string[] }>("ai", { action: "insights", context });
   return data?.insights?.length ? data.insights : null;
 }
 
@@ -46,7 +23,7 @@ export async function fetchRecommendations(
   context: TripContext,
   candidates: { name: string; category: string }[]
 ): Promise<Recommendation[] | null> {
-  const data = await postJson<{ recommendations: Recommendation[] }>("/api/ai/recommendations", { context, candidates });
+  const data = await callFn<{ recommendations: Recommendation[] }>("ai", { action: "recommendations", context, candidates });
   return data?.recommendations?.length ? data.recommendations : null;
 }
 
@@ -61,10 +38,10 @@ export async function streamAssistantReply(
   onDelta: (full: string) => void,
   signal?: AbortSignal
 ): Promise<string> {
-  const res = await fetch("/api/ai/assistant", {
+  const res = await fetch(fnUrl("ai"), {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-    body: JSON.stringify({ context, messages }),
+    headers: await fnHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "assistant", context, messages }),
     signal,
   });
   if (!res.ok || !res.body) throw new Error(`assistant unavailable (${res.status})`);

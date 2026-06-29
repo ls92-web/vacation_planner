@@ -29,7 +29,8 @@ Do **not** change these unless the user explicitly asks:
 
 ## Architecture
 - **Stack:** Next.js 16 (App Router, Turbopack) + React 19 + TypeScript + Tailwind CSS v4 (CSS-variable tokens). Icons: `lucide-react`. No router — a single page (`app/page.tsx` → `components/App.tsx`) swaps "screens" via `TripProvider.state.screen`.
-- **External services:** Supabase (auth + Postgres + Storage), OpenRouter (AI, env-driven model), Google Maps/Places (`@vis.gl/react-google-maps`), plus keyless geo APIs (Open-Meteo, Wikipedia, GeoNames optional) proxied through `app/api/geo/*`, and live FX rates via `app/api/fx`. Everything degrades gracefully if a key/service is missing (curated/localStorage/static-rate fallback).
+- **No Next.js API routes — all server logic runs as Supabase Edge Functions** (Deno), deployed via the Supabase MCP `deploy_edge_function` (not in this repo's source tree). The browser calls them through `lib/edge.ts` (`callFn(name, body)` → `${SUPABASE_URL}/functions/v1/<name>`, attaching the session token / anon key). Functions: `fx`, `geo-countries`, `geo-cities`, `geo-geocode`, `geo-city-image`, `geo-weather`, `username-login`, `maps-routes`, `ai` (one function, action-routed: itinerary/insights/recommendations/assistant-stream). All deployed with `verify_jwt=false` and handle CORS + auth in-function (so the preflight isn't blocked).
+- **External services:** Supabase (auth + Postgres + Storage + Edge Functions), OpenRouter (AI, env-driven model), Google Maps/Places (`@vis.gl/react-google-maps`), plus keyless geo APIs (Open-Meteo, Wikipedia, GeoNames optional) and live FX (open.er-api.com) — all now reached via the edge functions above. Everything degrades gracefully if a key/service is missing (curated/localStorage/static-rate fallback).
 - **State:** React Context providers nested in `App.tsx`: `AuthProvider › AuthGate › UIProvider › TripsProvider › TripProvider › AppShell`; `PlannerProvider` wraps the Explore screen. Cross-cutting signals use tiny **module-level pub/sub** stores (not context): `lib/ui/saveStatus`, `lib/ui/account`, `lib/ui/unsavedGuard`.
 - **Data layer (Supabase, all owner-only RLS `user_id = auth.uid()`):**
   - `profiles` — full_name, username, country, avatar_url, language, timezone, password_changed_at, onboarded
@@ -47,14 +48,9 @@ Do **not** change these unless the user explicitly asks:
 app/page.tsx                      Entry → <App/>
 app/layout.tsx                    Fonts: Outfit (UI) + DM Serif Display (branding) + Spline mono, metadata
 app/globals.css                   Tailwind + theme tokens ([data-theme=formal|girlie|funky|modern]), font vars, keyframes, print CSS
-app/api/fx/route.ts               Live EUR-base exchange rates (open.er-api.com, cached 12h; incl. GCC)
-app/api/ai/*/route.ts             OpenRouter proxies: assistant, itinerary, recommendations, insights
-app/api/geo/countries/route.ts    Country list from `world-countries` pkg (REST Countries v3.1 is dead)
-app/api/geo/cities/route.ts       Cities: GeoNames (if GEONAMES_USERNAME) else Open-Meteo
-app/api/geo/geocode/route.ts      Manual-city geocode: Open-Meteo → Nominatim fallback
-app/api/geo/city-image/route.ts   City photo via Wikipedia page images
-app/api/geo/weather/route.ts      Open-Meteo forecast (≤16d) else seasonal averages
-app/api/maps/routes/route.ts      Dormant Google Routes proxy (in-app routing disabled)
+(no app/api — server logic lives in Supabase Edge Functions; see lib/edge.ts)
+lib/edge.ts                       Client helper: callFn(name, body) → Supabase Edge Function (+ session token)
+Edge Functions (in Supabase, deployed via MCP): fx · geo-countries · geo-cities · geo-geocode · geo-city-image · geo-weather · username-login · maps-routes · ai
 
 components/App.tsx                 Provider nesting + screen switch (dashboard/trips/form/explore/generating/plan/saved/profile/settings); default screen = dashboard
 components/screens/Dashboard.tsx                 Home/overview: greeting, stat tiles, continue/active trip, recent trips, quick actions
@@ -121,10 +117,11 @@ lib/supabase/client.ts            Supabase singleton (on globalThis, HMR-safe)
 - **Editable forms:** call `useUnsavedChanges(dirty)` and route navigation through the store actions so the discard guard works automatically.
 
 ## Security posture
-- **AI routes are gated.** Every `app/api/ai/*` route runs `guardAI()` (`lib/ai/guard.ts`): requires a valid Supabase session (Bearer access token verified via `auth.getUser`), per-user in-memory rate limit, body-size + message caps, and generic errors (details logged server-side, never returned). `lib/ai-client.ts` attaches the token. The OpenRouter key is server-only.
+- **AI is gated in the `ai` edge function.** It verifies the caller's JWT is a real user (calls `/auth/v1/user`; the anon key is rejected), per-user in-memory rate limit, message caps, generic errors. **OpenRouter key/model are Edge Function secrets** (`OPENROUTER_API_KEY`, `OPENROUTER_MODEL`) set in Supabase — never on the client. Without them the function returns 503 and the app falls back to built-in behavior.
+- **Edge Function secrets (set in Supabase dashboard → Edge Functions → Secrets):** `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` (AI), optional `GEONAMES_USERNAME` (geo-cities), optional `GOOGLE_MAPS_SERVER_API_KEY` (maps-routes). `SUPABASE_URL`/`SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` are auto-injected. The browser-side `NEXT_PUBLIC_*` (Supabase URL/anon, Google Maps JS key) still belong on Vercel.
 - **RLS is owner-only** on all live tables (`trips`/`destinations`/`accommodations`/`schedule_items`/`saved_places`/`profiles`/`user_preferences`). Legacy `favorites`/`itinerary_items` are **locked (default-deny)** — kept for now, not used; drop when convenient. The `avatars` bucket serves via public URL with **no listing policy**.
 - **Run the linters after DB/auth changes:** Supabase MCP `get_advisors` (security + performance) and `npm audit`. Don't `npm audit fix --force` (it tries to downgrade Next).
-- **Username login is server-side.** `app/api/auth/username-login/route.ts` resolves username→email with the **service-role key** (`SUPABASE_SERVICE_ROLE_KEY`, server-only), verifies the password, and returns only session tokens (client calls `setSession`). `get_email_for_username` EXECUTE is **revoked from anon/authenticated** (granted to `service_role` only), so the browser can no longer enumerate username→email. Failures return one generic message; the route is rate-limited per IP + username. **Requires `SUPABASE_SERVICE_ROLE_KEY` to be set** or username login returns 503 (email login is unaffected).
+- **Username login is server-side** in the `username-login` edge function: resolves username→email with the auto-injected **service-role key**, verifies the password, returns only session tokens (client calls `setSession`). `get_email_for_username` EXECUTE is **revoked from anon/authenticated** (granted to `service_role` only), so the browser can't enumerate username→email. Failures return one generic message; rate-limited per IP + username.
 - **Known/accepted:** `username_available` stays anon-callable (needed for live signup validation; reveals only whether a username is taken, no email). **Manual dashboard steps (not code):** enable Auth → *Leaked password protection* (HIBP) and set the min password length to 12 (the client already enforces 12).
 - **MCP is full-admin** and bypasses RLS/app guards — prefer `SELECT` before `DELETE`.
 

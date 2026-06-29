@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { callFn } from "@/lib/edge";
 import type { AuthResult, OnboardingAnswers, Preferences, Profile, SignupInput, SignupResult } from "./types";
 
 interface AuthState {
@@ -191,25 +192,14 @@ function useProvideAuth() {
           return { ok: true };
         }
 
-        // Username login goes through the server route, which resolves the email
-        // with the service-role key — the username→email mapping is never exposed
-        // to the browser, and failures return one generic message.
-        try {
-          const res = await fetch("/api/auth/username-login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: id, password }),
-          });
-          const data = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; error?: string };
-          if (!res.ok || !data.access_token || !data.refresh_token) {
-            return fail(data.error || "Invalid username or password.");
-          }
-          const { error } = await sb.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
-          if (error) return fail("Invalid username or password.");
-          return { ok: true };
-        } catch {
-          return fail("Couldn't sign in. Please try again.");
-        }
+        // Username login goes through the `username-login` edge function, which
+        // resolves the email with the service-role key — the username→email mapping
+        // is never exposed to the browser, and failures return one generic message.
+        const data = await callFn<{ access_token?: string; refresh_token?: string }>("username-login", { username: id, password });
+        if (!data?.access_token || !data?.refresh_token) return fail("Invalid username or password.");
+        const { error } = await sb.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+        if (error) return fail("Invalid username or password.");
+        return { ok: true };
       },
 
       async signOut() {

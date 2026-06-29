@@ -1,7 +1,8 @@
-// ===== Cities via our /api/geo/cities proxy (GeoNames, with Open-Meteo fallback). =====
+// ===== Cities via the geo-cities edge function (GeoNames, with Open-Meteo fallback). =====
 // Results are cached per (country, query) so repeated searches don't re-hit the API.
 
 import { cachedGeo, GEO_TTL } from "./cache";
+import { callFn } from "@/lib/edge";
 import type { GeoCity } from "./types";
 
 export interface CitiesResult {
@@ -13,10 +14,8 @@ export function loadCities(countryCode: string, query = ""): Promise<CitiesResul
   const q = query.trim();
   const key = `cities:${countryCode}:${q.toLowerCase()}`;
   return cachedGeo(key, GEO_TTL.cities, async () => {
-    const params = new URLSearchParams({ country: countryCode });
-    if (q) params.set("q", q);
-    const res = await fetch(`/api/geo/cities?${params.toString()}`);
-    if (!res.ok) throw new Error(`Cities request failed (${res.status})`);
-    return (await res.json()) as CitiesResult;
+    const data = await callFn<CitiesResult>("geo-cities", { country: countryCode, q });
+    if (!data) throw new Error("Cities request failed");
+    return data;
   });
 }
