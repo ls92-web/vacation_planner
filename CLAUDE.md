@@ -59,7 +59,7 @@ app/api/maps/routes/route.ts      Dormant Google Routes proxy (in-app routing di
 components/App.tsx                 Provider nesting + screen switch (dashboard/trips/form/explore/generating/plan/saved/profile/settings); default screen = dashboard
 components/screens/Dashboard.tsx                 Home/overview: greeting, stat tiles, continue/active trip, recent trips, quick actions
 components/screens/SavedPlaces.tsx               Saved attractions across all trips (grouped by trip→destination) with Open-in-Maps
-components/shell/{AppShell,Sidebar,TopBar}.tsx  Shell: grouped sidebar, breadcrumb+save-status, mounts UnsavedChangesDialog
+components/shell/{AppShell,Sidebar,TopBar}.tsx  Shell: grouped sidebar, breadcrumb+save-status, mounts UnsavedChangesDialog; wraps screens in ErrorBoundary
 components/trips/TripsDashboard.tsx             Trips grid + New Trip modal (DestinationPicker)
 components/screens/RouteBuilder.tsx             "Plan your route": destination cards (dates/hotels/budget/weather), travel connectors, auto-save
 components/screens/Generating.tsx, Itinerary.tsx  Loading screen; legacy single-itinerary screen
@@ -73,7 +73,8 @@ components/account/{ProfilePage,SettingsPage,ui}.tsx  Profile (identity/security
 components/auth/{AuthScreen,Onboarding,AuthGate,AccountButton}.tsx  Auth flow + top-bar account menu
 components/theme/{ThemeApplier,ThemePicker}.tsx Apply <html data-theme> from prefs; 4 mini-app preview cards
 components/export/{ExportButton,ItineraryBook,templates}.tsx  Per-destination luxury PDF guide
-components/Logo.tsx, icons.tsx, Toast.tsx, ui/UnsavedChangesDialog.tsx
+components/Logo.tsx, icons.tsx, Toast.tsx, ui/UnsavedChangesDialog.tsx, ui/ErrorBoundary.tsx (contains screen crashes; auto-reloads once on stale-deploy ChunkLoadError)
+app/global-error.tsx               Branded last-resort fallback for root-layout crashes
 
 lib/store.tsx                     TripProvider: screen nav (routed through unsavedGuard), destinations, budget level
 lib/types.ts                      Core domain types (Screen, Destination, Accommodation, ItineraryItem…)
