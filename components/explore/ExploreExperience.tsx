@@ -167,7 +167,7 @@ function ExploreInner() {
 
             {/* right: your plan summary (sticky on desktop; above the map on mobile) */}
             <aside className="w-full lg:w-[340px] shrink-0 lg:sticky lg:top-[228px] self-start">
-              <PlanSummaryPanel activeDest={activeDest} />
+              <PlanSummaryPanel activeDest={activeDest} onContinue={() => setView("plan")} />
             </aside>
           </div>
 
@@ -190,11 +190,26 @@ function ExploreInner() {
 }
 
 function PlanView() {
+  const { state } = usePlanner();
   return (
     <div className="max-w-[1100px] mx-auto px-[clamp(16px,3vw,28px)] py-5 pb-24">
       <div className="font-display font-bold text-[24px] tracking-[-.02em] mb-1">Your itinerary</div>
       <p className="text-muted text-[13.5px] mb-4">Grouped by destination in your travel order. Open each city in Explore to fill its days — stops stay with the city you added them in.</p>
       <DestinationItinerary />
+
+      {/* Export lives here, at the end of the finalized plan. */}
+      <div className="mt-10 rounded-[18px] border border-line bg-surface p-6 text-center">
+        <div className="font-display font-bold text-[18px]">Happy with your plan?</div>
+        <p className="text-muted text-[13.5px] mt-1 max-w-[460px] mx-auto">Export it as a luxury PDF guide with your places, timings, hotels and budget.</p>
+        <div className="mt-4 flex justify-center">
+          <ExportButton
+            label="Export itinerary"
+            disabled={state.itinerary.length === 0}
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-[12px] bg-accent text-white text-[14px] font-bold cursor-pointer hover:brightness-[1.06] transition"
+          />
+        </div>
+        {state.itinerary.length === 0 && <p className="text-[12px] text-muted mt-2">Add places in Explore first.</p>}
+      </div>
     </div>
   );
 }
@@ -202,7 +217,7 @@ function PlanView() {
 const SLOT_ORDER: Record<string, number> = { morning: 0, afternoon: 1, evening: 2 };
 
 /** Sticky right-side summary of the places chosen for the active destination, grouped by day. */
-function PlanSummaryPanel({ activeDest }: { activeDest?: Destination }) {
+function PlanSummaryPanel({ activeDest, onContinue }: { activeDest?: Destination; onContinue: () => void }) {
   const { state } = usePlanner();
   const cityName = (activeDest?.name ?? state.destination).split(",")[0];
   const dk = cityKey(activeDest?.name ?? state.destination);
@@ -244,11 +259,13 @@ function PlanSummaryPanel({ activeDest }: { activeDest?: Destination }) {
       </div>
 
       <div className="p-3 border-t border-line">
-        <ExportButton
-          label="Continue to Export"
+        <button
+          onClick={onContinue}
           disabled={totalAll === 0}
-          className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-[12px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06] transition"
-        />
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-[12px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06] transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Continue <ArrowRight size={15} strokeWidth={2} />
+        </button>
         {totalAll === 0 && <p className="text-[11px] text-muted text-center mt-1.5">Add at least one place to continue.</p>}
       </div>
     </div>
@@ -360,7 +377,6 @@ function Header({ view, setView }: { view: "explore" | "plan"; setView: (v: "exp
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-3">
-          <ExportButton />
           <div className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
             <Heart size={16} strokeWidth={2} style={{ color: "var(--accent2)" }} fill="var(--accent2)" />
             {state.favorites.length}
