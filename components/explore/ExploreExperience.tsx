@@ -211,7 +211,7 @@ function PlanSummaryPanel({ activeDest }: { activeDest?: Destination }) {
   const totalAll = state.itinerary.length;
 
   return (
-    <div className="rounded-[18px] border border-line bg-surface overflow-hidden flex flex-col lg:max-h-[calc(100vh-248px)]">
+    <div className="rounded-[18px] border border-line bg-surface overflow-hidden flex flex-col lg:max-h-[calc(100vh-320px)]">
       <div className="px-4 py-3.5 border-b border-line flex items-center gap-2" style={{ background: "var(--tint)" }}>
         <ListChecks size={16} strokeWidth={2} className="text-accent shrink-0" />
         <div className="min-w-0">
