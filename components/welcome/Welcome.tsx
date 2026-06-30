@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
+import { useTripLoader } from "@/lib/trips/useTripLoader";
+import { composeTrip } from "@/lib/ai-client";
+import { geocodeCity } from "@/lib/geo";
+import { saveTrip } from "@/lib/destinations/repository";
+import type { Destination } from "@/lib/types";
 import { Logo } from "@/components/Logo";
+
+const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
 
 const PROMPTS = [
   "10 days exploring Italy with my family.",
@@ -26,6 +33,7 @@ const DOTS = [
 export function Welcome() {
   const { actions } = useTrip();
   const { actions: tripActions } = useTrips();
+  const loadPlan = useTripLoader();
   const [value, setValue] = useState("");
   const [promptIdx, setPromptIdx] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -40,12 +48,45 @@ export function Welcome() {
     const text = value.trim();
     if (!text || busy) return;
     setBusy(true);
-    // Phase 1: turn the words into a real trip and enter planning.
-    // Phase 2 (model live) will AI-compose destinations and open the conversational workspace.
-    const title = text.length > 64 ? text.slice(0, 61).trimEnd() + "…" : text;
-    const trip = await tripActions.createTrip(title, "");
-    if (!trip) { setBusy(false); actions.flash("Couldn't start the trip — please try again."); return; }
-    setTimeout(() => actions.goForm(), 700);
+    const fallbackTitle = text.length > 64 ? text.slice(0, 61).trimEnd() + "…" : text;
+    try {
+      // The AI reads the words and composes a real trip (destinations + preferences).
+      const composed = await composeTrip(text).catch(() => null);
+      if (composed?.destinations.length) {
+        const trip = await tripActions.createTrip(composed.name || fallbackTitle, composed.destinations[0].city);
+        if (trip) {
+          const cursor = new Date();
+          cursor.setDate(cursor.getDate() + 30); // sensible default start ~a month out
+          const dests: Destination[] = [];
+          for (let i = 0; i < composed.destinations.length; i++) {
+            const c = composed.destinations[i];
+            const g = await geocodeCity(c.city, c.country).catch(() => null);
+            const arrive = new Date(cursor);
+            cursor.setDate(cursor.getDate() + c.nights);
+            dests.push({
+              id: i + 1, name: c.city, country: g?.countryName || c.country || "", countryCode: g?.countryCode || "",
+              lat: g?.lat, lng: g?.lng, image: null, saved: true, expanded: false,
+              arrive: fmtDate(arrive), depart: fmtDate(cursor), accoms: [], budgetOverride: null,
+            });
+          }
+          await saveTrip(trip.id, dests, "standard", {}, composed.preferences || {});
+          // Enter the planner and hydrate the store from what we just saved
+          // (the planner doesn't auto-load on mount; without this its empty store
+          // would auto-save back over the freshly composed trip).
+          actions.goForm();
+          await loadPlan(trip.id, composed.destinations[0].city);
+          return;
+        }
+      }
+      // Fallback (AI unavailable): start an empty trip from the words.
+      const trip = await tripActions.createTrip(fallbackTitle, "");
+      if (!trip) throw new Error("createTrip failed");
+      actions.goForm();
+      await loadPlan(trip.id, "");
+    } catch {
+      setBusy(false);
+      actions.flash("Couldn't start the trip — please try again.");
+    }
   };
 
   return (

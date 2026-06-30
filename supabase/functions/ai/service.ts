@@ -1,5 +1,5 @@
 import { chat, streamDeltas } from "./openrouter.ts";
-import { assistantMessages, insightsMessages, itineraryMessages, recommendationMessages, type TripContext } from "./prompts.ts";
+import { assistantMessages, composeMessages, insightsMessages, itineraryMessages, recommendationMessages, type TripContext } from "./prompts.ts";
 import type { AIMessage } from "./openrouter.ts";
 
 function extractJson<T>(raw: string): T {
@@ -43,6 +43,38 @@ export async function recommendPlaces(ctx: TripContext, candidates: { name: stri
   const recs = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
   return recs.map((r) => { const o = r as Record<string, unknown>; const ai = Math.round(Number(o.ai)); return { name: String(o.name ?? ""), ai: Number.isFinite(ai) ? Math.min(100, Math.max(0, ai)) : 0, why: String(o.why ?? "") }; }).filter((r) => r.name);
 }
+const TRAVELLER = new Set(["family", "couple", "friends", "solo", "business", "mixed"]);
+const STYLE = new Set(["relaxed", "balanced", "packed"]);
+const INTERESTS = new Set(["attractions", "museums", "nature", "shopping", "restaurants", "cafes", "beaches", "themeparks", "historical", "local", "photography", "kids"]);
+const ACCESS = new Set(["stroller", "wheelchair", "lessWalking", "indoor", "outdoor", "noLateNight"]);
+
+/** Parse a free-text trip description into a structured, validated trip. */
+export async function composeTrip(text: string) {
+  const raw = await chat({ messages: composeMessages(text), temperature: 0.4, maxTokens: 800, json: true });
+  const p = extractJson<Record<string, unknown>>(raw);
+  const destsRaw = Array.isArray(p.destinations) ? (p.destinations as Record<string, unknown>[]) : [];
+  const destinations = destsRaw
+    .map((d) => ({ city: String(d.city ?? "").trim(), country: String(d.country ?? "").trim(), nights: Math.max(1, Math.min(30, Math.round(Number(d.nights)) || 2)) }))
+    .filter((d) => d.city)
+    .slice(0, 6);
+  if (!destinations.length) throw new Error("compose: no destinations");
+
+  const prefIn = (p.preferences ?? {}) as Record<string, unknown>;
+  const agesIn = (prefIn.ages ?? {}) as Record<string, unknown>;
+  const ages: Record<string, number> = {};
+  for (const k of ["adults", "children", "toddlers", "seniors"]) { const v = Math.round(Number(agesIn[k])); if (Number.isFinite(v) && v > 0) ages[k] = Math.min(20, v); }
+  const preferences: Record<string, unknown> = {};
+  if (typeof prefIn.travellerType === "string" && TRAVELLER.has(prefIn.travellerType)) preferences.travellerType = prefIn.travellerType;
+  if (typeof prefIn.travelStyle === "string" && STYLE.has(prefIn.travelStyle)) preferences.travelStyle = prefIn.travelStyle;
+  if (Object.keys(ages).length) preferences.ages = ages;
+  const interests = Array.isArray(prefIn.interests) ? (prefIn.interests as unknown[]).filter((x): x is string => typeof x === "string" && INTERESTS.has(x)) : [];
+  if (interests.length) preferences.interests = interests;
+  const access = Array.isArray(prefIn.accessibility) ? (prefIn.accessibility as unknown[]).filter((x): x is string => typeof x === "string" && ACCESS.has(x)) : [];
+  if (access.length) preferences.accessibility = access;
+
+  return { name: String(p.name ?? "").trim().slice(0, 80) || destinations[0].city, destinations, preferences };
+}
+
 export async function planningInsights(ctx: TripContext) {
   const raw = await chat({ messages: insightsMessages(ctx), temperature: 0.5, maxTokens: 500, json: true });
   const parsed = extractJson<{ insights?: unknown[] }>(raw);

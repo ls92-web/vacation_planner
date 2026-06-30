@@ -1,8 +1,20 @@
 "use client";
 
-import type { DayPlan } from "./types";
+import type { DayPlan, TripPreferences } from "./types";
 import type { Recommendation, TripContext, AIMessage } from "./ai";
 import { callFn, fnHeaders, fnUrl } from "./edge";
+
+export interface ComposedTrip {
+  name: string;
+  destinations: { city: string; country: string; nights: number }[];
+  preferences: TripPreferences;
+}
+
+/** Turn a free-text trip description into a structured trip (destinations + preferences). */
+export async function composeTrip(text: string): Promise<ComposedTrip | null> {
+  const data = await callFn<{ trip: ComposedTrip }>("ai", { action: "compose", text });
+  return data?.trip && data.trip.destinations?.length ? data.trip : null;
+}
 
 // ===== Browser helpers that call the `ai` Supabase Edge Function. =====
 // Each returns null / throws on failure so callers fall back to the built-in

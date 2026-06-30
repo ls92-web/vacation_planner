@@ -32,6 +32,12 @@ export function recommendationMessages(ctx: TripContext, candidates: { name: str
     { role: "user", content: `${contextBlock(ctx)}\n\nCandidates:\n${candidates.map((c) => `- ${c.name} (${c.category})`).join("\n")}\n\nReturn JSON: {"recommendations":[{"name":"<exact candidate name>","ai":<0-100 integer>,"why":"<one sentence>"}]}. Include every candidate exactly once. JSON only, no prose.` },
   ];
 }
+export function composeMessages(text: string): AIMessage[] {
+  return [
+    { role: "system", content: "You turn a traveller's free-text trip description into a structured plan and return ONLY valid JSON. Infer real destinations (cities, in sensible travel order). If only a country or region is named, choose 2-4 well-known cities that form a good route. Infer nights per city (split a stated total sensibly; otherwise pick reasonable lengths). Infer travellers, pace, interests and accessibility from the wording. Do not invent specifics the user didn't imply beyond reasonable defaults." },
+    { role: "user", content: `Trip description: "${text}"\n\nReturn JSON exactly:\n{"name":"<short trip title>","destinations":[{"city":"<city>","country":"<country>","nights":<int>}],"preferences":{"travellerType":"family|couple|friends|solo|business|mixed|","ages":{"adults":<int>,"children":<int>,"toddlers":<int>,"seniors":<int>},"travelStyle":"relaxed|balanced|packed|","interests":["attractions|museums|nature|shopping|restaurants|cafes|beaches|themeparks|historical|local|photography|kids"],"accessibility":["stroller|wheelchair|lessWalking|indoor|outdoor|noLateNight"]}}\nRules: 1-6 destinations. Use an empty string, 0, or [] for anything not implied. Use ONLY the listed enum values. JSON only, no prose.` },
+  ];
+}
 export function insightsMessages(ctx: TripContext): AIMessage[] {
   return [
     { role: "system", content: "You give short, concrete planning tips for a trip and return ONLY valid JSON. Each tip is one sentence about ordering, proximity, opening hours, meals, pacing, or kid fit." },
