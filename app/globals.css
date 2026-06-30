@@ -5,14 +5,14 @@
    data-theme retints the whole app — nothing else changes. */
 :root,
 [data-theme="formal"] {
-  /* Formal — deep navy, warm gold, soft ivory, light stone grey */
-  --accent: #9A7B33;   /* warm gold (buttons/highlights) */
+  /* Formal — deep navy, logo orange, soft ivory, light stone grey */
+  --accent: #C56E14;   /* logo orange (#F5A623) deepened so white-on-accent stays legible */
   --accent2: #20304D;  /* deep navy */
   --ink: #1F2D49;      /* deep navy text + deep surfaces */
   --muted: #76705F;    /* warm stone grey */
   --bg: #F7F2E8;       /* soft ivory */
   --surface: #ffffff;
-  --tint: #F0E6CC;     /* light gold (nav highlight) */
+  --tint: #FAE6CC;     /* light orange (nav highlight) */
   --line: #E7DECB;     /* light stone */
   --brand-deep: #1F2D49;
 }
