@@ -2,7 +2,6 @@
 
 import {
   Compass,
-  Download,
   Heart,
   HelpCircle,
   LayoutDashboard,
@@ -12,7 +11,6 @@ import {
   PanelLeftOpen,
   Plane,
   Settings,
-  Sparkles,
   Star,
   User,
 } from "lucide-react";
@@ -41,13 +39,6 @@ const SECTIONS: { group: string; items: NavItem[] }[] = [
       { key: "mytrips", label: "My Trips", icon: Plane, onClick: (a) => a.goTrips() },
       { key: "planner", label: "Planner", icon: MapIcon, onClick: (a) => a.goForm() },
       { key: "saved", label: "Saved Places", icon: Heart, onClick: (a) => a.goSaved() },
-    ],
-  },
-  {
-    group: "Tools",
-    items: [
-      { key: "export", label: "Export Itinerary", icon: Download, onClick: (a) => a.goExplore() },
-      { key: "ai", label: "AI Assistant", icon: Sparkles, onClick: (a) => a.flash("Ask the AI Assistant from any trip — full chat is coming soon.") },
     ],
   },
   {
