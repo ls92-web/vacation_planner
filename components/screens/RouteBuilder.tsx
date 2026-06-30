@@ -13,6 +13,7 @@ import {
 import type { Accommodation, Destination } from "@/lib/types";
 import { destinationCoords, isMapsConfigured, useGeocode, type LatLng, type MapMarker } from "@/lib/maps";
 import { GoogleMap, MapsApiProvider, DestinationMarkers, OpenInMapsButton } from "@/components/maps";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { CityImage } from "@/components/destinations/CityImage";
 import { BudgetPanel } from "@/components/destinations/BudgetPanel";
 import { WeatherPanel } from "@/components/destinations/WeatherPanel";
@@ -560,12 +561,16 @@ function RoutePanel() {
     <div className="flex flex-col gap-4">
       <div className="rounded-[18px] border border-line overflow-hidden">
         <div className="relative h-[300px]">
-          <MapsApiProvider>
-            <GoogleMap center={center} zoom={6} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px] px-6 text-center">Add a Maps key to preview your route.</div>}>
-              <DestinationMarkers markers={markers} />
-              <RouteLine points={points} />
-            </GoogleMap>
-          </MapsApiProvider>
+          {/* Local boundary: a Google Maps load/runtime failure degrades to a notice
+              here instead of crashing the whole Route Planner screen. */}
+          <ErrorBoundary fallback={() => <div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px] px-6 text-center">Map preview unavailable right now — your route and plan are unaffected.</div>}>
+            <MapsApiProvider>
+              <GoogleMap center={center} zoom={6} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px] px-6 text-center">Add a Maps key to preview your route.</div>}>
+                <DestinationMarkers markers={markers} />
+                <RouteLine points={points} />
+              </GoogleMap>
+            </MapsApiProvider>
+          </ErrorBoundary>
         </div>
       </div>
 

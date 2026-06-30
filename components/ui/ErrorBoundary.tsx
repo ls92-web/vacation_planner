@@ -28,9 +28,15 @@ export class ErrorBoundary extends React.Component<
     const msg = `${error?.name ?? ""} ${error?.message ?? ""}`;
     const isChunkError = /ChunkLoadError|Loading chunk|dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(msg);
     if (isChunkError && typeof window !== "undefined") {
-      const KEY = "itinera_chunk_reloaded";
-      if (!sessionStorage.getItem(KEY)) {
-        sessionStorage.setItem(KEY, "1");
+      // Reload to fetch the current build's chunks. Guard against a reload *loop*
+      // (a genuinely broken deploy) with a short time window — but still recover
+      // from a *later* stale-deploy error in the same session (e.g. several
+      // redeploys land while one tab stays open), which a once-per-session flag
+      // would leave stuck on the crash screen.
+      const KEY = "itinera_chunk_reloaded_at";
+      const last = Number(sessionStorage.getItem(KEY) || 0);
+      if (Date.now() - last > 20000) {
+        sessionStorage.setItem(KEY, String(Date.now()));
         window.location.reload();
       }
     }
