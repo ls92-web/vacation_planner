@@ -28,12 +28,14 @@ import type {
   Screen,
   ThemeName,
   TransportMode,
+  TripPreferences,
   Units,
 } from "./types";
 import type { AIMessage, TripContext } from "./ai";
 import type { SelectedDestination } from "./geo";
 import type { BudgetLevel } from "./budget/estimate";
 import type { LoadedDestination } from "./destinations/repository";
+import { summarizePreferences } from "./trips/preferences";
 import { fetchItinerary, streamAssistantReply } from "./ai-client";
 import { requestNavigation } from "./ui/unsavedGuard";
 import { placeCoords } from "./maps/coords";
@@ -55,6 +57,8 @@ interface AppState {
   tripLoadError: boolean;
   budgetLevel: BudgetLevel;
   transports: Record<string, TransportMode>;
+  /** Per-trip traveller preferences (drives personalized suggestions + ranking). */
+  preferences: TripPreferences;
   dragId: number | null;
   dragOverId: number | null;
   routing: boolean;
@@ -97,6 +101,7 @@ const INITIAL: AppState = {
   tripLoadError: false,
   budgetLevel: "standard",
   transports: {},
+  preferences: {},
   dragId: null,
   dragOverId: null,
   routing: false,
@@ -135,9 +140,12 @@ function tripContext(s: AppState): TripContext {
     })
     .filter((v): v is NonNullable<typeof v> => v !== null);
   const discovered = s.mapPicks.map((p) => ({ name: p.name, category: p.category }));
+  // Fold this trip's preferences into the traveller context so AI output fits it.
+  const prefSummary = summarizePreferences(s.preferences, s.budgetLevel);
+  const travelers = prefSummary || `${s.adults} adults · ${s.kids} kids`;
   return {
     destination: s.dest,
-    travelers: `${s.adults} adults · ${s.kids} kids (6 & 9)`,
+    travelers,
     numDays: s.days.length,
     selected,
     discovered: discovered.length ? discovered : undefined,
@@ -315,13 +323,14 @@ export function useTripStore() {
        * Always reflects exactly what was loaded — an empty list yields an empty
        * trip (the empty state), never a fallback to sample/demo destinations.
        */
-      hydrateTrip: (list: LoadedDestination[], budgetLevel: BudgetLevel, transports: Record<string, TransportMode> = {}) =>
+      hydrateTrip: (list: LoadedDestination[], budgetLevel: BudgetLevel, transports: Record<string, TransportMode> = {}, preferences: TripPreferences = {}) =>
         setState((s) => ({
           ...s,
           tripLoading: false,
           tripLoadError: false,
           budgetLevel: budgetLevel || s.budgetLevel,
           transports,
+          preferences: preferences ?? {},
           destinations: list.map((d) => ({
             id: ++uid.current,
             name: d.cityName,
@@ -369,6 +378,8 @@ export function useTripStore() {
         setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.saved ? { ...d, expanded: false } : d)) })),
       /** Trip-wide budget level — recalculates every estimate. */
       setBudgetLevel: (level: BudgetLevel) => setState((s) => ({ ...s, budgetLevel: level })),
+      /** Merge a patch into this trip's preferences (auto-saved by the route builder). */
+      setTripPreferences: (patch: Partial<TripPreferences>) => setState((s) => ({ ...s, preferences: { ...s.preferences, ...patch } })),
       /** Manual per-destination budget override (null clears it). */
       setDestBudget: (id: number, value: number | null) =>
         setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.id === id ? { ...d, budgetOverride: value } : d)) })),

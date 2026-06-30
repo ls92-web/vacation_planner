@@ -35,7 +35,7 @@ Do **not** change these unless the user explicitly asks:
 - **Data layer (Supabase, all owner-only RLS `user_id = auth.uid()`):**
   - `profiles` — full_name, username, country, avatar_url, language, timezone, password_changed_at, onboarded
   - `user_preferences` — pace, transport, travelers, family_friendly, with_children, children_ages, **currency** (default KWD), **theme** (default classic), distance_unit, temperature_unit, travel_style, accommodation, food_pref, accessibility, export_*
-  - `trips` — name, destination, budget_level, start_date, end_date, **transports** (jsonb: chosen travel mode per inter-city leg, keyed `"fromCity|toCity"`)
+  - `trips` — name, destination, budget_level, start_date, end_date, **transports** (jsonb: chosen travel mode per inter-city leg, keyed `"fromCity|toCity"`), **preferences** (jsonb: per-trip traveller prefs — travellerType, ages, travelStyle, interests[], accessibility[]; drives personalized place ranking/badges + suggestion tips, NOT account settings. See `lib/trips/preferences.ts` + `lib/places/personalize.ts`)
   - `destinations` — trip_id, name, country, country_code, lat, lng, image_url, arrive, depart, budget_override, position
   - `accommodations` — trip_id, destination_id, type, name, address, checkin, checkout, confirmation, notes, location_url, position
   - `schedule_items` — trip_id, **destination** (= itinerary item's destId/city), day, slot, position, duration_min, data(jsonb place)

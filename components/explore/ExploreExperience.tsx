@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, ChevronLeft, ChevronRight, Heart, ListChecks, MapPin, Search, Trash2 } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Heart, ListChecks, MapPin, Search, Sparkles, Trash2 } from "lucide-react";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { PlannerProvider, usePlanner } from "@/lib/planner/store";
 import { formatDurationMin, haversineKm, SLOT_LABELS, usePlaces, type ExploreFilters, type ExplorePlace, type ItineraryItem } from "@/lib/places";
+import { scorePlace } from "@/lib/places/personalize";
+import { hasPreferences } from "@/lib/trips/preferences";
 import { MapsApiProvider } from "@/components/maps";
 import { destinationCoords, useGeocode } from "@/lib/maps";
 import { nightsBetween } from "@/lib/data";
@@ -109,6 +111,10 @@ function ExploreInner() {
     return [...filtered, ...chosenPlaces.filter((p) => !seen.has(p.id))];
   }, [filtered, chosenPlaces]);
 
+  // Personalize results when this trip has preferences set.
+  const prefs = trip.state.preferences;
+  const personalize = hasPreferences(prefs);
+
   return (
     <div className="vp-scroll min-h-screen" style={{ background: "var(--bg)" }}>
       {/* header */}
@@ -156,12 +162,44 @@ function ExploreInner() {
                   <div className="font-bold text-ink">No places match those filters</div>
                   <div className="text-[13px] mt-1">Try a different category or relax a filter.</div>
                 </div>
-              ) : (
+              ) : !personalize ? (
                 <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(258px,1fr))" }}>
                   {filtered.map((p, i) => (
                     <PlaceCard key={p.id} place={p} index={i} distanceKm={haversineKm(state.center, p.position)} />
                   ))}
                 </div>
+              ) : (
+                (() => {
+                  const scored = filtered.map((p) => ({ p, m: scorePlace(p, prefs, trip.state.budgetLevel) }));
+                  const rec = scored.filter((x) => x.m.recommended).sort((a, b) => b.m.score - a.m.score);
+                  const others = scored.filter((x) => !x.m.recommended);
+                  const card = (x: (typeof scored)[number], i: number) => (
+                    <PlaceCard key={x.p.id} place={x.p} index={i} distanceKm={haversineKm(state.center, x.p.position)} match={x.m} />
+                  );
+                  return (
+                    <div className="flex flex-col gap-6">
+                      {rec.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-1.5 text-[13.5px] font-bold text-ink mb-3">
+                            <Sparkles size={15} strokeWidth={2} className="text-accent" />Recommended for this trip
+                            <span className="text-muted font-semibold ml-1">· {rec.length}</span>
+                          </div>
+                          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(258px,1fr))" }}>
+                            {rec.map((x, i) => card(x, i))}
+                          </div>
+                        </div>
+                      )}
+                      {others.length > 0 && (
+                        <div>
+                          <div className="text-[13.5px] font-bold text-muted mb-3">{rec.length ? "Other options" : "All places"}</div>
+                          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(258px,1fr))" }}>
+                            {others.map((x, i) => card(x, rec.length + i))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               )}
             </div>
 

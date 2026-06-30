@@ -10,6 +10,21 @@ export type Priority = "must" | "optional";
 export type AccomType = "Hotel" | "Apartment" | "Airbnb" | "Resort" | "Other";
 export type TransportMode = "Drive" | "Train" | "Flight" | "Ferry";
 
+// ===== Per-trip traveller preferences (stored on the trip, not the account) =====
+export type TravellerType = "family" | "couple" | "friends" | "solo" | "business" | "mixed";
+export type TravelStyle = "relaxed" | "balanced" | "packed";
+
+export interface TripPreferences {
+  travellerType?: TravellerType;
+  /** Rough head-count by life stage — drives kid/senior-aware suggestions. */
+  ages?: { adults?: number; children?: number; toddlers?: number; seniors?: number };
+  travelStyle?: TravelStyle;
+  /** Interest keys (see PREF_INTERESTS in lib/trips/preferences). */
+  interests?: string[];
+  /** Accessibility/special-needs keys (see PREF_ACCESS in lib/trips/preferences). */
+  accessibility?: string[];
+}
+
 export interface Accommodation {
   id: number;
   type: AccomType;

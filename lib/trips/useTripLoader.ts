@@ -19,7 +19,7 @@ export function useTripLoader() {
       actions.beginTripLoad();
       try {
         const plan = await loadTrip(tripId);
-        actions.hydrateTrip(plan.destinations, plan.budgetLevel, plan.transports as Record<string, TransportMode>);
+        actions.hydrateTrip(plan.destinations, plan.budgetLevel, plan.transports as Record<string, TransportMode>, plan.preferences);
       } catch {
         actions.failTripLoad();
       }

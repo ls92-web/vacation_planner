@@ -28,6 +28,7 @@ export interface SuggestionStop {
 
 export interface TripSuggestionInput {
   stops: SuggestionStop[];
+  preferences?: import("@/lib/types").TripPreferences;
 }
 
 interface Pt { lat: number; lng: number }
@@ -74,6 +75,21 @@ function bestOrder(pts: Pt[]): { order: number[]; len: number } {
 
 const PRIORITY: Record<SuggestionType, number> = { warning: 0, missing_info: 1, route: 2, timing: 2, hotel: 3, positive: 4 };
 
+/** Tips derived purely from this trip's traveller preferences. */
+function preferenceTips(pf?: import("@/lib/types").TripPreferences): TripSuggestion[] {
+  if (!pf) return [];
+  const out: TripSuggestion[] = [];
+  const ages = pf.ages ?? {};
+  const toddlers = (ages.toddlers ?? 0) > 0;
+  const seniors = (ages.seniors ?? 0) > 0;
+  const access = pf.accessibility ?? [];
+  if (pf.travelStyle === "packed") out.push({ type: "timing", title: "Fast-paced trip", description: "You set a packed pace — plan ~3–4 stops a day and group nearby places to keep moving." });
+  else if (pf.travelStyle === "relaxed") out.push({ type: "timing", title: "Relaxed pace", description: "You set a relaxed pace — 2–3 stops a day with breaks in between fits best." });
+  if (toddlers) out.push({ type: "warning", title: "Travelling with toddlers", description: "Keep days light, favour stroller-friendly stops, and plan a midday break." });
+  if (seniors || access.includes("lessWalking")) out.push({ type: "warning", title: "Easier on the feet", description: "Group nearby stops and favour central stays to cut down on walking." });
+  return out;
+}
+
 function finalize(list: TripSuggestion[]): TripSuggestion[] {
   const seen = new Set<string>();
   return list
@@ -112,6 +128,7 @@ export function generateTripSuggestions(input: TripSuggestionInput): TripSuggest
       out.push({ type: "hotel", title: "A central base helps", description: `In ${city}, staying near the centre usually keeps most attractions within walking distance.` });
     }
     out.push({ type: "positive", title: "Build your days in Explore", description: `Open ${city} in Explore to add attractions, then let the planner lay out each day.` });
+    out.push(...preferenceTips(input.preferences));
     return finalize(out);
   }
 
@@ -218,5 +235,6 @@ export function generateTripSuggestions(input: TripSuggestionInput): TripSuggest
     out.push({ type: "missing_info", title: "Add dates to each stop", description: `Set dates for ${names}${more} so nights, weather and budget can be worked out.` });
   }
 
+  out.push(...preferenceTips(input.preferences));
   return finalize(out);
 }

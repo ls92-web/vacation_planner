@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
 import type { SelectedDestination } from "@/lib/geo";
-import type { Accommodation, AccomType, Destination } from "@/lib/types";
+import type { Accommodation, AccomType, Destination, TripPreferences } from "@/lib/types";
 import type { BudgetLevel } from "@/lib/budget/estimate";
 
 // ===== Selected-destination persistence, scoped per TRIP. =====
@@ -118,6 +118,8 @@ export interface LoadedTrip {
   budgetLevel: BudgetLevel;
   /** Chosen travel mode per inter-city leg, keyed by "fromCity|toCity" (lowercased). */
   transports: Record<string, string>;
+  /** Per-trip traveller preferences. */
+  preferences: TripPreferences;
 }
 
 const planKey = (tripId: string) => `itinera_plan_${tripId}`;
@@ -187,8 +189,8 @@ interface AccomRow {
 // arrive while one is running, only the latest is run next.
 const saveState = new Map<string, { running: boolean; next: (() => Promise<void>) | null }>();
 
-export function saveTrip(tripId: string, destinations: Destination[], budgetLevel: BudgetLevel, transports: Record<string, string> = {}): Promise<void> {
-  const run = () => doSaveTrip(tripId, destinations, budgetLevel, transports);
+export function saveTrip(tripId: string, destinations: Destination[], budgetLevel: BudgetLevel, transports: Record<string, string> = {}, preferences: TripPreferences = {}): Promise<void> {
+  const run = () => doSaveTrip(tripId, destinations, budgetLevel, transports, preferences);
   const q = saveState.get(tripId) ?? { running: false, next: null };
   saveState.set(tripId, q);
   if (q.running) {
@@ -211,21 +213,21 @@ export function saveTrip(tripId: string, destinations: Destination[], budgetLeve
 }
 
 /** Replace the whole trip plan (destinations + accommodations + budget + transport modes). */
-async function doSaveTrip(tripId: string, destinations: Destination[], budgetLevel: BudgetLevel, transports: Record<string, string>): Promise<void> {
+async function doSaveTrip(tripId: string, destinations: Destination[], budgetLevel: BudgetLevel, transports: Record<string, string>, preferences: TripPreferences): Promise<void> {
   const loaded = toLoaded(destinations);
   const sb = getSupabase();
   if (!sb) {
-    lsPlanWrite(tripId, { destinations: loaded, budgetLevel, transports });
+    lsPlanWrite(tripId, { destinations: loaded, budgetLevel, transports, preferences });
     return;
   }
   const { data: sess } = await sb.auth.getSession();
   const uid = sess.session?.user?.id;
   if (!uid) {
-    lsPlanWrite(tripId, { destinations: loaded, budgetLevel, transports });
+    lsPlanWrite(tripId, { destinations: loaded, budgetLevel, transports, preferences });
     return;
   }
 
-  await sb.from("trips").update({ budget_level: budgetLevel, transports }).eq("id", tripId);
+  await sb.from("trips").update({ budget_level: budgetLevel, transports, preferences }).eq("id", tripId);
   // accommodations reference destinations — clear them first.
   await sb.from("accommodations").delete().eq("trip_id", tripId);
   await sb.from("destinations").delete().eq("trip_id", tripId);
@@ -316,7 +318,7 @@ async function getReadyUserId(sb: SupabaseClient): Promise<string | null> {
  */
 export async function loadTrip(tripId: string): Promise<LoadedTrip> {
   const sb = getSupabase();
-  if (!sb) return lsPlanRead(tripId) ?? { destinations: [], budgetLevel: "standard", transports: {} };
+  if (!sb) return lsPlanRead(tripId) ?? { destinations: [], budgetLevel: "standard", transports: {}, preferences: {} };
   const uid = await getReadyUserId(sb);
   if (!uid) {
     // Supabase is configured (the app runs signed-in), yet no session became
@@ -327,7 +329,7 @@ export async function loadTrip(tripId: string): Promise<LoadedTrip> {
   const [destsRes, accomsRes, tripRes] = await Promise.all([
     sb.from("destinations").select("id,name,country,country_code,lat,lng,image_url,arrive,depart,budget_override").eq("trip_id", tripId).order("position", { ascending: true }),
     sb.from("accommodations").select("destination_id,type,name,checkin,checkout,checkin_time,checkout_time,confirmation,address,notes,location_url").eq("trip_id", tripId).order("position", { ascending: true }),
-    sb.from("trips").select("budget_level,transports").eq("id", tripId).maybeSingle(),
+    sb.from("trips").select("budget_level,transports,preferences").eq("id", tripId).maybeSingle(),
   ]);
 
   // A query error (or a missing trip row) is a load failure, not an empty trip.
@@ -335,6 +337,7 @@ export async function loadTrip(tripId: string): Promise<LoadedTrip> {
 
   const budgetLevel = ((tripRes.data?.budget_level as BudgetLevel) || "standard") as BudgetLevel;
   const transports = (tripRes.data?.transports as Record<string, string> | null) ?? {};
+  const preferences = (tripRes.data?.preferences as TripPreferences | null) ?? {};
 
   const accomsByDest = new Map<string, LoadedAccommodation[]>();
   for (const a of (accomsRes.data as AccomRow[]) ?? []) {
@@ -367,5 +370,5 @@ export async function loadTrip(tripId: string): Promise<LoadedTrip> {
     accoms: accomsByDest.get(r.id) ?? [],
   }));
 
-  return { destinations, budgetLevel, transports };
+  return { destinations, budgetLevel, transports, preferences };
 }

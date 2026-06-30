@@ -19,6 +19,7 @@ import { placeLink } from "@/lib/maps";
 import { OpenInMapsButton } from "@/components/maps";
 import { formatDurationMin, formatKm, recommendedTimeLabel, SLOTS, SLOT_LABELS, type ExplorePlace, type Slot } from "@/lib/places";
 import { inItinerary, isFavorite, usePlanner } from "@/lib/planner/store";
+import type { PlaceMatch } from "@/lib/places/personalize";
 
 const SLOT_ICON: Record<Slot, typeof Sun> = { morning: Sun, afternoon: CloudSun, evening: Moon };
 
@@ -46,14 +47,22 @@ function chip(tag: string) {
   return TAG_STYLES[tag] ?? { bg: "#f0ece4", color: "var(--muted)" };
 }
 
+const BADGE_STYLE: Record<"good" | "warn" | "info", { bg: string; color: string }> = {
+  good: { bg: "color-mix(in oklab, var(--accent) 13%, #fff)", color: "var(--accent)" },
+  warn: { bg: "#FCEFD6", color: "#9A6512" },
+  info: { bg: "#f0ece4", color: "var(--muted)" },
+};
+
 export function PlaceCard({
   place,
   distanceKm,
   index,
+  match,
 }: {
   place: ExplorePlace;
   distanceKm?: number | null;
   index: number;
+  match?: PlaceMatch | null;
 }) {
   const { state, actions } = usePlanner();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -149,6 +158,20 @@ export function PlaceCard({
         </div>
 
         {place.address && <div className="mt-2 text-[11.5px] text-muted truncate">{place.address}</div>}
+
+        {/* trip-fit badges (only when this trip has preferences set) */}
+        {match && match.badges.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {match.badges.map((b) => {
+              const s = BADGE_STYLE[b.kind];
+              return (
+                <span key={b.label} className="px-2 py-1 rounded-lg text-[11px] font-bold" style={{ background: s.bg, color: s.color }}>
+                  {b.label}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* actions */}
         <div className="mt-3 flex items-center gap-2">

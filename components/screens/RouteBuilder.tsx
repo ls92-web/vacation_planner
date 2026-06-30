@@ -10,7 +10,8 @@ import {
   nightsBetween,
   recommend,
 } from "@/lib/data";
-import type { Accommodation, Destination } from "@/lib/types";
+import type { Accommodation, Destination, TripPreferences } from "@/lib/types";
+import { PREF_ACCESS, PREF_AGE_GROUPS, PREF_INTERESTS, PREF_TRAVEL_STYLES, PREF_TRAVELLER_TYPES } from "@/lib/trips/preferences";
 import { destinationCoords, isMapsConfigured, useGeocode, type LatLng, type MapMarker } from "@/lib/maps";
 import { GoogleMap, MapsApiProvider, DestinationMarkers, OpenInMapsButton } from "@/components/maps";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -26,7 +27,7 @@ import { addBreakdowns, computeBudget, convertCostText, formatMoney, EMPTY_BREAK
 import { useCurrency } from "@/lib/budget/useCurrency";
 import { useWeather } from "@/lib/weather/client";
 import { describeWeather } from "@/lib/weather/codes";
-import { Bed, Cloud, ExternalLink, Loader2, PenLine, RefreshCw, TriangleAlert, Wallet } from "lucide-react";
+import { Bed, Cloud, ExternalLink, Loader2, Minus, PenLine, RefreshCw, TriangleAlert, Wallet } from "lucide-react";
 import { useTripLoader } from "@/lib/trips/useTripLoader";
 import { generateTripSuggestions, type SuggestionType } from "@/lib/planner/suggestions";
 import {
@@ -623,6 +624,7 @@ function RoutePanel() {
         hotels: d.accoms.length,
       };
     }),
+    preferences: state.preferences,
   });
 
   return (
@@ -692,12 +694,92 @@ function EmptyState() {
 
 /* ============================ floating action bar ============================ */
 
+/* ============================ trip preferences ============================ */
+
+function PrefChip({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-3 py-1.5 rounded-full border text-[12.5px] font-semibold cursor-pointer transition"
+      style={{ borderColor: on ? "var(--accent)" : "var(--line)", background: on ? "var(--accent)" : "var(--surface)", color: on ? "#fff" : "var(--muted)" }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function TripPreferencesCard() {
+  const { state, actions } = useTrip();
+  const p = state.preferences;
+  const ages = p.ages ?? {};
+  const setAge = (k: keyof NonNullable<TripPreferences["ages"]>, delta: number) => {
+    const next = Math.max(0, Math.min(20, (ages[k] ?? 0) + delta));
+    actions.setTripPreferences({ ages: { ...ages, [k]: next } });
+  };
+  const setSingle = (field: "travellerType" | "travelStyle", key: string) =>
+    actions.setTripPreferences({ [field]: p[field] === key ? undefined : key } as Partial<TripPreferences>);
+  const toggleMulti = (field: "interests" | "accessibility", key: string) => {
+    const arr = p[field] ?? [];
+    const next = arr.includes(key) ? arr.filter((x) => x !== key) : [...arr, key];
+    actions.setTripPreferences({ [field]: next } as Partial<TripPreferences>);
+  };
+
+  const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div>
+      <div className="text-[12px] font-bold text-ink mb-2">{title}</div>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+
+  return (
+    <div className="rounded-[20px] border border-line bg-surface p-5">
+      <div className="flex items-center gap-2">
+        <Sparkle size={16} strokeWidth={1.8} className="text-accent" />
+        <div className="font-display font-bold text-[17px] tracking-[-.01em]">Trip preferences</div>
+      </div>
+      <p className="text-[12.5px] text-muted mt-1 mb-4">Help Itinera recommend places that actually fit this trip — all optional.</p>
+
+      <div className="flex flex-col gap-5">
+        <Group title="Who's travelling?">
+          {PREF_TRAVELLER_TYPES.map((t) => <PrefChip key={t.key} on={p.travellerType === t.key} label={t.label} onClick={() => setSingle("travellerType", t.key)} />)}
+        </Group>
+
+        <div>
+          <div className="text-[12px] font-bold text-ink mb-2">Who&apos;s coming?</div>
+          <div className="flex flex-wrap gap-2">
+            {PREF_AGE_GROUPS.map((g) => (
+              <div key={g.key} className="inline-flex items-center gap-2 rounded-full border border-line bg-surface pl-3 pr-1.5 py-1">
+                <span className="text-[12.5px] text-ink font-semibold">{g.label}</span>
+                <button onClick={() => setAge(g.key, -1)} className="w-6 h-6 rounded-full border border-line grid place-items-center text-muted hover:text-ink cursor-pointer disabled:opacity-40" disabled={(ages[g.key] ?? 0) === 0}><Minus size={13} strokeWidth={2.2} /></button>
+                <span className="w-4 text-center text-[13px] font-bold tabular-nums">{ages[g.key] ?? 0}</span>
+                <button onClick={() => setAge(g.key, 1)} className="w-6 h-6 rounded-full border border-line grid place-items-center text-muted hover:text-accent cursor-pointer"><Plus size={13} strokeWidth={2.2} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Group title="Travel style">
+          {PREF_TRAVEL_STYLES.map((t) => <PrefChip key={t.key} on={p.travelStyle === t.key} label={t.label} onClick={() => setSingle("travelStyle", t.key)} />)}
+        </Group>
+
+        <Group title="Interests">
+          {PREF_INTERESTS.map((t) => <PrefChip key={t.key} on={(p.interests ?? []).includes(t.key)} label={t.label} onClick={() => toggleMulti("interests", t.key)} />)}
+        </Group>
+
+        <Group title="Accessibility & needs">
+          {PREF_ACCESS.map((t) => <PrefChip key={t.key} on={(p.accessibility ?? []).includes(t.key)} label={t.label} onClick={() => toggleMulti("accessibility", t.key)} />)}
+        </Group>
+      </div>
+    </div>
+  );
+}
+
 function FloatingActionBar() {
   const { state, actions } = useTrip();
   const { activeTrip } = useTrips();
   const totalNights = state.destinations.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
   const persist = () => {
-    if (activeTrip?.id) withSave(saveTrip(activeTrip.id, state.destinations, state.budgetLevel, state.transports));
+    if (activeTrip?.id) withSave(saveTrip(activeTrip.id, state.destinations, state.budgetLevel, state.transports, state.preferences));
     else withSave(Promise.resolve());
   };
   return (
@@ -727,11 +809,13 @@ function useAutoSaveRoute() {
     "::" +
     JSON.stringify(state.transports) +
     "::" +
+    JSON.stringify(state.preferences) +
+    "::" +
     state.destinations
       .map(
         (d) =>
           `${d.saved ? 1 : 0}|${d.name}|${d.country}|${d.countryCode ?? ""}|${d.lat ?? ""}|${d.lng ?? ""}|${d.arrive}|${d.depart}|${d.image ?? ""}|${d.budgetOverride ?? ""}|` +
-          d.accoms.map((a) => `${a.type},${a.name},${a.checkin},${a.checkout},${a.conf},${a.address},${a.notes},${a.locationUrl ?? ""}`).join(";")
+          d.accoms.map((a) => `${a.type},${a.name},${a.checkin},${a.checkout},${a.checkinTime ?? ""},${a.checkoutTime ?? ""},${a.conf},${a.address},${a.notes},${a.locationUrl ?? ""}`).join(";")
       )
       .join("~");
   useEffect(() => {
@@ -744,7 +828,7 @@ function useAutoSaveRoute() {
     // plan is intentionally empty (skeleton/retry), and saving it would wipe the
     // user's saved destinations. Only auto-save real, loaded/edited plans.
     if (state.tripLoading || state.tripLoadError) return;
-    const t = setTimeout(() => withSave(saveTrip(tripId, state.destinations, state.budgetLevel, state.transports)), 800);
+    const t = setTimeout(() => withSave(saveTrip(tripId, state.destinations, state.budgetLevel, state.transports, state.preferences)), 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig, tripId, state.tripLoading, state.tripLoadError]);
@@ -849,6 +933,7 @@ export function RouteBuilder() {
                     </>
                   )}
                 </div>
+                {dests.length > 0 && <div className="mt-6"><TripPreferencesCard /></div>}
                 <FloatingActionBar />
               </>
             )}
