@@ -28,6 +28,7 @@ import { useWeather } from "@/lib/weather/client";
 import { describeWeather } from "@/lib/weather/codes";
 import { Bed, Cloud, ExternalLink, Loader2, PenLine, RefreshCw, TriangleAlert, Wallet } from "lucide-react";
 import { useTripLoader } from "@/lib/trips/useTripLoader";
+import { generateTripSuggestions, type SuggestionType } from "@/lib/planner/suggestions";
 import {
   ACCOM_ICONS,
   MODE_ICONS,
@@ -542,6 +543,15 @@ function RouteLine({ points }: { points: LatLng[] }) {
   return null;
 }
 
+const SUGGESTION_META: Record<SuggestionType, { Icon: typeof TriangleAlert; color: string }> = {
+  warning: { Icon: TriangleAlert, color: "#B26B00" },
+  missing_info: { Icon: PenLine, color: "var(--muted)" },
+  route: { Icon: MapPin, color: "var(--accent)" },
+  timing: { Icon: Clock, color: "var(--accent)" },
+  hotel: { Icon: Bed, color: "var(--accent)" },
+  positive: { Icon: Check, color: "var(--accent)" },
+};
+
 function RoutePanel() {
   const { state } = useTrip();
   const geocode = useGeocode();
@@ -577,16 +587,24 @@ function RoutePanel() {
   const points = markers.map((m) => m.position);
   const center = points[0] ?? destinationCoords(state.dest.split(",")[0]) ?? { lat: 41.3874, lng: 2.1686 };
 
-  // AI suggestions (distance-based heuristics)
-  const suggestions: { title: string; detail: string }[] = [];
-  if (markers.length >= 2) {
-    const haversine = (a: LatLng, b: LatLng) => { const R = 6371, dLat = ((b.lat - a.lat) * Math.PI) / 180, dLng = ((b.lng - a.lng) * Math.PI) / 180, la1 = (a.lat * Math.PI) / 180, la2 = (b.lat * Math.PI) / 180; const h = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(la1) * Math.cos(la2); return 2 * R * Math.asin(Math.min(1, Math.sqrt(h))); };
-    let total = 0;
-    for (let i = 0; i < points.length - 1; i++) total += haversine(points[i], points[i + 1]);
-    suggestions.push({ title: "Route looks efficient", detail: `About ${Math.round(total)} km across ${markers.length} stops — a sensible loop.` });
-    if (total > 600) suggestions.push({ title: "Long total distance", detail: "Consider a flight for the longest leg to save driving hours." });
-  }
-  suggestions.push({ title: "Add places in Explore", detail: "Once your route is set, browse attractions and the AI builds the daily schedule." });
+  // Trip-specific suggestions generated from the route the user actually entered.
+  const suggestions = generateTripSuggestions({
+    stops: savedDests.map((d) => {
+      const p: LatLng | undefined =
+        typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0)
+          ? { lat: d.lat, lng: d.lng }
+          : coords[d.id];
+      return {
+        name: d.name,
+        country: d.country,
+        lat: p?.lat,
+        lng: p?.lng,
+        nights: nightsBetween(d.arrive, d.depart) || 0,
+        hasDates: !!(d.arrive && d.depart),
+        hotels: d.accoms.length,
+      };
+    }),
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -608,17 +626,27 @@ function RoutePanel() {
       <div className="rounded-[18px] border border-line bg-surface p-4">
         <div className="flex items-center gap-1.5 font-display font-bold text-[15px]"><Sparkle size={16} strokeWidth={1.7} className="text-accent" />AI travel suggestions</div>
         <div className="mt-3 flex flex-col gap-2">
-          {suggestions.map((s, i) => (
-            <div key={i} className="rounded-xl bg-tint px-3 py-2.5 vp-slide-up">
-              <div className="flex items-start gap-2">
-                <Check size={14} strokeWidth={2.5} className="text-accent shrink-0 mt-0.5" />
-                <div>
-                  <div className="text-[12.5px] font-semibold text-ink">{s.title}</div>
-                  <div className="text-[12px] text-muted leading-snug mt-0.5">{s.detail}</div>
-                </div>
-              </div>
+          {suggestions.length === 0 ? (
+            <div className="rounded-xl bg-tint px-3 py-2.5 text-[12px] text-muted leading-snug">
+              Add your destinations, dates and hotels — tailored tips for this trip will appear here.
             </div>
-          ))}
+          ) : (
+            suggestions.map((s, i) => {
+              const meta = SUGGESTION_META[s.type];
+              const Icon = meta.Icon;
+              return (
+                <div key={i} className="rounded-xl bg-tint px-3 py-2.5 vp-slide-up">
+                  <div className="flex items-start gap-2">
+                    <Icon size={14} strokeWidth={2.2} className="shrink-0 mt-0.5" style={{ color: meta.color }} />
+                    <div>
+                      <div className="text-[12.5px] font-semibold text-ink">{s.title}</div>
+                      <div className="text-[12px] text-muted leading-snug mt-0.5">{s.description}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>
