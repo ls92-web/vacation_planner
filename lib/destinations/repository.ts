@@ -157,6 +157,8 @@ function toLoaded(destinations: Destination[]): LoadedDestination[] {
         name: a.name,
         checkin: a.checkin,
         checkout: a.checkout,
+        checkinTime: a.checkinTime ?? "",
+        checkoutTime: a.checkoutTime ?? "",
         conf: a.conf,
         address: a.address,
         notes: a.notes,
@@ -171,6 +173,8 @@ interface AccomRow {
   name: string | null;
   checkin: string | null;
   checkout: string | null;
+  checkin_time: string | null;
+  checkout_time: string | null;
   confirmation: string | null;
   address: string | null;
   notes: string | null;
@@ -262,6 +266,8 @@ async function doSaveTrip(tripId: string, destinations: Destination[], budgetLev
       name: a.name,
       checkin: a.checkin || null,
       checkout: a.checkout || null,
+      checkin_time: a.checkinTime || null,
+      checkout_time: a.checkoutTime || null,
       confirmation: a.conf,
       address: a.address,
       notes: a.notes,
@@ -320,7 +326,7 @@ export async function loadTrip(tripId: string): Promise<LoadedTrip> {
 
   const [destsRes, accomsRes, tripRes] = await Promise.all([
     sb.from("destinations").select("id,name,country,country_code,lat,lng,image_url,arrive,depart,budget_override").eq("trip_id", tripId).order("position", { ascending: true }),
-    sb.from("accommodations").select("destination_id,type,name,checkin,checkout,confirmation,address,notes,location_url").eq("trip_id", tripId).order("position", { ascending: true }),
+    sb.from("accommodations").select("destination_id,type,name,checkin,checkout,checkin_time,checkout_time,confirmation,address,notes,location_url").eq("trip_id", tripId).order("position", { ascending: true }),
     sb.from("trips").select("budget_level,transports").eq("id", tripId).maybeSingle(),
   ]);
 
@@ -338,6 +344,8 @@ export async function loadTrip(tripId: string): Promise<LoadedTrip> {
       name: a.name ?? "",
       checkin: a.checkin ?? "",
       checkout: a.checkout ?? "",
+      checkinTime: a.checkin_time ?? "",
+      checkoutTime: a.checkout_time ?? "",
       conf: a.confirmation ?? "",
       address: a.address ?? "",
       notes: a.notes ?? "",

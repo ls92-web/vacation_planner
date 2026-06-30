@@ -274,6 +274,16 @@ function AccommodationCard({ dest, accom }: { dest: Destination; accom: Accommod
           <span className="text-accent flex"><Moon size={14} strokeWidth={2} /></span>{an == null ? "—" : `${an} night${an !== 1 ? "s" : ""}`}
         </div>
       </div>
+      <div className="mt-2.5 flex flex-wrap gap-2.5">
+        <div className="flex-[1_1_135px]">
+          <label className="text-[11.5px] font-semibold text-muted">Check-in time <span className="font-normal text-muted/80">(optional)</span></label>
+          <input type="time" value={accom.checkinTime ?? ""} onChange={(e) => actions.updateAccom(dest.id, accom.id, "checkinTime", e.target.value)} className="w-full mt-[5px] px-[11px] py-2.5 border border-line rounded-[10px] text-[13.5px] text-ink bg-surface outline-none vp-input" />
+        </div>
+        <div className="flex-[1_1_135px]">
+          <label className="text-[11.5px] font-semibold text-muted">Check-out time <span className="font-normal text-muted/80">(optional)</span></label>
+          <input type="time" value={accom.checkoutTime ?? ""} onChange={(e) => actions.updateAccom(dest.id, accom.id, "checkoutTime", e.target.value)} className="w-full mt-[5px] px-[11px] py-2.5 border border-line rounded-[10px] text-[13.5px] text-ink bg-surface outline-none vp-input" />
+        </div>
+      </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         {isMapsConfigured() && accom.address && (
           <OpenInMapsButton href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(accom.address)}`} label="Open in Google Maps" size="sm" />

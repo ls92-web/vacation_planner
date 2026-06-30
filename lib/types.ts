@@ -16,6 +16,9 @@ export interface Accommodation {
   name: string;
   checkin: string;
   checkout: string;
+  /** Optional time of day for check-in / check-out, e.g. "15:00". */
+  checkinTime?: string;
+  checkoutTime?: string;
   conf: string;
   address: string;
   notes: string;
