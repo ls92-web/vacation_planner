@@ -1,12 +1,11 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { Bell, Check, ChevronRight, Sparkle } from "lucide-react";
+import { Check, ChevronRight, Sparkle } from "lucide-react";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import type { Screen } from "@/lib/types";
 import { getSaveSnapshot, getServerSaveSnapshot, subscribeSave } from "@/lib/ui/saveStatus";
-import { AccountButton } from "@/components/auth/AccountButton";
 
 const SCREEN_LABEL: Record<Screen, string> = {
   auth: "Sign in",
@@ -115,11 +114,6 @@ export function TopBar() {
         >
           <Sparkle size={15} strokeWidth={1.8} />AI Assistant
         </button>
-        <button onClick={() => actions.flash("You're all caught up — no new notifications.")} title="Notifications" className="relative w-9 h-9 rounded-[10px] border border-line bg-surface grid place-items-center text-muted hover:text-ink cursor-pointer">
-          <Bell size={17} strokeWidth={2} />
-          <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-accent2" />
-        </button>
-        <AccountButton inline />
       </div>
     </header>
   );
