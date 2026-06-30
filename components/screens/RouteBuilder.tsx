@@ -321,6 +321,16 @@ function AccommodationCard({ dest, accom }: { dest: Destination; accom: Accommod
           <p className="text-[11.5px] text-muted mt-1">Paste a map pin or booking link you can open later to reach this stay.</p>
         </div>
       )}
+      <div className="mt-2.5 flex flex-wrap gap-2.5">
+        <div className="flex-[1_1_180px]">
+          <label className="text-[11.5px] font-semibold text-muted">Booking confirmation <span className="font-normal text-muted/80">(optional)</span></label>
+          <input value={accom.conf} onChange={(e) => actions.updateAccom(dest.id, accom.id, "conf", e.target.value)} placeholder="e.g. ABC123XYZ" className="w-full mt-[5px] px-[13px] py-2.5 border border-line rounded-[10px] text-[13.5px] bg-surface outline-none vp-input" />
+        </div>
+      </div>
+      <div className="mt-2.5">
+        <label className="text-[11.5px] font-semibold text-muted">Notes <span className="font-normal text-muted/80">(optional)</span></label>
+        <textarea value={accom.notes} onChange={(e) => actions.updateAccom(dest.id, accom.id, "notes", e.target.value)} placeholder="e.g. breakfast included, late check-in arranged, parking on-site" rows={2} className="w-full mt-[5px] px-[13px] py-2.5 border border-line rounded-[10px] text-[13.5px] bg-surface outline-none vp-input resize-y" />
+      </div>
     </div>
   );
 }
