@@ -57,5 +57,5 @@ Deno.serve(async (req: Request) => {
     if (action === "recommendations") { const cands = Array.isArray(body.candidates) ? body.candidates.slice(0, 60) : []; if (!cands.length) return json({ error: "Missing 'candidates'" }, 400); return json({ recommendations: await recommendPlaces(context, cands) }); }
     if (action === "insights") return json({ insights: await planningInsights(context) });
     return json({ error: "Unknown action" }, 400);
-  } catch (e) { console.error("[ai]", e); return json({ error: "AI request failed" }, 502); }
+  } catch (e) { console.error("[ai]", e); return json({ error: "AI request failed", detail: String((e as Error)?.message ?? e).slice(0, 300) }, 502); }
 });

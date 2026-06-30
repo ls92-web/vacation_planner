@@ -8,6 +8,7 @@ import {
   Heart,
   MapPin,
   Plus,
+  Sparkles,
   Star,
   Sun,
   CloudSun,
@@ -58,11 +59,13 @@ export function PlaceCard({
   distanceKm,
   index,
   match,
+  whyFits,
 }: {
   place: ExplorePlace;
   distanceKm?: number | null;
   index: number;
   match?: PlaceMatch | null;
+  whyFits?: string;
 }) {
   const { state, actions } = usePlanner();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -170,6 +173,14 @@ export function PlaceCard({
                 </span>
               );
             })}
+          </div>
+        )}
+
+        {/* AI one-liner: why this place fits the trip's travellers */}
+        {whyFits && (
+          <div className="mt-2 flex items-start gap-1.5 text-[11.5px] leading-snug" style={{ color: "var(--muted)" }}>
+            <Sparkles size={12} strokeWidth={2} className="text-accent shrink-0 mt-0.5" />
+            <span>{whyFits}</span>
           </div>
         )}
 

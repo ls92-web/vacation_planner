@@ -27,7 +27,9 @@ function headers(c: ReturnType<typeof cfg>): Record<string, string> {
 function buildBody(req: ChatReq, stream: boolean) {
   const b: Record<string, unknown> = { messages: req.messages, temperature: req.temperature ?? 0.7, stream };
   if (req.maxTokens) b.max_tokens = req.maxTokens;
-  if (req.json) b.response_format = { type: "json_object" };
+  // NOTE: response_format:json_object is NOT sent — many OpenRouter models
+  // (incl. the free tiers) reject it with an upstream error. The prompts already
+  // demand strict JSON and extractJson() parses it out robustly.
   return b;
 }
 async function requestRaw(req: ChatReq, stream: boolean): Promise<Response> {
@@ -39,8 +41,8 @@ async function requestRaw(req: ChatReq, stream: boolean): Promise<Response> {
     try {
       const res = await fetch(url, { method: "POST", headers: headers(c), body: payload });
       if (res.ok) return res;
-      await res.text().catch(() => "");
-      if (!RETRYABLE.has(res.status) || a === c.maxRetries) throw new Error(`OpenRouter HTTP ${res.status}`);
+      const errText = await res.text().catch(() => "");
+      if (!RETRYABLE.has(res.status) || a === c.maxRetries) throw new Error(`OpenRouter HTTP ${res.status}: ${errText.slice(0, 200)}`);
     } catch (e) { last = e; if (a === c.maxRetries) throw e; }
     await sleep(backoff(a));
   }

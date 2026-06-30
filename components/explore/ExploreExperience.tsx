@@ -7,7 +7,8 @@ import { useTrips } from "@/lib/trips/store";
 import { PlannerProvider, usePlanner } from "@/lib/planner/store";
 import { formatDurationMin, haversineKm, SLOT_LABELS, usePlaces, type ExploreFilters, type ExplorePlace, type ItineraryItem } from "@/lib/places";
 import { scorePlace } from "@/lib/places/personalize";
-import { hasPreferences } from "@/lib/trips/preferences";
+import { useTripWhy } from "@/lib/places/useTripWhy";
+import { hasPreferences, summarizePreferences } from "@/lib/trips/preferences";
 import { MapsApiProvider } from "@/components/maps";
 import { destinationCoords, useGeocode } from "@/lib/maps";
 import { nightsBetween } from "@/lib/data";
@@ -114,6 +115,25 @@ function ExploreInner() {
   // Personalize results when this trip has preferences set.
   const prefs = trip.state.preferences;
   const personalize = hasPreferences(prefs);
+  const scored = useMemo(
+    () => (personalize ? filtered.map((p) => ({ p, m: scorePlace(p, prefs, trip.state.budgetLevel) })) : []),
+    [personalize, filtered, prefs, trip.state.budgetLevel]
+  );
+  const recScored = useMemo(() => scored.filter((x) => x.m.recommended).sort((a, b) => b.m.score - a.m.score), [scored]);
+  const otherScored = useMemo(() => scored.filter((x) => !x.m.recommended), [scored]);
+
+  // Optional LLM "why it fits" line for the recommended places.
+  const whyCtx = useMemo(
+    () => ({
+      destination: (activeDest?.name ?? state.destination).split(",")[0],
+      travelers: summarizePreferences(prefs, trip.state.budgetLevel),
+      numDays: Math.max(1, state.focusDays),
+    }),
+    [activeDest?.name, state.destination, prefs, trip.state.budgetLevel, state.focusDays]
+  );
+  // Fetch the "why it fits" line for the best-scoring places (shown in either section).
+  const topForWhy = useMemo(() => [...scored].sort((a, b) => b.m.score - a.m.score).slice(0, 14).map((x) => x.p), [scored]);
+  const why = useTripWhy(topForWhy, whyCtx, personalize && scored.length > 0);
 
   return (
     <div className="vp-scroll min-h-screen" style={{ background: "var(--bg)" }}>
@@ -169,37 +189,31 @@ function ExploreInner() {
                   ))}
                 </div>
               ) : (
-                (() => {
-                  const scored = filtered.map((p) => ({ p, m: scorePlace(p, prefs, trip.state.budgetLevel) }));
-                  const rec = scored.filter((x) => x.m.recommended).sort((a, b) => b.m.score - a.m.score);
-                  const others = scored.filter((x) => !x.m.recommended);
-                  const card = (x: (typeof scored)[number], i: number) => (
-                    <PlaceCard key={x.p.id} place={x.p} index={i} distanceKm={haversineKm(state.center, x.p.position)} match={x.m} />
-                  );
-                  return (
-                    <div className="flex flex-col gap-6">
-                      {rec.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-1.5 text-[13.5px] font-bold text-ink mb-3">
-                            <Sparkles size={15} strokeWidth={2} className="text-accent" />Recommended for this trip
-                            <span className="text-muted font-semibold ml-1">· {rec.length}</span>
-                          </div>
-                          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(258px,1fr))" }}>
-                            {rec.map((x, i) => card(x, i))}
-                          </div>
-                        </div>
-                      )}
-                      {others.length > 0 && (
-                        <div>
-                          <div className="text-[13.5px] font-bold text-muted mb-3">{rec.length ? "Other options" : "All places"}</div>
-                          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(258px,1fr))" }}>
-                            {others.map((x, i) => card(x, rec.length + i))}
-                          </div>
-                        </div>
-                      )}
+                <div className="flex flex-col gap-6">
+                  {recScored.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[13.5px] font-bold text-ink mb-3">
+                        <Sparkles size={15} strokeWidth={2} className="text-accent" />Recommended for this trip
+                        <span className="text-muted font-semibold ml-1">· {recScored.length}</span>
+                      </div>
+                      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(258px,1fr))" }}>
+                        {recScored.map((x, i) => (
+                          <PlaceCard key={x.p.id} place={x.p} index={i} distanceKm={haversineKm(state.center, x.p.position)} match={x.m} whyFits={why[x.p.id]} />
+                        ))}
+                      </div>
                     </div>
-                  );
-                })()
+                  )}
+                  {otherScored.length > 0 && (
+                    <div>
+                      <div className="text-[13.5px] font-bold text-muted mb-3">{recScored.length ? "Other options" : "All places"}</div>
+                      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(258px,1fr))" }}>
+                        {otherScored.map((x, i) => (
+                          <PlaceCard key={x.p.id} place={x.p} index={recScored.length + i} distanceKm={haversineKm(state.center, x.p.position)} match={x.m} whyFits={why[x.p.id]} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
