@@ -165,22 +165,21 @@ function TripOverview() {
   }
 
   return (
-    <div className="rounded-[20px] border border-line p-5" style={{ background: "var(--tint)" }}>
-      <div className="flex items-center gap-5 flex-wrap">
+    <div className="rounded-[20px] border border-line p-4" style={{ background: "var(--tint)" }}>
+      <div className="flex items-center gap-3">
         <ProgressRing value={completion} />
         <div className="min-w-0">
           <div className="text-[11.5px] font-bold uppercase tracking-[.06em] text-muted">Trip overview</div>
-          <div className="font-display font-bold text-[20px] tracking-[-.01em] mt-0.5">{state.dest.split(",")[0]}</div>
+          <div className="font-display font-bold text-[19px] tracking-[-.01em] mt-0.5 truncate">{state.dest.split(",")[0]}</div>
           <div className="text-[12.5px] text-muted">{span} · {travelers} traveler{travelers !== 1 ? "s" : ""}</div>
         </div>
-        <div className="flex-1" />
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-6 gap-y-4">
-          <Stat label="Destinations" value={String(dests.length)} />
-          <Stat label="Nights" value={String(totalNights)} />
-          <Stat label="Hotels" value={String(hotels)} />
-          <Stat label="Travelers" value={String(travelers)} />
-          <Stat label="Est. budget" value={formatMoney(budgetTotal, currency)} />
-        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-x-3 gap-y-3.5">
+        <Stat label="Destinations" value={String(dests.length)} />
+        <Stat label="Nights" value={String(totalNights)} />
+        <Stat label="Hotels" value={String(hotels)} />
+        <Stat label="Travelers" value={String(travelers)} />
+        <Stat label="Est. budget" value={formatMoney(budgetTotal, currency)} />
       </div>
 
       {/* estimated budget breakdown + level */}
@@ -643,6 +642,10 @@ function RoutePanel() {
         </div>
       </div>
 
+      {/* Trip summary lives in the side panel (before the AI suggestions) so the main
+          column stays free for adding destinations and routes. */}
+      {savedDests.length > 0 && <TripOverview />}
+
       <div className="rounded-[18px] border border-line bg-surface p-4">
         <div className="flex items-center gap-1.5 font-display font-bold text-[15px]"><Sparkle size={16} strokeWidth={1.7} className="text-accent" />AI travel suggestions</div>
         <div className="mt-3 flex flex-col gap-2">
@@ -846,8 +849,6 @@ export function RouteBuilder() {
                     </>
                   )}
                 </div>
-                {/* Trip summary now lives at the end of the page — a recap once the route is built. */}
-                {dests.length > 0 && <div className="mt-8"><TripOverview /></div>}
                 <FloatingActionBar />
               </>
             )}
