@@ -12,6 +12,7 @@ import {
   Sun,
   CloudSun,
   Moon,
+  Trash2,
 } from "lucide-react";
 import { EX_THUMBS } from "@/lib/data";
 import { placeLink } from "@/lib/maps";
@@ -158,7 +159,7 @@ export function PlaceCard({
               style={{ background: added ? "var(--accent)" : "#fff", color: added ? "#fff" : "var(--accent)" }}
             >
               {added ? <Check size={15} strokeWidth={2} /> : <Plus size={15} strokeWidth={2} />}
-              {added ? "In your plan" : "Add to plan"}
+              {added ? "Added" : "Add to plan"}
             </button>
             {menuOpen && (
               <div
@@ -195,6 +196,15 @@ export function PlaceCard({
                     );
                   })}
                 </div>
+                {added && (
+                  <button
+                    onClick={() => { actions.removeFromItinerary(place.id); setMenuOpen(false); }}
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border border-line text-[12px] font-semibold cursor-pointer hover:bg-[#fbe9e2]"
+                    style={{ color: "#b3492f", borderColor: "var(--line)" }}
+                  >
+                    <Trash2 size={13} strokeWidth={2} />Remove from plan
+                  </button>
+                )}
               </div>
             )}
           </div>

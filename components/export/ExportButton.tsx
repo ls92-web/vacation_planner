@@ -29,7 +29,7 @@ function TemplateCard({ t, city, days, onPick }: { t: BookTemplate; city: string
   );
 }
 
-export function ExportButton() {
+export function ExportButton({ label = "Export", className, disabled = false }: { label?: string; className?: string; disabled?: boolean } = {}) {
   const { state } = usePlanner();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [book, setBook] = useState<BookTemplate | null>(null);
@@ -67,10 +67,12 @@ export function ExportButton() {
   return (
     <>
       <button
-        onClick={() => setGalleryOpen(true)}
-        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[11px] bg-ink text-white text-[13px] font-bold cursor-pointer hover:brightness-125 transition"
+        onClick={() => { if (!disabled) setGalleryOpen(true); }}
+        disabled={disabled}
+        style={disabled ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+        className={className ?? "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[11px] bg-ink text-white text-[13px] font-bold cursor-pointer hover:brightness-125 transition"}
       >
-        <Download size={15} strokeWidth={2} />Export
+        <Download size={15} strokeWidth={2} />{label}
       </button>
       {mounted && createPortal(overlays, document.body)}
     </>

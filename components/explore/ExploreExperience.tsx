@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, ChevronLeft, ChevronRight, Heart, MapPin, Search } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Heart, ListChecks, MapPin, Search, Trash2 } from "lucide-react";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { PlannerProvider, usePlanner } from "@/lib/planner/store";
-import { haversineKm, usePlaces, type ExploreFilters, type ExplorePlace } from "@/lib/places";
+import { formatDurationMin, haversineKm, SLOT_LABELS, usePlaces, type ExploreFilters, type ExplorePlace, type ItineraryItem } from "@/lib/places";
 import { MapsApiProvider } from "@/components/maps";
 import { destinationCoords, useGeocode } from "@/lib/maps";
 import { nightsBetween } from "@/lib/data";
@@ -19,6 +19,8 @@ import { CompareTray } from "./CompareTray";
 import { useDebounced } from "./useDebounced";
 import type { Destination } from "@/lib/types";
 import { ExportButton } from "@/components/export/ExportButton";
+
+const cityKey = (name: string) => name.split(",")[0].trim().toLowerCase();
 
 function applyFilters(places: ExplorePlace[], f: ExploreFilters, center: { lat: number; lng: number }): ExplorePlace[] {
   return places.filter((p) => {
@@ -98,6 +100,15 @@ function ExploreInner() {
   const filtered = useMemo(() => applyFilters(places, state.filters, state.center), [places, state.filters, state.center]);
   const pool = useMemo(() => [...places, ...state.favorites, ...state.itinerary.map((i) => i.place)], [places, state.favorites, state.itinerary]);
 
+  // Places shown on the map: the visible results plus any already-chosen places for
+  // this destination (so chosen stops always have a marker, even if filtered out).
+  const dk = cityKey(activeDest?.name ?? state.destination);
+  const chosenPlaces = useMemo(() => state.itinerary.filter((it) => cityKey(it.destId) === dk).map((it) => it.place), [state.itinerary, dk]);
+  const mapPlaces = useMemo(() => {
+    const seen = new Set(filtered.map((p) => p.id));
+    return [...filtered, ...chosenPlaces.filter((p) => !seen.has(p.id))];
+  }, [filtered, chosenPlaces]);
+
   return (
     <div className="vp-scroll min-h-screen" style={{ background: "var(--bg)" }}>
       {/* header */}
@@ -129,9 +140,9 @@ function ExploreInner() {
             <div className="mt-3"><FilterBar /></div>
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-5 mt-4">
+          <div className="flex flex-col lg:flex-row gap-5 mt-4 items-start">
             {/* grid */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 w-full">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-[13px] text-muted">
                   {loading ? "Finding places…" : `${filtered.length} place${filtered.length !== 1 ? "s" : ""}`}
@@ -146,7 +157,7 @@ function ExploreInner() {
                   <div className="text-[13px] mt-1">Try a different category or relax a filter.</div>
                 </div>
               ) : (
-                <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))" }}>
+                <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(258px,1fr))" }}>
                   {filtered.map((p, i) => (
                     <PlaceCard key={p.id} place={p} index={i} distanceKm={haversineKm(state.center, p.position)} />
                   ))}
@@ -154,11 +165,17 @@ function ExploreInner() {
               )}
             </div>
 
-            {/* map */}
-            <div className="lg:w-[42%] lg:max-w-[560px] shrink-0">
-              <div className="relative rounded-[18px] overflow-hidden border border-line h-[320px] lg:h-[calc(100vh-220px)] lg:sticky lg:top-[210px]">
-                <ExploreMap places={filtered} />
-              </div>
+            {/* right: your plan summary (sticky on desktop; above the map on mobile) */}
+            <aside className="w-full lg:w-[340px] shrink-0 lg:sticky lg:top-[200px]">
+              <PlanSummaryPanel activeDest={activeDest} />
+            </aside>
+          </div>
+
+          {/* map — below the main explore section so it no longer dominates the side */}
+          <div className="mt-5">
+            <div className="text-[12px] font-bold uppercase tracking-[.04em] text-muted mb-2 flex items-center gap-1.5"><MapPin size={13} strokeWidth={2} className="text-accent" />Map · results &amp; your chosen places</div>
+            <div className="relative rounded-[18px] overflow-hidden border border-line h-[380px]">
+              <ExploreMap places={mapPlaces} />
             </div>
           </div>
         </div>
@@ -178,6 +195,92 @@ function PlanView() {
       <div className="font-display font-bold text-[24px] tracking-[-.02em] mb-1">Your itinerary</div>
       <p className="text-muted text-[13.5px] mb-4">Grouped by destination in your travel order. Open each city in Explore to fill its days — stops stay with the city you added them in.</p>
       <DestinationItinerary />
+    </div>
+  );
+}
+
+const SLOT_ORDER: Record<string, number> = { morning: 0, afternoon: 1, evening: 2 };
+
+/** Sticky right-side summary of the places chosen for the active destination, grouped by day. */
+function PlanSummaryPanel({ activeDest }: { activeDest?: Destination }) {
+  const { state } = usePlanner();
+  const cityName = (activeDest?.name ?? state.destination).split(",")[0];
+  const dk = cityKey(activeDest?.name ?? state.destination);
+  const items = state.itinerary.filter((it) => cityKey(it.destId) === dk);
+  const days = Math.max(1, state.focusDays);
+  const totalAll = state.itinerary.length;
+
+  return (
+    <div className="rounded-[18px] border border-line bg-surface overflow-hidden flex flex-col lg:max-h-[calc(100vh-220px)]">
+      <div className="px-4 py-3.5 border-b border-line flex items-center gap-2" style={{ background: "var(--tint)" }}>
+        <ListChecks size={16} strokeWidth={2} className="text-accent shrink-0" />
+        <div className="min-w-0">
+          <div className="font-display font-bold text-[15px] leading-tight truncate">Your plan · {cityName}</div>
+          <div className="text-[11.5px] text-muted">{items.length} place{items.length !== 1 ? "s" : ""} here · {totalAll} in trip</div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto vp-scroll p-3 flex flex-col gap-3">
+        {Array.from({ length: days }).map((_, d) => {
+          const dayItems = items
+            .filter((it) => it.day === d)
+            .sort((a, b) => (SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot]) || (a.position - b.position));
+          return (
+            <div key={d}>
+              <div className="flex items-center justify-between px-1 mb-1.5">
+                <div className="text-[12px] font-bold text-ink">Day {d + 1}</div>
+                {dayItems.length > 0 && <div className="text-[11px] text-muted">{dayItems.length} stop{dayItems.length !== 1 ? "s" : ""}</div>}
+              </div>
+              {dayItems.length === 0 ? (
+                <div className="rounded-[12px] border border-dashed border-line px-3 py-3 text-[12px] text-muted">No places added yet</div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {dayItems.map((it) => <PlanRow key={it.place.id} it={it} days={days} />)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="p-3 border-t border-line">
+        <ExportButton
+          label="Continue to Export"
+          disabled={totalAll === 0}
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-[12px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06] transition"
+        />
+        {totalAll === 0 && <p className="text-[11px] text-muted text-center mt-1.5">Add at least one place to continue.</p>}
+      </div>
+    </div>
+  );
+}
+
+function PlanRow({ it, days }: { it: ItineraryItem; days: number }) {
+  const { actions } = usePlanner();
+  const p = it.place;
+  return (
+    <div className="rounded-[12px] border border-line px-2.5 py-2 flex items-center gap-2" style={{ background: "color-mix(in oklab, var(--surface) 94%, var(--bg))" }}>
+      <div className="flex-1 min-w-0">
+        <div className="text-[12.5px] font-semibold text-ink truncate">{p.name}</div>
+        <div className="text-[11px] text-muted truncate capitalize">{p.category} · {SLOT_LABELS[it.slot]} · {formatDurationMin(it.durationMin ?? p.estDurationMin)}</div>
+      </div>
+      {days > 1 && (
+        <select
+          value={it.day}
+          onChange={(e) => actions.moveItemToDay(p.id, Number(e.target.value))}
+          title="Move to another day"
+          className="shrink-0 text-[11px] font-semibold text-muted bg-surface border border-line rounded-lg px-1.5 py-1 cursor-pointer outline-none"
+        >
+          {Array.from({ length: days }).map((_, d) => <option key={d} value={d}>Day {d + 1}</option>)}
+        </select>
+      )}
+      <button
+        onClick={() => actions.removeFromItinerary(p.id)}
+        title="Remove from plan"
+        className="shrink-0 w-7 h-7 rounded-lg border border-line bg-surface grid place-items-center text-muted cursor-pointer hover:text-[#b3492f] hover:border-[#b3492f]"
+      >
+        <Trash2 size={13} strokeWidth={2} />
+      </button>
     </div>
   );
 }
