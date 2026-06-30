@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Compass, Download, MapPin, Moon, Send, Sparkles, Wallet } from "lucide-react";
+import { ArrowRight, Check, Compass, Download, MapPin, Moon, Plus, Send, Sparkles, Wallet } from "lucide-react";
 import { queryLink } from "@/lib/maps";
+import { getRepository } from "@/lib/itinerary/repository";
+import { geocodeCity } from "@/lib/geo";
+import type { ExplorePlace } from "@/lib/places";
+import type { PlaceSuggestion } from "@/lib/ai-client";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { useTripLoader } from "@/lib/trips/useTripLoader";
@@ -24,6 +28,9 @@ const sigOf = (t: ComposedTrip) =>
 
 const QUICK = ["What should we do there?", "Add another city", "Make it more relaxed", "We're travelling with kids"];
 
+/** Stable id for a suggested place, so saving is idempotent and "saved" survives reload. */
+const suggestionId = (s: PlaceSuggestion) => `sugg:${s.city.toLowerCase()}:${s.name.toLowerCase()}`.replace(/\s+/g, "-");
+
 export function Workspace() {
   const { state, actions } = useTrip();
   const { activeTrip, actions: tripActions } = useTrips();
@@ -33,6 +40,7 @@ export function Workspace() {
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const saved = useMemo(() => state.destinations.filter((d) => d.saved && d.name.trim()), [state.destinations]);
@@ -46,10 +54,11 @@ export function Workspace() {
     [activeTrip?.name, saved, state.preferences, state.dest]
   );
 
-  // Load this trip's conversation memory (per-trip).
+  // Load this trip's conversation memory + which suggested places are already saved.
   const greeted = useRef(false);
   useEffect(() => {
     greeted.current = false;
+    setSavedIds(new Set());
     if (!activeTrip) return;
     let cancelled = false;
     loadChat(activeTrip.id).then((chat) => {
@@ -57,8 +66,37 @@ export function Workspace() {
       if (chat.length) { greeted.current = true; setMessages(chat); }
       else setMessages([]);
     });
+    getRepository().listFavorites(activeTrip.id).then((favs) => {
+      if (!cancelled) setSavedIds(new Set(favs.map((p) => p.id)));
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [activeTrip?.id]);
+
+  // Save a suggested place to this trip (shows on the Saved Places page).
+  const saveSuggestion = async (s: PlaceSuggestion) => {
+    if (!activeTrip) return;
+    const id = suggestionId(s);
+    if (savedIds.has(id)) return;
+    setSavedIds((prev) => new Set(prev).add(id)); // optimistic
+    // Best-effort coords: try the place name, fall back to the city centre so the
+    // saved pin lands in the right place (never 0,0). The Maps deep link below
+    // still opens by name for exact discovery.
+    let g = await geocodeCity(s.name, s.city).catch(() => null);
+    if (!g || (g.lat === 0 && g.lng === 0)) g = await geocodeCity(s.city).catch(() => null);
+    const place: ExplorePlace = {
+      id, name: s.name, category: "Recommended",
+      position: { lat: g?.lat ?? 0, lng: g?.lng ?? 0 },
+      address: s.city,
+      description: s.why, tags: [], estDurationMin: 120, recommendedSlot: "morning",
+      source: "curated",
+    };
+    try {
+      await getRepository().setFavorite(activeTrip.id, s.city, place, true);
+    } catch {
+      setSavedIds((prev) => { const n = new Set(prev); n.delete(id); return n; }); // roll back
+      actions.flash("Couldn't save that place — try again.");
+    }
+  };
 
   // Greet once the trip's cities are loaded (so the greeting is personal).
   useEffect(() => {
@@ -127,22 +165,36 @@ export function Workspace() {
               </div>
               {m.role === "assistant" && m.suggestions?.length ? (
                 <div className="mt-2 flex flex-col gap-2">
-                  {m.suggestions.map((s, si) => (
-                    <a
-                      key={si}
-                      href={queryLink(`${s.name}, ${s.city}`)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group block rounded-[14px] border border-line bg-surface px-3.5 py-2.5 transition hover:border-accent vp-fade-fast"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="font-display font-bold text-[13.5px] leading-tight truncate">{s.name}</div>
-                        <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-accent opacity-0 group-hover:opacity-100 transition"><MapPin size={11} />Map</span>
+                  {m.suggestions.map((s, si) => {
+                    const isSaved = savedIds.has(suggestionId(s));
+                    return (
+                      <div key={si} className="rounded-[14px] border border-line bg-surface px-3.5 py-2.5 vp-fade-fast">
+                        <div className="font-display font-bold text-[13.5px] leading-tight">{s.name}</div>
+                        <div className="text-[11px] text-muted">{s.city}</div>
+                        {s.why && <div className="text-[12px] text-ink/80 mt-1 leading-snug">{s.why}</div>}
+                        <div className="mt-2 flex items-center gap-2">
+                          <button
+                            onClick={() => saveSuggestion(s)}
+                            disabled={isSaved}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11.5px] font-semibold transition cursor-pointer disabled:cursor-default"
+                            style={isSaved
+                              ? { background: "var(--tint)", color: "var(--accent)" }
+                              : { background: "var(--accent)", color: "#fff" }}
+                          >
+                            {isSaved ? <><Check size={12} />Saved</> : <><Plus size={12} />Save</>}
+                          </button>
+                          <a
+                            href={queryLink(`${s.name}, ${s.city}`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-line text-[11.5px] font-semibold text-muted cursor-pointer hover:text-accent hover:border-accent transition"
+                          >
+                            <MapPin size={12} />Map
+                          </a>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-muted">{s.city}</div>
-                      {s.why && <div className="text-[12px] text-ink/80 mt-1 leading-snug">{s.why}</div>}
-                    </a>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
