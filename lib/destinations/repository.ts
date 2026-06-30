@@ -374,7 +374,12 @@ export async function loadTrip(tripId: string): Promise<LoadedTrip> {
 }
 
 // ===== Conversational trip memory (the workspace chat), stored on trips.chat. =====
-export interface ChatTurn { role: "user" | "assistant"; content: string }
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+  /** Curated place ideas attached to an assistant turn (optional). */
+  suggestions?: { name: string; city: string; why: string }[];
+}
 const chatKey = (tripId: string) => `itinera_chat_${tripId}`;
 
 export async function loadChat(tripId: string): Promise<ChatTurn[]> {

@@ -16,12 +16,20 @@ export async function composeTrip(text: string): Promise<ComposedTrip | null> {
   return data?.trip && data.trip.destinations?.length ? data.trip : null;
 }
 
+/** A curated place idea the companion surfaces in conversation. */
+export interface PlaceSuggestion {
+  name: string;
+  city: string;
+  why: string;
+}
+
 export interface RefineResult {
   reply: string;
   trip: ComposedTrip;
+  suggestions?: PlaceSuggestion[];
 }
 
-/** Conversationally edit a trip: returns the AI reply + the (possibly changed) full trip. */
+/** Conversationally edit a trip: returns the AI reply + the (possibly changed) full trip + optional curated suggestions. */
 export async function refineTrip(trip: ComposedTrip, history: AIMessage[], message: string): Promise<RefineResult | null> {
   const data = await callFn<RefineResult>("ai", { action: "refine", trip, messages: history, message });
   return data?.trip?.destinations?.length ? data : null;

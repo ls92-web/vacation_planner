@@ -87,7 +87,13 @@ export async function refineTrip(trip: unknown, history: AIMessage[], message: s
   const p = extractJson<Record<string, unknown>>(raw);
   const reply = String(p.reply ?? "").trim() || "Done — I've updated your trip.";
   const updated = normalizeTrip((p.trip ?? {}) as Record<string, unknown>);
-  return { reply, trip: updated };
+  const sugsRaw = Array.isArray(p.suggestions) ? (p.suggestions as Record<string, unknown>[]) : [];
+  const cities = new Set(updated.destinations.map((d) => d.city.toLowerCase()));
+  const suggestions = sugsRaw
+    .map((s) => ({ name: String(s.name ?? "").trim(), city: String(s.city ?? "").trim(), why: String(s.why ?? "").trim() }))
+    .filter((s) => s.name && cities.has(s.city.toLowerCase()))
+    .slice(0, 4);
+  return { reply, trip: updated, suggestions };
 }
 
 export async function planningInsights(ctx: TripContext) {

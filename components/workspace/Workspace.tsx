@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Compass, Download, MapPin, Moon, Send, Sparkles, Wallet } from "lucide-react";
+import { queryLink } from "@/lib/maps";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { useTripLoader } from "@/lib/trips/useTripLoader";
@@ -21,7 +22,7 @@ import { Logo } from "@/components/Logo";
 const sigOf = (t: ComposedTrip) =>
   JSON.stringify({ n: t.name, d: t.destinations.map((x) => `${x.city.toLowerCase()}#${x.nights}`), p: t.preferences });
 
-const QUICK = ["Add another city", "Make it more relaxed", "We're travelling with kids", "Tighten the budget"];
+const QUICK = ["What should we do there?", "Add another city", "Make it more relaxed", "We're travelling with kids"];
 
 export function Workspace() {
   const { state, actions } = useTrip();
@@ -86,7 +87,7 @@ export function Workspace() {
           if (res.trip.name && res.trip.name !== activeTrip.name) await tripActions.rename(activeTrip.id, res.trip.name);
           await loadPlan(activeTrip.id, res.trip.destinations[0].city);
         }
-        const full = [...afterUser, { role: "assistant" as const, content: res.reply }];
+        const full = [...afterUser, { role: "assistant" as const, content: res.reply, suggestions: res.suggestions?.length ? res.suggestions : undefined }];
         setMessages(full);
         saveChat(activeTrip.id, full);
       } else {
@@ -124,6 +125,26 @@ export function Workspace() {
               >
                 {m.content}
               </div>
+              {m.role === "assistant" && m.suggestions?.length ? (
+                <div className="mt-2 flex flex-col gap-2">
+                  {m.suggestions.map((s, si) => (
+                    <a
+                      key={si}
+                      href={queryLink(`${s.name}, ${s.city}`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block rounded-[14px] border border-line bg-surface px-3.5 py-2.5 transition hover:border-accent vp-fade-fast"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-display font-bold text-[13.5px] leading-tight truncate">{s.name}</div>
+                        <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-accent opacity-0 group-hover:opacity-100 transition"><MapPin size={11} />Map</span>
+                      </div>
+                      <div className="text-[11px] text-muted">{s.city}</div>
+                      {s.why && <div className="text-[12px] text-ink/80 mt-1 leading-snug">{s.why}</div>}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
           {sending && (
