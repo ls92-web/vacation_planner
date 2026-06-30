@@ -154,8 +154,8 @@ export function TripsDashboard() {
   const loadPlan = useTripLoader();
   const openTrip = async (t: Trip) => {
     actions.select(t.id);
-    trip.actions.goForm(); // show the route screen (skeleton while loading)
-    await loadPlan(t.id, t.destination); // skeleton → hydrate, or → retryable error
+    trip.actions.goWorkspace(); // open the conversational workspace
+    await loadPlan(t.id, t.destination); // hydrate the store (or → retryable error)
   };
 
   return (

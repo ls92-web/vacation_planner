@@ -9,6 +9,7 @@ import { getSaveSnapshot, getServerSaveSnapshot, subscribeSave } from "@/lib/ui/
 
 const SCREEN_LABEL: Record<Screen, string> = {
   welcome: "Welcome",
+  workspace: "Plan",
   auth: "Sign in",
   dashboard: "Dashboard",
   trips: "My Trips",

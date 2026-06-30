@@ -268,6 +268,7 @@ export function useTripStore() {
       toggleAuth: () => set((s) => ({ authMode: s.authMode === "signin" ? "signup" : "signin" })),
       goForm: () => requestNavigation(() => set({ screen: "form" })),
       goWelcome: () => requestNavigation(() => set({ screen: "welcome" })),
+      goWorkspace: () => requestNavigation(() => set({ screen: "workspace" })),
       goProfile: () =>
         requestNavigation(() => {
           set({ screen: "profile" });

@@ -38,7 +38,7 @@ export function Dashboard() {
 
   const open = async (t: Trip) => {
     tripsActions.select(t.id);
-    actions.goForm();
+    actions.goWorkspace();
     await loadPlan(t.id, t.destination);
   };
 

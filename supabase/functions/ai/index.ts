@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isConfigured } from "./openrouter.ts";
-import { composeTrip, generateItinerary, planningInsights, recommendPlaces, streamAssistant } from "./service.ts";
+import { composeTrip, generateItinerary, planningInsights, recommendPlaces, refineTrip, streamAssistant } from "./service.ts";
 
 // Single action-routed AI function: itinerary | insights | recommendations | assistant (stream).
 // Requires a real signed-in user (the anon key is rejected). OpenRouter key/model come
@@ -48,6 +48,13 @@ Deno.serve(async (req: Request) => {
       if (!text) return json({ error: "Missing 'text'" }, 400);
       if (text.length > 1200) return json({ error: "Description too long" }, 413);
       return json({ trip: await composeTrip(text) });
+    }
+    if (action === "refine") {
+      const message = String(body.message ?? "").trim();
+      if (!message) return json({ error: "Missing 'message'" }, 400);
+      if (message.length > 1200) return json({ error: "Message too long" }, 413);
+      const messages = Array.isArray(body.messages) ? body.messages : [];
+      return json(await refineTrip(body.trip, messages, message));
     }
     if (!context) return json({ error: "Missing 'context'" }, 400);
     if (action === "assistant") {

@@ -38,6 +38,17 @@ export function composeMessages(text: string): AIMessage[] {
     { role: "user", content: `Trip description: "${text}"\n\nReturn JSON exactly:\n{"name":"<short trip title>","destinations":[{"city":"<city>","country":"<country>","nights":<int>}],"preferences":{"travellerType":"family|couple|friends|solo|business|mixed|","ages":{"adults":<int>,"children":<int>,"toddlers":<int>,"seniors":<int>},"travelStyle":"relaxed|balanced|packed|","interests":["attractions|museums|nature|shopping|restaurants|cafes|beaches|themeparks|historical|local|photography|kids"],"accessibility":["stroller|wheelchair|lessWalking|indoor|outdoor|noLateNight"]}}\nRules: 1-6 destinations. Use an empty string, 0, or [] for anything not implied. Use ONLY the listed enum values. JSON only, no prose.` },
   ];
 }
+export function refineMessages(tripJson: string, history: AIMessage[], message: string): AIMessage[] {
+  return [
+    {
+      role: "system",
+      content:
+        "You are Itinera, an expert, warm AI travel companion editing ONE trip through conversation. You are given the CURRENT trip as JSON and the recent conversation. Return ONLY valid JSON: {\"reply\":\"<1-3 sentence message to the traveller>\",\"trip\":{\"name\":string,\"destinations\":[{\"city\":string,\"country\":string,\"nights\":int}],\"preferences\":{\"travellerType\":\"family|couple|friends|solo|business|mixed|\",\"ages\":{\"adults\":int,\"children\":int,\"toddlers\":int,\"seniors\":int},\"travelStyle\":\"relaxed|balanced|packed|\",\"interests\":[\"attractions|museums|nature|shopping|restaurants|cafes|beaches|themeparks|historical|local|photography|kids\"],\"accessibility\":[\"stroller|wheelchair|lessWalking|indoor|outdoor|noLateNight\"]}}}. If the traveller asks to change the trip (add/remove/reorder cities, change nights, change who's travelling, pace, interests, or accessibility, rename), update the trip accordingly and PRESERVE everything they didn't ask to change. If they only ask a question or chat, return the trip EXACTLY as given and put the answer in reply. Always notice and gently flag real issues (backtracking, too-rushed days, a city that doesn't fit their stated tastes) and explain WHY. Use ONLY the listed enum values. JSON only, no prose.",
+    },
+    ...history,
+    { role: "user", content: `CURRENT TRIP:\n${tripJson}\n\nTraveller says: "${message}"\n\nReturn the JSON now.` },
+  ];
+}
 export function insightsMessages(ctx: TripContext): AIMessage[] {
   return [
     { role: "system", content: "You give short, concrete planning tips for a trip and return ONLY valid JSON. Each tip is one sentence about ordering, proximity, opening hours, meals, pacing, or kid fit." },

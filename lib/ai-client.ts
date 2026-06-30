@@ -16,6 +16,17 @@ export async function composeTrip(text: string): Promise<ComposedTrip | null> {
   return data?.trip && data.trip.destinations?.length ? data.trip : null;
 }
 
+export interface RefineResult {
+  reply: string;
+  trip: ComposedTrip;
+}
+
+/** Conversationally edit a trip: returns the AI reply + the (possibly changed) full trip. */
+export async function refineTrip(trip: ComposedTrip, history: AIMessage[], message: string): Promise<RefineResult | null> {
+  const data = await callFn<RefineResult>("ai", { action: "refine", trip, messages: history, message });
+  return data?.trip?.destinations?.length ? data : null;
+}
+
 // ===== Browser helpers that call the `ai` Supabase Edge Function. =====
 // Each returns null / throws on failure so callers fall back to the built-in
 // simulated behavior — the app always works, with or without an AI key. The edge

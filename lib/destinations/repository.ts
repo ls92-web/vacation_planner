@@ -372,3 +372,22 @@ export async function loadTrip(tripId: string): Promise<LoadedTrip> {
 
   return { destinations, budgetLevel, transports, preferences };
 }
+
+// ===== Conversational trip memory (the workspace chat), stored on trips.chat. =====
+export interface ChatTurn { role: "user" | "assistant"; content: string }
+const chatKey = (tripId: string) => `itinera_chat_${tripId}`;
+
+export async function loadChat(tripId: string): Promise<ChatTurn[]> {
+  const sb = getSupabase();
+  if (!sb) { try { return JSON.parse(localStorage.getItem(chatKey(tripId)) || "[]"); } catch { return []; } }
+  const { data } = await sb.from("trips").select("chat").eq("id", tripId).maybeSingle();
+  const chat = (data?.chat as ChatTurn[] | null) ?? [];
+  return Array.isArray(chat) ? chat : [];
+}
+
+export async function saveChat(tripId: string, chat: ChatTurn[]): Promise<void> {
+  const trimmed = chat.slice(-60);
+  const sb = getSupabase();
+  if (!sb) { try { localStorage.setItem(chatKey(tripId), JSON.stringify(trimmed)); } catch { /* ignore */ } return; }
+  await sb.from("trips").update({ chat: trimmed }).eq("id", tripId);
+}

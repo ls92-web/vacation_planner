@@ -17,6 +17,7 @@ import { Itinerary } from "./screens/Itinerary";
 import { ProfilePage } from "./account/ProfilePage";
 import { SettingsPage } from "./account/SettingsPage";
 import { Welcome } from "./welcome/Welcome";
+import { Workspace } from "./workspace/Workspace";
 import { Toast } from "./Toast";
 
 function Screens() {
@@ -41,6 +42,7 @@ function Screens() {
 function Shell() {
   const { state } = useTrip();
   if (state.screen === "welcome") return <><Welcome /><Toast /></>;
+  if (state.screen === "workspace") return <><Workspace /><Toast /></>;
   return (
     <AppShell>
       <Screens />

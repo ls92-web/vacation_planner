@@ -70,10 +70,9 @@ export function Welcome() {
             });
           }
           await saveTrip(trip.id, dests, "standard", {}, composed.preferences || {});
-          // Enter the planner and hydrate the store from what we just saved
-          // (the planner doesn't auto-load on mount; without this its empty store
-          // would auto-save back over the freshly composed trip).
-          actions.goForm();
+          // Enter the conversational workspace, hydrating the store from what we
+          // just saved (the workspace reads the store; loadPlan populates it).
+          actions.goWorkspace();
           await loadPlan(trip.id, composed.destinations[0].city);
           return;
         }
@@ -81,7 +80,7 @@ export function Welcome() {
       // Fallback (AI unavailable): start an empty trip from the words.
       const trip = await tripActions.createTrip(fallbackTitle, "");
       if (!trip) throw new Error("createTrip failed");
-      actions.goForm();
+      actions.goWorkspace();
       await loadPlan(trip.id, "");
     } catch {
       setBusy(false);

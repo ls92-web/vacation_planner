@@ -1,5 +1,5 @@
 import { chat, streamDeltas } from "./openrouter.ts";
-import { assistantMessages, composeMessages, insightsMessages, itineraryMessages, recommendationMessages, type TripContext } from "./prompts.ts";
+import { assistantMessages, composeMessages, insightsMessages, itineraryMessages, recommendationMessages, refineMessages, type TripContext } from "./prompts.ts";
 import type { AIMessage } from "./openrouter.ts";
 
 function extractJson<T>(raw: string): T {
@@ -48,16 +48,14 @@ const STYLE = new Set(["relaxed", "balanced", "packed"]);
 const INTERESTS = new Set(["attractions", "museums", "nature", "shopping", "restaurants", "cafes", "beaches", "themeparks", "historical", "local", "photography", "kids"]);
 const ACCESS = new Set(["stroller", "wheelchair", "lessWalking", "indoor", "outdoor", "noLateNight"]);
 
-/** Parse a free-text trip description into a structured, validated trip. */
-export async function composeTrip(text: string) {
-  const raw = await chat({ messages: composeMessages(text), temperature: 0.4, maxTokens: 800, json: true });
-  const p = extractJson<Record<string, unknown>>(raw);
+/** Validate + clamp a model-produced trip object into the canonical shape. */
+function normalizeTrip(p: Record<string, unknown>) {
   const destsRaw = Array.isArray(p.destinations) ? (p.destinations as Record<string, unknown>[]) : [];
   const destinations = destsRaw
     .map((d) => ({ city: String(d.city ?? "").trim(), country: String(d.country ?? "").trim(), nights: Math.max(1, Math.min(30, Math.round(Number(d.nights)) || 2)) }))
     .filter((d) => d.city)
     .slice(0, 6);
-  if (!destinations.length) throw new Error("compose: no destinations");
+  if (!destinations.length) throw new Error("trip: no destinations");
 
   const prefIn = (p.preferences ?? {}) as Record<string, unknown>;
   const agesIn = (prefIn.ages ?? {}) as Record<string, unknown>;
@@ -73,6 +71,23 @@ export async function composeTrip(text: string) {
   if (access.length) preferences.accessibility = access;
 
   return { name: String(p.name ?? "").trim().slice(0, 80) || destinations[0].city, destinations, preferences };
+}
+
+/** Parse a free-text trip description into a structured, validated trip. */
+export async function composeTrip(text: string) {
+  const raw = await chat({ messages: composeMessages(text), temperature: 0.4, maxTokens: 800, json: true });
+  return normalizeTrip(extractJson<Record<string, unknown>>(raw));
+}
+
+/** Conversationally edit a trip: returns a reply + the (possibly changed) full trip. */
+export async function refineTrip(trip: unknown, history: AIMessage[], message: string) {
+  const tripJson = JSON.stringify(trip ?? {});
+  const safeHistory = (Array.isArray(history) ? history : []).slice(-12).filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string");
+  const raw = await chat({ messages: refineMessages(tripJson, safeHistory, message), temperature: 0.4, maxTokens: 1100, json: true });
+  const p = extractJson<Record<string, unknown>>(raw);
+  const reply = String(p.reply ?? "").trim() || "Done — I've updated your trip.";
+  const updated = normalizeTrip((p.trip ?? {}) as Record<string, unknown>);
+  return { reply, trip: updated };
 }
 
 export async function planningInsights(ctx: TripContext) {
