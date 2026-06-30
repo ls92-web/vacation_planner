@@ -88,7 +88,7 @@ interface AppState {
 }
 
 const INITIAL: AppState = {
-  screen: "dashboard",
+  screen: "welcome",
   authMode: "signin",
   theme: "Ocean",
   dest: "Barcelona, Spain",
@@ -267,6 +267,7 @@ export function useTripStore() {
       // auth
       toggleAuth: () => set((s) => ({ authMode: s.authMode === "signin" ? "signup" : "signin" })),
       goForm: () => requestNavigation(() => set({ screen: "form" })),
+      goWelcome: () => requestNavigation(() => set({ screen: "welcome" })),
       goProfile: () =>
         requestNavigation(() => {
           set({ screen: "profile" });

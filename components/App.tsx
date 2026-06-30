@@ -16,6 +16,7 @@ import { GeneratingScreen } from "./screens/Generating";
 import { Itinerary } from "./screens/Itinerary";
 import { ProfilePage } from "./account/ProfilePage";
 import { SettingsPage } from "./account/SettingsPage";
+import { Welcome } from "./welcome/Welcome";
 import { Toast } from "./Toast";
 
 function Screens() {
@@ -36,6 +37,17 @@ function Screens() {
   );
 }
 
+/** Boots into the immersive Welcome (no chrome); everything else runs in the AppShell. */
+function Shell() {
+  const { state } = useTrip();
+  if (state.screen === "welcome") return <><Welcome /><Toast /></>;
+  return (
+    <AppShell>
+      <Screens />
+    </AppShell>
+  );
+}
+
 export function App() {
   return (
     <AuthProvider>
@@ -44,9 +56,7 @@ export function App() {
         <UIProvider>
           <TripsProvider>
             <TripProvider>
-              <AppShell>
-                <Screens />
-              </AppShell>
+              <Shell />
             </TripProvider>
           </TripsProvider>
         </UIProvider>

@@ -8,6 +8,7 @@ import type { Screen } from "@/lib/types";
 import { getSaveSnapshot, getServerSaveSnapshot, subscribeSave } from "@/lib/ui/saveStatus";
 
 const SCREEN_LABEL: Record<Screen, string> = {
+  welcome: "Welcome",
   auth: "Sign in",
   dashboard: "Dashboard",
   trips: "My Trips",
