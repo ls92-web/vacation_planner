@@ -25,6 +25,17 @@ function dayDate(arrive: string, offset: number): string | null {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 
+/** "15:00" → "3:00 PM" for the printed guide. */
+function fmtTime(t?: string): string {
+  if (!t) return "";
+  const [hRaw, mRaw] = t.split(":");
+  const h = Number(hRaw);
+  if (!Number.isFinite(h)) return t;
+  const ap = h < 12 ? "AM" : "PM";
+  const hr = h % 12 === 0 ? 12 : h % 12;
+  return `${hr}:${(mRaw ?? "00").padStart(2, "0")} ${ap}`;
+}
+
 export function ItineraryBook({ template: t, onClose }: { template: BookTemplate; onClose: () => void }) {
   const { state } = usePlanner();
   const trip = useTrip();
@@ -178,6 +189,40 @@ export function ItineraryBook({ template: t, onClose }: { template: BookTemplate
                   )}
                 </div>
               </div>
+
+              {/* accommodation details (full, incl. check-in/out dates + times) */}
+              {sec.d.accoms.some((a) => a.name) && (
+                <div className="px-10 py-6" style={{ borderTop: `1px solid ${t.line}` }}>
+                  <div className={`text-[11px] font-bold ${labelCls}`} style={{ color: t.accent }}>Where you&apos;re staying</div>
+                  <div className="mt-3 flex flex-col gap-4">
+                    {sec.d.accoms.filter((a) => a.name).map((a, ai) => {
+                      const an = nightsBetween(a.checkin, a.checkout);
+                      const ci = [a.checkin ? fmtMonthDay(a.checkin) : "", fmtTime(a.checkinTime)].filter(Boolean).join(" · ");
+                      const co = [a.checkout ? fmtMonthDay(a.checkout) : "", fmtTime(a.checkoutTime)].filter(Boolean).join(" · ");
+                      const link = (a.locationUrl ?? "").trim();
+                      const href = link && !/^https?:\/\//i.test(link) ? `https://${link}` : link;
+                      return (
+                        <div key={ai} style={{ breakInside: "avoid" }}>
+                          <div className="flex items-baseline justify-between gap-3">
+                            <div className="font-display font-bold text-[15px]">{a.name}</div>
+                            <div className="text-[11px] shrink-0" style={{ color: t.muted }}>{a.type}{an != null ? ` · ${an} night${an !== 1 ? "s" : ""}` : ""}</div>
+                          </div>
+                          {(ci || co) && (
+                            <div className="mt-1 grid grid-cols-2 gap-x-6 gap-y-0.5 text-[12px]">
+                              {ci && <div><span style={{ color: t.muted }}>Check-in: </span>{ci}</div>}
+                              {co && <div><span style={{ color: t.muted }}>Check-out: </span>{co}</div>}
+                            </div>
+                          )}
+                          {a.address && <div className="mt-1 text-[12px]"><span style={{ color: t.muted }}>Address: </span>{a.address}</div>}
+                          {a.conf && <div className="mt-0.5 text-[12px]"><span style={{ color: t.muted }}>Confirmation: </span>{a.conf}</div>}
+                          {a.notes && <div className="mt-0.5 text-[12px]" style={{ color: t.muted }}>{a.notes}</div>}
+                          {href && <div className="mt-0.5 text-[11.5px]"><a href={href} style={{ color: t.accent }}>{href}</a></div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* days for this destination */}
               {sec.dayList.map((x) => (
