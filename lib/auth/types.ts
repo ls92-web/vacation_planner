@@ -33,6 +33,7 @@ export interface Preferences {
   paper_size: string | null;
   itinerary_layout: string | null;
   export_language: string | null;
+  export_include_overview: boolean;
 }
 
 export interface SignupInput {

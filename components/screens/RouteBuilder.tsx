@@ -19,6 +19,7 @@ import { BudgetPanel } from "@/components/destinations/BudgetPanel";
 import { WeatherPanel } from "@/components/destinations/WeatherPanel";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
+import { useAuth } from "@/lib/auth/store";
 import { saveTrip } from "@/lib/destinations/repository";
 import { withSave } from "@/lib/ui/saveStatus";
 import { addBreakdowns, computeBudget, convertCostText, formatMoney, EMPTY_BREAKDOWN, BUDGET_LEVELS } from "@/lib/budget/estimate";
@@ -121,7 +122,17 @@ const BUDGET_CATS: { key: "hotels" | "activities" | "food" | "transport"; label:
 
 function TripOverview() {
   const { state, actions } = useTrip();
+  const auth = useAuth();
   const currency = useCurrency();
+  // Whether this summary is included in the exported PDF (persisted per account).
+  const includeInExport = auth.state.preferences?.export_include_overview ?? true;
+  const [saving, setSaving] = useState(false);
+  const toggleExport = async () => {
+    if (saving) return;
+    setSaving(true);
+    try { await auth.actions.updatePreferences({ export_include_overview: !includeInExport }); }
+    finally { setSaving(false); }
+  };
   const dests = state.destinations;
   const saved = dests.filter((d) => d.saved);
   const totalNights = dests.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
@@ -197,6 +208,26 @@ function TripOverview() {
         <span className="text-[12.5px] text-ink leading-snug">
           {saved.length < dests.length ? "Finish your destinations, then the AI builds an optimized day-by-day plan." : "Route ready — continue to Explore to add places and let the AI build your schedule."}
         </span>
+      </div>
+
+      <div className="mt-4 pt-4 border-t" style={{ borderColor: "color-mix(in oklab, var(--accent) 16%, transparent)" }}>
+        <button
+          type="button"
+          onClick={toggleExport}
+          disabled={saving}
+          aria-pressed={includeInExport}
+          className="flex items-center gap-2.5 text-left cursor-pointer disabled:opacity-60 group"
+        >
+          <span
+            className="w-[20px] h-[20px] rounded-[6px] grid place-items-center shrink-0 border-[1.5px] transition"
+            style={{ background: includeInExport ? "var(--accent)" : "var(--surface)", borderColor: includeInExport ? "var(--accent)" : "var(--line)" }}
+          >
+            {includeInExport && <Check size={13} strokeWidth={3} className="text-white" />}
+          </span>
+          <span className="text-[12.5px] text-ink leading-snug group-hover:text-accent">
+            Include this summary in the exported PDF
+          </span>
+        </button>
       </div>
     </div>
   );
@@ -752,8 +783,7 @@ export function RouteBuilder() {
               <RouteLoadError onRetry={retry} retrying={retrying} />
             ) : (
               <>
-                <TripOverview />
-                <div className="mt-6">
+                <div>
                   {dests.length === 0 ? (
                     <EmptyState />
                   ) : (
@@ -768,6 +798,8 @@ export function RouteBuilder() {
                     </>
                   )}
                 </div>
+                {/* Trip summary now lives at the end of the page — a recap once the route is built. */}
+                {dests.length > 0 && <div className="mt-8"><TripOverview /></div>}
                 <FloatingActionBar />
               </>
             )}

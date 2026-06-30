@@ -9,6 +9,7 @@ import { computeTimeline, fmtClock, orderedItems as orderItems } from "@/lib/pla
 import { analyzeDay } from "@/lib/planner/dayAnalysis";
 import { usePlanner } from "@/lib/planner/store";
 import { useTrip } from "@/lib/store";
+import { useAuth } from "@/lib/auth/store";
 import { computeBudget, convertCostText, formatMoney } from "@/lib/budget/estimate";
 import { useCurrency } from "@/lib/budget/useCurrency";
 import type { LatLng } from "@/lib/maps";
@@ -27,7 +28,10 @@ function dayDate(arrive: string, offset: number): string | null {
 export function ItineraryBook({ template: t, onClose }: { template: BookTemplate; onClose: () => void }) {
   const { state } = usePlanner();
   const trip = useTrip();
+  const auth = useAuth();
   const currency = useCurrency();
+  // The "Trip at a glance" recap is opt-out via the planner's summary card.
+  const includeOverview = auth.state.preferences?.export_include_overview ?? true;
   const travelers = trip.state.adults + trip.state.kids;
   const [qr, setQr] = useState("");
 
@@ -118,24 +122,26 @@ export function ItineraryBook({ template: t, onClose }: { template: BookTemplate
             </div>
           </div>
 
-          {/* trip overview */}
-          <div className="px-10 py-8" style={{ borderBottom: `1px solid ${t.line}` }}>
-            <div className={`text-[11px] font-bold ${labelCls}`} style={{ color: t.accent }}>Trip at a glance</div>
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-5">
-              {[
-                { v: String(dests.length), l: "Destinations" },
-                { v: String(totalDays), l: "Days" },
-                { v: String(totals.attractions), l: "Attractions" },
-                { v: String(totals.restaurants), l: "Restaurants" },
-                { v: formatMoney(totalBudget, currency), l: "Est. budget" },
-              ].map((s, i) => (
-                <div key={i}>
-                  <div className="font-display font-bold text-[22px] leading-none">{s.v}</div>
-                  <div className="text-[11px] mt-1.5" style={{ color: t.muted }}>{s.l}</div>
-                </div>
-              ))}
+          {/* trip overview — opt-out via the planner's summary card */}
+          {includeOverview && (
+            <div className="px-10 py-8" style={{ borderBottom: `1px solid ${t.line}` }}>
+              <div className={`text-[11px] font-bold ${labelCls}`} style={{ color: t.accent }}>Trip at a glance</div>
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-5">
+                {[
+                  { v: String(dests.length), l: "Destinations" },
+                  { v: String(totalDays), l: "Days" },
+                  { v: String(totals.attractions), l: "Attractions" },
+                  { v: String(totals.restaurants), l: "Restaurants" },
+                  { v: formatMoney(totalBudget, currency), l: "Est. budget" },
+                ].map((s, i) => (
+                  <div key={i}>
+                    <div className="font-display font-bold text-[22px] leading-none">{s.v}</div>
+                    <div className="text-[11px] mt-1.5" style={{ color: t.muted }}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* destination sections */}
           {sections.map((sec, si) => (
