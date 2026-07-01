@@ -6,14 +6,14 @@ import type { LucideIcon } from "lucide-react";
 import { useTrip } from "@/lib/store";
 
 export const acctInput =
-  "w-full px-3.5 py-2.5 border border-line rounded-[11px] text-[14px] bg-surface text-ink outline-none vp-input";
+  "w-full px-3.5 py-2.5 rounded-[11px] text-[14px] outline-none imm-input";
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
-      <label className="text-[12.5px] font-semibold text-ink">{label}</label>
+      <label className="text-[12.5px] font-semibold text-white/80">{label}</label>
       <div className="mt-1.5">{children}</div>
-      {hint && <p className="text-[11.5px] text-muted mt-1">{hint}</p>}
+      {hint && <p className="text-[11.5px] text-white/45 mt-1">{hint}</p>}
     </div>
   );
 }
@@ -24,7 +24,7 @@ export function SelectInput({ value, onChange, options }: { value: string; onCha
       <select value={value} onChange={(e) => onChange(e.target.value)} className={`${acctInput} appearance-none cursor-pointer pr-9`}>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <ChevronDown size={15} strokeWidth={2} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+      <ChevronDown size={15} strokeWidth={2} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
     </div>
   );
 }
@@ -40,7 +40,7 @@ export function Segmented({ value, onChange, options }: { value: string; onChang
             type="button"
             onClick={() => onChange(o.value)}
             className="px-3.5 py-2 rounded-[10px] border text-[13px] font-semibold cursor-pointer transition"
-            style={{ borderColor: on ? "var(--accent)" : "var(--line)", background: on ? "var(--accent)" : "var(--surface)", color: on ? "#fff" : "var(--muted)" }}
+            style={{ borderColor: on ? "var(--accent)" : "rgba(255,255,255,.15)", background: on ? "var(--accent)" : "rgba(255,255,255,.06)", color: "#fff" }}
           >
             {o.label}
           </button>
@@ -53,9 +53,9 @@ export function Segmented({ value, onChange, options }: { value: string; onChang
 export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-[13.5px] text-ink">{label}</span>
-      <button type="button" onClick={() => onChange(!on)} className="w-[44px] h-[26px] rounded-full transition relative cursor-pointer shrink-0" style={{ background: on ? "var(--accent)" : "var(--line)" }} aria-pressed={on} aria-label={label}>
-        <span className="absolute top-[3px] w-[20px] h-[20px] rounded-full bg-white transition-all" style={{ left: on ? 21 : 3, boxShadow: "0 1px 3px rgba(0,0,0,.25)" }} />
+      <span className="text-[13.5px] text-white">{label}</span>
+      <button type="button" onClick={() => onChange(!on)} className="w-[44px] h-[26px] rounded-full transition relative cursor-pointer shrink-0" style={{ background: on ? "var(--accent)" : "rgba(255,255,255,.2)" }} aria-pressed={on} aria-label={label}>
+        <span className="absolute top-[3px] w-[20px] h-[20px] rounded-full bg-white transition-all" style={{ left: on ? 21 : 3, boxShadow: "0 1px 3px rgba(0,0,0,.35)" }} />
       </button>
     </div>
   );
@@ -96,18 +96,18 @@ export function SettingCard({
 
   return (
     <section
-      className="rounded-[18px] border bg-surface p-5 sm:p-6 transition-shadow"
-      style={{ borderColor: danger ? "color-mix(in oklab, #b3402f 45%, var(--line))" : "var(--line)", boxShadow: "0 6px 24px -18px rgba(0,0,0,.3)" }}
+      className="imm-glass rounded-[18px] p-5 sm:p-6"
+      style={{ borderColor: danger ? "rgba(241,168,140,.35)" : undefined, boxShadow: "0 14px 34px -22px rgba(0,0,0,.6)" }}
     >
       <div className="flex items-start gap-3">
         {Icon && (
-          <span className="w-9 h-9 rounded-[11px] grid place-items-center shrink-0" style={{ background: danger ? "#f7e7e3" : "var(--tint)", color: danger ? "#b3402f" : "var(--accent)" }}>
+          <span className="w-9 h-9 rounded-[11px] grid place-items-center shrink-0" style={{ background: danger ? "rgba(241,168,140,.16)" : "rgba(255,255,255,.08)", color: danger ? "#F1A88C" : "var(--accent)" }}>
             <Icon size={17} strokeWidth={2} />
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <h3 className="font-display font-bold text-[16px] tracking-[-.01em]" style={{ color: danger ? "#b3402f" : "var(--ink)" }}>{title}</h3>
-          {description && <p className="text-[13px] text-muted mt-0.5 leading-snug">{description}</p>}
+          <h3 className="font-display font-bold text-[16px] tracking-[-.01em]" style={{ color: danger ? "#F1A88C" : "#fff" }}>{title}</h3>
+          {description && <p className="text-[13px] text-white/55 mt-0.5 leading-snug">{description}</p>}
         </div>
       </div>
 
@@ -125,15 +125,15 @@ export function SettingCard({
           {onReset && dirty && !saving && (
             <button
               onClick={onReset}
-              className="vp-pop inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-line bg-surface text-muted text-[13.5px] font-bold cursor-pointer transition hover:text-ink hover:border-accent"
+              className="vp-pop inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-[11px] border border-white/15 text-white/70 text-[13.5px] font-bold cursor-pointer transition hover:text-white hover:border-white/35"
             >
               <RotateCcw size={14} strokeWidth={2.2} />Reset changes
             </button>
           )}
           <span className="flex-1" />
           {dirty && !saving && (
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-muted">
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#c08a2e" }} />Unsaved changes
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-white/55">
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#E0A44F" }} />Unsaved changes
             </span>
           )}
         </div>
@@ -146,17 +146,17 @@ export function PageHeader({ title, subtitle, dirty }: { title: string; subtitle
   return (
     <div className="mb-6">
       <div className="flex items-center gap-3 flex-wrap">
-        <h1 className="font-display font-bold text-[clamp(24px,3vw,32px)] tracking-[-.02em]">{title}</h1>
+        <h1 className="font-brand font-bold tracking-[-.01em] text-white" style={{ fontSize: "clamp(26px,4vw,40px)" }}>{title}</h1>
         {dirty && (
           <span
             className="vp-pop inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold"
-            style={{ background: "#fbf0dd", color: "#8a5a12" }}
+            style={{ background: "rgba(224,164,79,.15)", color: "#E0A44F" }}
           >
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#c08a2e" }} />You have unsaved changes
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#E0A44F" }} />You have unsaved changes
           </span>
         )}
       </div>
-      <p className="text-muted text-[14.5px] mt-1.5">{subtitle}</p>
+      <p className="text-white/60 text-[14.5px] mt-1.5">{subtitle}</p>
     </div>
   );
 }

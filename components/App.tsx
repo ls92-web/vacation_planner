@@ -9,16 +9,19 @@ import { ThemeApplier } from "./theme/ThemeApplier";
 import { ImmersiveShell } from "./immersive/ImmersiveShell";
 import { TripsDashboard } from "./trips/TripsDashboard";
 import { SavedPlaces } from "./screens/SavedPlaces";
+import { ProfilePage } from "./account/ProfilePage";
+import { SettingsPage } from "./account/SettingsPage";
 import { Welcome } from "./welcome/Welcome";
 import { Workspace } from "./workspace/Workspace";
 import { Toast } from "./Toast";
 
-/** Secondary immersive screens (reached from the floating menu): My journeys + Saved. */
+/** Secondary immersive screens (reached from the floating menu / Account overlay). */
 function Screens() {
   const { state } = useTrip();
+  const s = state.screen;
   return (
     <>
-      {state.screen === "saved" ? <SavedPlaces /> : <TripsDashboard />}
+      {s === "profile" ? <ProfilePage /> : s === "settings" ? <SettingsPage /> : s === "saved" ? <SavedPlaces /> : <TripsDashboard />}
       <Toast />
     </>
   );

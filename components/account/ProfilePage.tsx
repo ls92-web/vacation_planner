@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { BadgeCheck, Camera, Loader2, Lock, Mail, ShieldAlert, Trash2, User, UserCircle } from "lucide-react";
+import { BadgeCheck, Camera, Loader2, Lock, Mail, ShieldAlert, Trash2, UserCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth/store";
 import { useTrip } from "@/lib/store";
 import { acctInput, Field, PageHeader, SelectInput, SettingCard } from "./ui";
@@ -116,15 +116,15 @@ export function ProfilePage() {
   const initial = (profile?.full_name || username || email || "?").slice(0, 1).toUpperCase();
 
   return (
-    <div className="vp-scroll min-h-full" style={{ background: "var(--bg)" }}>
-      <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] py-6 vp-fade">
+    <div className="min-h-full text-white">
+      <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] py-8">
         <PageHeader title="Profile" subtitle="Manage your personal account details and security." dirty={piDirty} />
 
         <div className="flex flex-col gap-5">
           {/* header card */}
-          <section className="rounded-[18px] border border-line bg-surface p-5 sm:p-6 flex items-center gap-4 sm:gap-5" style={{ boxShadow: "0 6px 24px -18px rgba(0,0,0,.3)" }}>
+          <section className="imm-glass rounded-[18px] p-5 sm:p-6 flex items-center gap-4 sm:gap-5">
             <div className="relative shrink-0">
-              <div className="w-[76px] h-[76px] rounded-full overflow-hidden grid place-items-center text-white font-display font-bold text-[28px]" style={{ background: "var(--brand-deep)" }}>
+              <div className="w-[76px] h-[76px] rounded-full overflow-hidden grid place-items-center text-white font-display font-bold text-[28px]" style={{ background: "var(--accent)" }}>
                 {profile?.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
@@ -132,7 +132,7 @@ export function ProfilePage() {
                   initial
                 )}
               </div>
-              <button onClick={() => fileRef.current?.click()} disabled={avatarBusy} title="Upload photo" className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-accent text-white grid place-items-center cursor-pointer border-2 border-surface hover:brightness-[1.06]">
+              <button onClick={() => fileRef.current?.click()} disabled={avatarBusy} title="Upload photo" className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-accent text-white grid place-items-center cursor-pointer hover:brightness-[1.06]" style={{ border: "2px solid #0c1828" }}>
                 {avatarBusy ? <Loader2 size={14} className="vp-spin" /> : <Camera size={14} strokeWidth={2} />}
               </button>
               <input ref={fileRef} type="file" accept="image/*" onChange={onAvatarFile} className="hidden" />
@@ -141,15 +141,15 @@ export function ProfilePage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-display font-bold text-[19px] tracking-[-.01em] truncate">{profile?.full_name || "Your name"}</span>
                 {verified ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "var(--color-ok-bg)", color: "var(--color-ok)" }}><BadgeCheck size={12} strokeWidth={2.5} />Verified</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(62,124,90,.2)", color: "#7FD1A3" }}><BadgeCheck size={12} strokeWidth={2.5} />Verified</span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "#f7efe0", color: "#9A6512" }}><ShieldAlert size={12} strokeWidth={2.5} />Unverified</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(224,164,79,.16)", color: "#E0A44F" }}><ShieldAlert size={12} strokeWidth={2.5} />Unverified</span>
                 )}
               </div>
-              <div className="text-[13px] text-muted truncate">@{profile?.username || "username"}</div>
-              <div className="text-[13px] text-muted truncate">{email}</div>
+              <div className="text-[13px] text-white/55 truncate">@{profile?.username || "username"}</div>
+              <div className="text-[13px] text-white/55 truncate">{email}</div>
               {profile?.avatar_url && (
-                <button onClick={removeAvatar} disabled={avatarBusy} className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-muted hover:text-[#b3402f] cursor-pointer"><Trash2 size={13} strokeWidth={2} />Remove photo</button>
+                <button onClick={removeAvatar} disabled={avatarBusy} className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-white/55 hover:text-[#F1A88C] cursor-pointer"><Trash2 size={13} strokeWidth={2} />Remove photo</button>
               )}
             </div>
           </section>
@@ -168,16 +168,16 @@ export function ProfilePage() {
           {/* security */}
           <SettingCard icon={Lock} title="Security" description="Keep your sign-in details safe.">
             {/* email */}
-            <div className="rounded-[12px] border border-line p-3.5">
+            <div className="rounded-[12px] border border-white/10 p-3.5">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <Mail size={16} className="text-muted shrink-0" />
+                  <Mail size={16} className="text-white/50 shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-[12px] text-muted">Email address</div>
-                    <div className="text-[14px] font-semibold text-ink truncate">{email}</div>
+                    <div className="text-[12px] text-white/50">Email address</div>
+                    <div className="text-[14px] font-semibold text-white truncate">{email}</div>
                   </div>
                 </div>
-                <button onClick={() => setEmailOpen((o) => !o)} className="px-3.5 py-2 rounded-[10px] border border-line bg-surface text-[13px] font-bold text-ink cursor-pointer hover:border-accent hover:text-accent">Change email</button>
+                <button onClick={() => setEmailOpen((o) => !o)} className="px-3.5 py-2 rounded-[10px] border border-white/15 text-[13px] font-bold text-white/80 cursor-pointer hover:border-white/35 hover:text-white transition">Change email</button>
               </div>
               {emailOpen && (
                 <div className="mt-3 flex flex-col sm:flex-row gap-2 vp-slide-down">
@@ -188,17 +188,17 @@ export function ProfilePage() {
             </div>
 
             {/* password */}
-            <div className="rounded-[12px] border border-line p-3.5 mt-3">
+            <div className="rounded-[12px] border border-white/10 p-3.5 mt-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <Lock size={16} className="text-muted shrink-0" />
+                  <Lock size={16} className="text-white/50 shrink-0" />
                   <div className="min-w-0">
-                    <div className="text-[12px] text-muted">Password</div>
-                    <div className="text-[14px] font-semibold text-ink tracking-[2px]">••••••••</div>
-                    <div className="text-[11.5px] text-muted">Last changed: {relativeTime(profile?.password_changed_at ?? null)}</div>
+                    <div className="text-[12px] text-white/50">Password</div>
+                    <div className="text-[14px] font-semibold text-white tracking-[2px]">••••••••</div>
+                    <div className="text-[11.5px] text-white/45">Last changed: {relativeTime(profile?.password_changed_at ?? null)}</div>
                   </div>
                 </div>
-                <button onClick={() => setPwOpen((o) => !o)} className="px-3.5 py-2 rounded-[10px] border border-line bg-surface text-[13px] font-bold text-ink cursor-pointer hover:border-accent hover:text-accent">Change password</button>
+                <button onClick={() => setPwOpen((o) => !o)} className="px-3.5 py-2 rounded-[10px] border border-white/15 text-[13px] font-bold text-white/80 cursor-pointer hover:border-white/35 hover:text-white transition">Change password</button>
               </div>
               {pwOpen && (
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 vp-slide-down">
@@ -213,13 +213,13 @@ export function ProfilePage() {
           {/* danger zone */}
           <SettingCard icon={Trash2} title="Delete account" description="Permanently delete your account and all trips, schedules and saved places." danger>
             {!confirmDelete ? (
-              <button onClick={() => setConfirmDelete(true)} className="px-4 py-2.5 rounded-[11px] border text-[13.5px] font-bold cursor-pointer" style={{ borderColor: "#b3402f", color: "#b3402f", background: "transparent" }}>Delete account</button>
+              <button onClick={() => setConfirmDelete(true)} className="px-4 py-2.5 rounded-[11px] border text-[13.5px] font-bold cursor-pointer" style={{ borderColor: "#F1A88C", color: "#F1A88C", background: "transparent" }}>Delete account</button>
             ) : (
-              <div className="rounded-[12px] p-3.5" style={{ background: "#f7e7e3" }}>
-                <div className="text-[13.5px] font-bold" style={{ color: "#b3402f" }}>This cannot be undone. Delete your account permanently?</div>
+              <div className="rounded-[12px] p-3.5" style={{ background: "rgba(241,168,140,.12)", border: "1px solid rgba(241,168,140,.3)" }}>
+                <div className="text-[13.5px] font-bold" style={{ color: "#F1A88C" }}>This cannot be undone. Delete your account permanently?</div>
                 <div className="flex gap-2 mt-2.5">
-                  <button onClick={() => actions.deleteAccount()} className="px-4 py-2 rounded-[10px] text-white text-[13px] font-bold cursor-pointer" style={{ background: "#b3402f" }}>Yes, delete everything</button>
-                  <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 rounded-[10px] border border-line bg-surface text-ink text-[13px] font-bold cursor-pointer">Cancel</button>
+                  <button onClick={() => actions.deleteAccount()} className="px-4 py-2 rounded-[10px] text-white text-[13px] font-bold cursor-pointer" style={{ background: "#B3402F" }}>Yes, delete everything</button>
+                  <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 rounded-[10px] border border-white/20 text-white text-[13px] font-bold cursor-pointer">Cancel</button>
                 </div>
               </div>
             )}

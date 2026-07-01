@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, LogOut, X } from "lucide-react";
+import { Check, LogOut, SlidersHorizontal, UserCircle, X } from "lucide-react";
 import { useAuth } from "@/lib/auth/store";
+import { useTrip } from "@/lib/store";
 import { requestNavigation } from "@/lib/ui/unsavedGuard";
 import { THEME_OPTIONS, normalizeTheme } from "@/lib/theme/themes";
 import { CURRENCIES } from "@/lib/budget/estimate";
@@ -16,6 +17,7 @@ import { CURRENCIES } from "@/lib/budget/estimate";
  */
 export function AccountOverlay({ onClose }: { onClose: () => void }) {
   const { state, actions } = useAuth();
+  const { actions: tripActions } = useTrip();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -83,6 +85,25 @@ export function AccountOverlay({ onClose }: { onClose: () => void }) {
                   <option key={c.code} value={c.code} style={{ color: "#111" }}>{c.label}</option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          {/* full profile + settings (all existing functionality preserved) */}
+          <div>
+            <div className="text-[11px] uppercase tracking-[.12em] text-white/45 mb-2.5">More settings</div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { onClose(); tripActions.goProfile(); }}
+                className="imm-glass imm-glass-hover flex items-center gap-2 px-3.5 py-3 rounded-[12px] text-[13px] font-semibold text-white cursor-pointer transition"
+              >
+                <UserCircle size={16} style={{ color: "var(--accent)" }} />Profile &amp; security
+              </button>
+              <button
+                onClick={() => { onClose(); tripActions.goSettings(); }}
+                className="imm-glass imm-glass-hover flex items-center gap-2 px-3.5 py-3 rounded-[12px] text-[13px] font-semibold text-white cursor-pointer transition"
+              >
+                <SlidersHorizontal size={16} style={{ color: "var(--accent)" }} />All settings
+              </button>
             </div>
           </div>
 

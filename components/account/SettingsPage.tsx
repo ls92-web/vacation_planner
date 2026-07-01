@@ -99,8 +99,8 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="vp-scroll min-h-full" style={{ background: "var(--bg)" }}>
-      <div className="max-w-[820px] mx-auto px-[clamp(16px,3vw,28px)] py-6 vp-fade">
+    <div className="min-h-full text-white">
+      <div className="max-w-[820px] mx-auto px-[clamp(16px,3vw,28px)] py-8">
         <PageHeader title="Settings" subtitle="Configure how Itinera looks and plans your trips." dirty={anyDirty} />
 
         <div className="flex flex-col gap-5">
@@ -128,9 +128,9 @@ export function SettingsPage() {
           {/* AI preferences */}
           <SettingCard icon={Sparkles} title="AI preferences" description="Shape the recommendations the AI makes for you." dirty={aiDirty} onReset={resetAI} onSave={() => save({ family_friendly: family, with_children: withKids, children_ages: kidsAges.trim() || null, travel_style: style, accommodation: accom, food_pref: food, accessibility: access.trim() || null })}>
             <div className="flex flex-col gap-4">
-              <div className="rounded-[12px] border border-line p-3.5 flex flex-col gap-3">
+              <div className="rounded-[12px] border border-white/10 p-3.5 flex flex-col gap-3">
                 <Toggle on={family} onChange={setFamily} label="Family-friendly recommendations" />
-                <div className="border-t border-line" />
+                <div className="border-t border-white/10" />
                 <Toggle on={withKids} onChange={setWithKids} label="Traveling with children" />
                 {withKids && <div className="vp-slide-down"><Field label="Children's ages"><input value={kidsAges} onChange={(e) => setKidsAges(e.target.value)} placeholder="e.g. 6, 9" className={acctInput} /></Field></div>}
               </div>
