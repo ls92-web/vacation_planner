@@ -25,21 +25,31 @@ const CONFIRM = /^(y(es|ep|up|eah)?|n(o|ope|ah)|sure|ok(ay)?|correct|right|sound
 const PLAN = /\b(plan|itinerar|trip|days?|nights?|weekend|week|visit|travel|tour|road\s?trip|honeymoon|holiday|vacation|schedule|explore|stay|hotel|restaurant|eat|see|do)\b/i;
 const QUESTION = /\?\s*$|^(what|where|when|which|how|why|can|could|should|would|do|does|is|are|any|recommend|suggest|tell)\b/i;
 
+const KB = ["qwer", "wert", "erty", "rtyu", "tyui", "asdf", "sdfg", "dfgh", "fghj", "ghjk", "hjkl", "zxcv", "xcvb", "cvbn", "vbnm", "lkjh", "poiu", "iuyt", "qazwsx", "qwerty"];
+const VOWEL = /[aeiouyà-ÿ]/i;
+
+/** Does this token resemble a real word / place name (vs keyboard mashing)? */
+function wordLike(w: string): boolean {
+  const t = w.toLowerCase().replace(/[^a-zà-ÿ]/g, "");
+  if (t.length <= 2) return true;                                  // "LA", "hi" — too short to judge
+  if (!VOWEL.test(t)) return false;                               // no vowel at all → "sdklf"
+  if (/[bcdfghjklmnpqrstvwxz]{4,}/.test(t)) return false;         // 4+ consonant run → "asdkfj"
+  const vowels = (t.match(/[aeiouyà-ÿ]/gi) || []).length;
+  return vowels / t.length >= 0.2;                                // too few vowels → mashing
+}
+
 /** Keyboard mashing / random characters — clearly not a real message. */
-function isGibberish(t: string): boolean {
+function isGibberish(raw: string): boolean {
+  const t = raw.trim();
   const compact = t.replace(/\s+/g, "");
   if (compact.length < 2) return false;
-  if (/^(.)\1{3,}$/.test(compact)) return true;            // "aaaa", "!!!!"
-  if (/^[\d\W]+$/.test(compact) && compact.length >= 4) return true; // "123123", "...."
-  const kb = ["qwert", "werty", "asdf", "sdfg", "dfgh", "fghj", "ghjk", "hjkl", "zxcv", "xcvb", "cvbn", "lkjh", "poiuy", "asdfgh", "qwerty", "qazwsx"];
+  if (/^(.)\1{3,}$/.test(compact)) return true;                    // "aaaa", "!!!!"
+  if (/^[\d\W_]+$/.test(compact) && compact.length >= 4) return true; // "123123", "...."
   const low = compact.toLowerCase();
-  if (kb.some((k) => low.includes(k))) return true;
-  const letters = compact.replace(/[^a-z]/gi, "");
-  if (letters.length >= 5) {
-    const vowels = (letters.match(/[aeiouy]/gi) || []).length;
-    if (vowels === 0) return true;                          // "brtghn"
-    if (t.trim().split(/\s+/).length === 1 && letters.length >= 8 && vowels / letters.length < 0.16) return true;
-  }
+  if (KB.some((k) => low.includes(k))) return true;                // keyboard runs
+  // No token looks like a real word → treat the whole thing as mashing.
+  const tokens = t.split(/\s+/).filter(Boolean);
+  if (tokens.length && !tokens.some(wordLike)) return true;
   return false;
 }
 
