@@ -20,7 +20,8 @@ import { useTrips } from "@/lib/trips/store";
 import { useTripLoader } from "@/lib/trips/useTripLoader";
 import type { ComposedTrip } from "@/lib/ai-client";
 import { applyTrip } from "@/lib/trips/applyTrip";
-import { loadChat, saveChat, type ChatTurn } from "@/lib/destinations/repository";
+import { loadChat, saveChat, saveTrip, type ChatTurn } from "@/lib/destinations/repository";
+import { TripContextCard } from "./TripContextCard";
 import { fmtMonthDay, MODE_TEMPLATES, nightsBetween, recommend } from "@/lib/data";
 import { addBreakdowns, computeBudget, convertCostText, EMPTY_BREAKDOWN, formatMoney } from "@/lib/budget/estimate";
 import { useCurrency } from "@/lib/budget/useCurrency";
@@ -84,6 +85,8 @@ export function Workspace() {
   const saved = useMemo(() => state.destinations.filter((d) => d.saved && d.name.trim()), [state.destinations]);
   // Proactive intelligence: the companion's own observations about the current plan.
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  // One-time trip-context prompt (who's travelling / pace / budget / interests).
+  const [ctxDismissed, setCtxDismissed] = useState<Set<string>>(new Set());
   const insights = useMemo(
     () => deriveInsights(saved, itinerary, weatherByDay, budget.byDay, state.budgetLevel, state.transports),
     [saved, itinerary, weatherByDay, budget.byDay, state.budgetLevel, state.transports]
@@ -170,6 +173,19 @@ export function Workspace() {
 
   /** Quick Add — drop a suggested place straight into the plan (the AI places it well). */
   const quickAdd = (s: RichSuggestion) => send(`Add ${s.name} in ${s.city} to my plan`);
+
+  // Trip-context prompt: persist the tapped answers to this trip's preferences + budget.
+  const applyContext = (patch: Partial<typeof state.preferences>, budget: typeof state.budgetLevel) => {
+    if (!activeTrip) return;
+    actions.setTripPreferences(patch);
+    actions.setBudgetLevel(budget);
+    withSave(saveTrip(activeTrip.id, state.destinations, budget, state.transports, { ...state.preferences, ...patch }));
+    setCtxDismissed((prev) => new Set(prev).add(activeTrip.id));
+    actions.flash("Got it — I'll tailor this trip to that.");
+  };
+  const skipContext = () => { if (activeTrip) setCtxDismissed((prev) => new Set(prev).add(activeTrip.id)); };
+  const needsContext = !!activeTrip && saved.length > 0 && !ctxDismissed.has(activeTrip.id) &&
+    (!state.preferences.travellerType || !(state.preferences.interests && state.preferences.interests.length));
 
   // Greet once the trip's cities are loaded (so the greeting is personal).
   useEffect(() => {
@@ -395,6 +411,11 @@ export function Workspace() {
 
       {/* ============ Live journey ============ */}
       <section className="flex-1 overflow-y-auto imm-scroll">
+        {needsContext && (
+          <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] pt-6">
+            <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
+          </div>
+        )}
         <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} onInsightAction={(m, id) => { setDismissed((prev) => new Set(prev).add(id)); send(m); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
 
