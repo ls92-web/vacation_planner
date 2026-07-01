@@ -2,7 +2,7 @@
 export { MapsApiProvider } from "./MapsApiProvider";
 export { GoogleMap } from "./GoogleMap";
 export { MapSkeleton } from "./MapSkeleton";
-export { MarkerPin, DestinationMarkers, HotelMarkers, PlaceMarkers } from "./markers";
+export { MarkerPin, DestinationMarkers, HotelMarkers, PlaceMarkers, FitBounds } from "./markers";
 export { MapInfoCard } from "./InfoCard";
 export { PlacesExplorer } from "./PlacesExplorer";
 export { MapSearch } from "./MapSearch";

@@ -20,6 +20,10 @@ interface GoogleMapProps {
   fallback?: ReactNode;
   /** Background-atmosphere mode: no controls, no gestures, non-interactive. */
   atmospheric?: boolean;
+  /** Night-vision: render Google's native dark map (works with mapId + markers). */
+  dark?: boolean;
+  /** Gesture handling override (default: "none" when atmospheric, else "greedy"). */
+  gesture?: "greedy" | "cooperative" | "none";
 }
 
 /** Smoothly re-centers the map whenever `center` changes. */
@@ -52,7 +56,7 @@ function LoadingOverlay() {
  * Falls back to `fallback` when no key is configured. Children (markers, overlays)
  * use the vis.gl map context.
  */
-export function GoogleMap({ center, zoom = mapsConfig.defaultZoom, children, className, fallback, atmospheric = false }: GoogleMapProps) {
+export function GoogleMap({ center, zoom = mapsConfig.defaultZoom, children, className, fallback, atmospheric = false, dark = false, gesture }: GoogleMapProps) {
   if (!isMapsConfigured()) return <>{fallback ?? null}</>;
 
   return (
@@ -61,7 +65,8 @@ export function GoogleMap({ center, zoom = mapsConfig.defaultZoom, children, cla
         mapId={mapsConfig.mapId}
         defaultCenter={center}
         defaultZoom={zoom}
-        gestureHandling={atmospheric ? "none" : "greedy"}
+        colorScheme={dark ? "DARK" : undefined}
+        gestureHandling={gesture ?? (atmospheric ? "none" : "greedy")}
         disableDefaultUI={atmospheric}
         zoomControl={!atmospheric}
         mapTypeControl={false}

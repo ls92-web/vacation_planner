@@ -151,10 +151,6 @@ body {
   .jc-route { stroke-dashoffset: 0 !important; }
 }
 
-/* ===== Atmospheric map (background only, never reads as a map component) ===== */
-.jc-atmomap { filter: blur(7px) saturate(.42) brightness(.36) contrast(1.05); transform: scale(1.16); pointer-events: none; }
-.jc-atmomap :is(a, button, .gmnoprint, .gm-style-cc) { display: none !important; }
-
 /* ===== Constellation chips — glowing star actions ===== */
 .constellation-chip {
   position: relative; display: inline-flex; align-items: center; gap: 7px;

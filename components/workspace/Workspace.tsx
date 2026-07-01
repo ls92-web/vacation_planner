@@ -28,13 +28,12 @@ import { fmtMonthDay, MODE_TEMPLATES, nightsBetween, recommend } from "@/lib/dat
 import { addBreakdowns, computeBudget, convertCostText, EMPTY_BREAKDOWN, formatMoney } from "@/lib/budget/estimate";
 import { useCurrency } from "@/lib/budget/useCurrency";
 import { summarizePreferences } from "@/lib/trips/preferences";
-import { GoogleMap, MapsApiProvider } from "@/components/maps";
+import { GoogleMap, MapsApiProvider, DestinationMarkers, FitBounds } from "@/components/maps";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import type { LatLng } from "@/lib/maps";
+import type { LatLng, MapMarker } from "@/lib/maps";
 import { CityImage } from "@/components/destinations/CityImage";
 import { ExportControl } from "@/components/export/ExportButton";
 import { ImmersiveMenu } from "@/components/immersive/ImmersiveMenu";
-import { JourneyCore, type CoreNode } from "@/components/immersive/JourneyCore";
 import { Logo } from "@/components/Logo";
 
 const sigOf = (t: ComposedTrip) =>
@@ -532,7 +531,7 @@ export function Workspace() {
             <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
           </div>
         )}
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} coreState={sending ? "routing" : "idle"} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) applyFix(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) applyFix(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
 
       {/* particle bursts flowing toward the companion */}
@@ -550,7 +549,7 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports, insights, coreState, onInsightAction, onInsightDismiss }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports, insights, onInsightAction, onInsightDismiss }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   itinerary: ItineraryItem[];
@@ -559,16 +558,13 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
   budgetByDay: Map<number, BudgetDaySignal>;
   transports: Record<string, string>;
   insights: Insight[];
-  coreState: "idle" | "thinking" | "routing";
   onInsightAction: (insight: Insight) => void;
   onInsightDismiss: (id: string) => void;
 }) {
   const geo = saved.filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0));
   const center: LatLng = geo[0] ? { lat: geo[0].lat as number, lng: geo[0].lng as number } : { lat: 41.39, lng: 2.16 };
-  // The trip's cities become the Core's destination nodes; consecutive nodes draw the route.
-  const coreNodes: CoreNode[] = saved.length <= 1
-    ? [{ x: 0, y: 0, active: true }]
-    : saved.map((_, i) => { const ang = -Math.PI / 2 + (i / saved.length) * 2 * Math.PI; return { x: Math.cos(ang) * 0.6, y: Math.sin(ang) * 0.6, active: i === 0 }; });
+  // The chosen destinations, plotted on the night map.
+  const markers: MapMarker[] = geo.map((d, i) => ({ id: String(d.id), name: d.name, kind: "destination" as const, position: { lat: d.lat as number, lng: d.lng as number }, subtitle: `Stop ${i + 1}`, category: d.country }));
   const totalNights = saved.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
   let agg = EMPTY_BREAKDOWN; let budgetTotal = 0;
   for (const d of saved) {
@@ -595,17 +591,16 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
       {/* proactive intelligence */}
       <InsightBar insights={insights} onAction={onInsightAction} onDismiss={onInsightDismiss} />
 
-      {/* Living Journey Canvas — atmospheric map behind the intelligence Core */}
-      <div className="relative rounded-[24px] overflow-hidden border border-white/[0.06] h-[clamp(240px,34vh,320px)]">
-        <div className="jc-atmomap absolute inset-0">
-          <ErrorBoundary fallback={() => null}>
-            <GoogleMap atmospheric center={center} zoom={4} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0" style={{ background: "radial-gradient(120% 120% at 50% 30%, #16233c, #060c16)" }} />} />
-          </ErrorBoundary>
-        </div>
-        <div aria-hidden className="absolute inset-0" style={{ background: "radial-gradient(115% 85% at 50% 8%, rgba(6,12,22,0) 30%, rgba(6,12,22,.78) 82%), linear-gradient(180deg, rgba(6,12,22,.4), rgba(6,12,22,.15))" }} />
-        <div className="absolute inset-0 grid place-items-center">
-          <JourneyCore size="clamp(200px,26vh,280px)" state={coreState} nodes={coreNodes} />
-        </div>
+      {/* Your route — the chosen destinations on a night map */}
+      <div className="relative rounded-[24px] overflow-hidden border border-white/10 h-[clamp(240px,34vh,320px)]">
+        <ErrorBoundary fallback={() => <div className="absolute inset-0 grid place-items-center text-white/40 text-[13px]" style={{ background: "radial-gradient(120% 120% at 50% 30%, #16233c, #060c16)" }}>Map unavailable</div>}>
+          <GoogleMap dark gesture="cooperative" center={center} zoom={5} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0 grid place-items-center text-white/40 text-[13px]" style={{ background: "radial-gradient(120% 120% at 50% 30%, #16233c, #060c16)" }}>Map preview</div>}>
+            <DestinationMarkers markers={markers} />
+            <FitBounds points={markers.map((m) => m.position)} />
+          </GoogleMap>
+        </ErrorBoundary>
+        {/* subtle edge for depth (never blocks the map) */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 rounded-[24px]" style={{ boxShadow: "inset 0 0 0 1px rgba(255,255,255,.06), inset 0 -44px 60px -44px rgba(6,12,22,.85)" }} />
       </div>
 
       {/* summary strip */}
