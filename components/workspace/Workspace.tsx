@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, Clock, Compass, Lightbulb, MapPin, Moon, Plus, Send, Sparkles, Wallet, X } from "lucide-react";
+import { ArrowRight, Check, Clock, Compass, Lightbulb, MapPin, Moon, Plus, Send, Sparkles, Star, Wallet, X } from "lucide-react";
 import { queryLink } from "@/lib/maps";
 import { getRepository } from "@/lib/itinerary/repository";
 import { geocodeCity } from "@/lib/geo";
@@ -38,6 +38,18 @@ const sigOf = (t: ComposedTrip) =>
 
 /** Stable id for a suggested place, so saving is idempotent and "saved" survives reload. */
 const suggestionId = (s: PlaceSuggestion) => `sugg:${s.city.toLowerCase()}:${s.name.toLowerCase()}`.replace(/\s+/g, "-");
+
+/** A curated suggestion enriched with real Places data (as stored in chat memory). */
+type RichSuggestion = NonNullable<ChatTurn["suggestions"]>[number];
+
+/** Rough visit-duration estimate from place types, for the premium card. */
+function estVisit(types?: string[]): string {
+  const t = types ?? [];
+  if (t.some((x) => ["restaurant", "cafe", "bar", "bakery"].includes(x))) return "~1h";
+  if (t.some((x) => ["museum", "art_gallery", "aquarium", "zoo", "amusement_park"].includes(x))) return "~2–3h";
+  if (t.some((x) => ["park", "tourist_attraction", "natural_feature"].includes(x))) return "~1–2h";
+  return "~2h";
+}
 
 export function Workspace() {
   const { state, actions } = useTrip();
@@ -110,34 +122,43 @@ export function Workspace() {
   }, [activeTrip?.id]);
 
   // Save a suggested place to this trip (shows on the Saved Places page).
-  const saveSuggestion = async (s: PlaceSuggestion) => {
+  const saveSuggestion = async (s: RichSuggestion) => {
     if (!activeTrip) return;
     const id = suggestionId(s);
     if (savedIds.has(id)) return;
     setSavedIds((prev) => new Set(prev).add(id)); // optimistic
-    // Prefer real Google Places data (name/coords/photo/rating/hours/place_id).
-    // Fall back to a city-centre geocode so the saved pin never lands at 0,0; the
-    // card's Maps deep link still opens by name for exact discovery.
-    const hit = await lookupPlace(`${s.name}, ${s.city}`).catch(() => null);
     let place: ExplorePlace;
-    if (hit) {
+    if (s.placeId && typeof s.lat === "number") {
+      // Already enriched on the card — reuse it (no second lookup).
       place = {
-        id, placeId: hit.id, name: hit.name || s.name, category: "Recommended",
-        position: hit.position ?? { lat: 0, lng: 0 },
-        rating: hit.rating, reviews: hit.reviews, priceLevel: hit.priceLevel, openNow: hit.openNow,
-        hours: hit.hours, photoUrl: hit.photoUrl, address: hit.address ?? s.city,
-        description: s.why || hit.description || "", tags: [], estDurationMin: 120, recommendedSlot: "morning",
-        googleTypes: hit.googleTypes, source: "google",
+        id, placeId: s.placeId, name: s.name, category: "Recommended",
+        position: { lat: s.lat, lng: s.lng ?? 0 },
+        rating: s.rating, priceLevel: s.priceLevel, hours: s.hours, photoUrl: s.photoUrl,
+        address: s.address ?? s.city, description: s.why, tags: [], estDurationMin: 120, recommendedSlot: "morning",
+        googleTypes: s.types, source: "google",
       };
     } else {
-      let g = await geocodeCity(s.name, s.city).catch(() => null);
-      if (!g || (g.lat === 0 && g.lng === 0)) g = await geocodeCity(s.city).catch(() => null);
-      place = {
-        id, name: s.name, category: "Recommended",
-        position: { lat: g?.lat ?? 0, lng: g?.lng ?? 0 },
-        address: s.city, description: s.why, tags: [], estDurationMin: 120, recommendedSlot: "morning",
-        source: "curated",
-      };
+      // Fall back: look up now, else a city-centre geocode so the pin never lands at 0,0.
+      const hit = await lookupPlace(`${s.name}, ${s.city}`).catch(() => null);
+      if (hit) {
+        place = {
+          id, placeId: hit.id, name: hit.name || s.name, category: "Recommended",
+          position: hit.position ?? { lat: 0, lng: 0 },
+          rating: hit.rating, reviews: hit.reviews, priceLevel: hit.priceLevel, openNow: hit.openNow,
+          hours: hit.hours, photoUrl: hit.photoUrl, address: hit.address ?? s.city,
+          description: s.why || hit.description || "", tags: [], estDurationMin: 120, recommendedSlot: "morning",
+          googleTypes: hit.googleTypes, source: "google",
+        };
+      } else {
+        let g = await geocodeCity(s.name, s.city).catch(() => null);
+        if (!g || (g.lat === 0 && g.lng === 0)) g = await geocodeCity(s.city).catch(() => null);
+        place = {
+          id, name: s.name, category: "Recommended",
+          position: { lat: g?.lat ?? 0, lng: g?.lng ?? 0 },
+          address: s.city, description: s.why, tags: [], estDurationMin: 120, recommendedSlot: "morning",
+          source: "curated",
+        };
+      }
     }
     try {
       await getRepository().setFavorite(activeTrip.id, s.city, place, true);
@@ -146,6 +167,9 @@ export function Workspace() {
       actions.flash("Couldn't save that place — try again.");
     }
   };
+
+  /** Quick Add — drop a suggested place straight into the plan (the AI places it well). */
+  const quickAdd = (s: RichSuggestion) => send(`Add ${s.name} in ${s.city} to my plan`);
 
   // Greet once the trip's cities are loaded (so the greeting is personal).
   useEffect(() => {
@@ -186,6 +210,11 @@ export function Workspace() {
       const { text: scheduleText, refMap } = serializeSchedule(state.destinations, itineraryRef.current);
       const res = await planTrip(struct, scheduleText, weatherTextRef.current, budgetTextRef.current, transportTextRef.current, Object.keys(refMap), history, text);
       if (res) {
+        const ck = (n: string) => n.split(",")[0].trim().toLowerCase();
+        const cityCenter = (city: string): LatLng | null => {
+          const d = saved.find((x) => ck(x.name) === ck(city));
+          return d && typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0) ? { lat: d.lat, lng: d.lng } : null;
+        };
         // (1) Structural change → rebuild destinations + rehydrate the store.
         if (res.trip && sigOf(res.trip) !== sigOf(struct)) {
           await applyTrip(activeTrip.id, res.trip, state.destinations, state.budgetLevel);
@@ -195,11 +224,6 @@ export function Workspace() {
         // (2) Schedule change → enrich added stops with real Google Places data,
         //     then apply minimal edit ops onto the live stops (preserving the rest) + persist.
         if (res.ops) {
-          const ck = (n: string) => n.split(",")[0].trim().toLowerCase();
-          const cityCenter = (city: string): LatLng | null => {
-            const d = saved.find((x) => ck(x.name) === ck(city));
-            return d && typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0) ? { lat: d.lat, lng: d.lng } : null;
-          };
           const enrichByIndex = new Map<number, Awaited<ReturnType<typeof lookupPlace>>>();
           await Promise.all(
             res.ops.map(async (op, i) => {
@@ -212,7 +236,19 @@ export function Workspace() {
           setItinerary(items);
           withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", items));
         }
-        const full = [...afterUser, { role: "assistant" as const, content: res.reply, suggestions: res.suggestions?.length ? res.suggestions : undefined }];
+        // (3) Curated suggestions → enrich into premium cards (photo/rating/hours/place_id).
+        let rich: RichSuggestion[] | undefined;
+        if (res.suggestions?.length) {
+          rich = await Promise.all(
+            res.suggestions.map(async (s) => {
+              const hit = await lookupPlace(`${s.name}, ${s.city}`, cityCenter(s.city)).catch(() => null);
+              return hit
+                ? { ...s, placeId: hit.id, photoUrl: hit.photoUrl, rating: hit.rating, hours: hit.hours, address: hit.address, lat: hit.position?.lat, lng: hit.position?.lng, priceLevel: hit.priceLevel, types: hit.googleTypes }
+                : s;
+            })
+          );
+        }
+        const full = [...afterUser, { role: "assistant" as const, content: res.reply, suggestions: rich }];
         setMessages(full);
         saveChat(activeTrip.id, full);
       } else {
@@ -264,30 +300,60 @@ export function Workspace() {
                 <div className="mt-2 flex flex-col gap-2">
                   {m.suggestions.map((s, si) => {
                     const isSaved = savedIds.has(suggestionId(s));
+                    const price = s.priceLevel != null && s.priceLevel > 0 ? "$".repeat(Math.min(4, s.priceLevel)) : "";
                     return (
-                      <div key={si} className="imm-glass rounded-[14px] px-3.5 py-2.5 vp-fade-fast">
-                        <div className="font-display font-bold text-[13.5px] leading-tight">{s.name}</div>
-                        <div className="text-[11px] text-white/50">{s.city}</div>
-                        {s.why && <div className="text-[12px] text-white/75 mt-1 leading-snug">{s.why}</div>}
-                        <div className="mt-2 flex items-center gap-2">
-                          <button
-                            onClick={() => saveSuggestion(s)}
-                            disabled={isSaved}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11.5px] font-semibold transition cursor-pointer disabled:cursor-default"
-                            style={isSaved
-                              ? { background: "rgba(255,255,255,.12)", color: "#fff" }
-                              : { background: "var(--accent)", color: "#fff" }}
-                          >
-                            {isSaved ? <><Check size={12} />Saved</> : <><Plus size={12} />Save</>}
-                          </button>
-                          <a
-                            href={queryLink(`${s.name}, ${s.city}`)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-white/15 text-[11.5px] font-semibold text-white/70 cursor-pointer hover:text-white hover:border-white/35 transition"
-                          >
-                            <MapPin size={12} />Map
-                          </a>
+                      <div key={si} className="imm-glass rounded-[16px] overflow-hidden vp-fade-fast">
+                        {s.photoUrl && (
+                          <div className="relative h-[118px]">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={s.photoUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                            <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(6,12,22,0) 40%, rgba(6,12,22,.6))" }} />
+                            <div className="absolute bottom-2 left-3 right-3 text-white">
+                              <div className="font-display font-bold text-[14.5px] leading-tight truncate" style={{ textShadow: "0 1px 6px rgba(0,0,0,.5)" }}>{s.name}</div>
+                              <div className="text-[11px] text-white/80">{s.city}</div>
+                            </div>
+                          </div>
+                        )}
+                        <div className="p-3.5">
+                          {!s.photoUrl && (
+                            <>
+                              <div className="font-display font-bold text-[14px] leading-tight">{s.name}</div>
+                              <div className="text-[11px] text-white/50">{s.city}</div>
+                            </>
+                          )}
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-white/60">
+                            {s.rating != null && <span className="inline-flex items-center gap-1" style={{ color: "#E0A44F" }}><Star size={10} fill="currentColor" stroke="none" /><span className="text-white/80 font-semibold">{s.rating.toFixed(1)}</span></span>}
+                            <span className="inline-flex items-center gap-1"><Clock size={11} />{estVisit(s.types)}</span>
+                            {s.hours && <span className="truncate max-w-[150px]">{s.hours}</span>}
+                            {price && <span className="text-white/70">{price}</span>}
+                          </div>
+                          {s.why && <div className="text-[12px] text-white/75 mt-2 leading-snug">{s.why}</div>}
+                          <div className="mt-2.5 flex items-center gap-2">
+                            <button
+                              onClick={() => quickAdd(s)}
+                              disabled={sending}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11.5px] font-bold text-white cursor-pointer transition hover:brightness-[1.06] disabled:opacity-50"
+                              style={{ background: "var(--accent)" }}
+                            >
+                              <Plus size={12} strokeWidth={2.4} />Add to plan
+                            </button>
+                            <button
+                              onClick={() => saveSuggestion(s)}
+                              disabled={isSaved}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11.5px] font-semibold transition cursor-pointer disabled:cursor-default border"
+                              style={isSaved ? { background: "rgba(255,255,255,.12)", color: "#fff", borderColor: "transparent" } : { background: "transparent", color: "rgba(255,255,255,.8)", borderColor: "rgba(255,255,255,.15)" }}
+                            >
+                              {isSaved ? <><Check size={12} />Saved</> : <>Save</>}
+                            </button>
+                            <a
+                              href={queryLink(`${s.name}, ${s.city}`)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ml-auto inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11.5px] font-semibold text-white/60 cursor-pointer hover:text-white transition"
+                            >
+                              <MapPin size={12} />Map
+                            </a>
+                          </div>
                         </div>
                       </div>
                     );

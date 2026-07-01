@@ -377,8 +377,21 @@ export async function loadTrip(tripId: string): Promise<LoadedTrip> {
 export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
-  /** Curated place ideas attached to an assistant turn (optional). */
-  suggestions?: { name: string; city: string; why: string }[];
+  /** Curated place ideas attached to an assistant turn, enriched with real Places data (optional). */
+  suggestions?: {
+    name: string;
+    city: string;
+    why: string;
+    placeId?: string;
+    photoUrl?: string;
+    rating?: number;
+    hours?: string;
+    address?: string;
+    lat?: number;
+    lng?: number;
+    priceLevel?: number;
+    types?: string[];
+  }[];
 }
 const chatKey = (tripId: string) => `itinera_chat_${tripId}`;
 
