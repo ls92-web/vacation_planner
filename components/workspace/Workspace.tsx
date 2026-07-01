@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, Clock, Compass, Download, MapPin, Moon, Plus, Send, Sparkles, Wallet, X } from "lucide-react";
+import { Check, Clock, Compass, MapPin, Moon, Plus, Send, Sparkles, Wallet, X } from "lucide-react";
 import { queryLink } from "@/lib/maps";
 import { getRepository } from "@/lib/itinerary/repository";
 import { geocodeCity } from "@/lib/geo";
@@ -365,8 +365,6 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
 
       {/* actions */}
       <div className="mt-6 flex flex-wrap gap-2.5">
-        <button onClick={actions.goExplore} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06]"><Compass size={15} />Browse places to add</button>
-        <button onClick={actions.goForm} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent"><MapPin size={15} />Detailed planner</button>
         <ExportControl
           itinerary={itinerary}
           destination={saved[0]?.name ?? ""}

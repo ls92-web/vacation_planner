@@ -36,7 +36,7 @@ import type { SelectedDestination } from "./geo";
 import type { BudgetLevel } from "./budget/estimate";
 import type { LoadedDestination } from "./destinations/repository";
 import { summarizePreferences } from "./trips/preferences";
-import { fetchItinerary, streamAssistantReply } from "./ai-client";
+import { streamAssistantReply } from "./ai-client";
 import { requestNavigation } from "./ui/unsavedGuard";
 import { placeCoords } from "./maps/coords";
 import type { PlaceResult } from "./maps/types";
@@ -208,30 +208,6 @@ export function useTripStore() {
     routingTimer.current = setTimeout(() => set({ routing: false }), 850);
   }, [set]);
 
-  const runGenerate = useCallback(() => {
-    set({ screen: "generating", genStep: 0, destOpen: false });
-
-    // Kick off real itinerary generation through the shared AI service.
-    // On success we swap in the AI plan; on any failure we keep the mock DAYS.
-    fetchItinerary(tripContext(stateRef.current))
-      .then((days) => {
-        if (days) setState((st) => ({ ...st, days }));
-      })
-      .catch(() => {});
-
-    if (genInterval.current) clearInterval(genInterval.current);
-    genInterval.current = setInterval(() => {
-      setState((s) => {
-        const n = s.genStep + 1;
-        if (n > 5) {
-          if (genInterval.current) clearInterval(genInterval.current);
-          return { ...s, screen: "plan", genStep: 5 };
-        }
-        return { ...s, genStep: n };
-      });
-    }, 640);
-  }, [set]);
-
   // Streamed travel-assistant reply via the AI service; falls back to a canned reply.
   const runAssistant = useCallback((ctx: TripContext, history: ChatMessage[], userText: string) => {
     const aiMessages: AIMessage[] = history
@@ -266,7 +242,6 @@ export function useTripStore() {
       setTheme: (t: ThemeName) => set({ theme: t }),
       // auth
       toggleAuth: () => set((s) => ({ authMode: s.authMode === "signin" ? "signup" : "signin" })),
-      goForm: () => requestNavigation(() => set({ screen: "form" })),
       goWelcome: () => requestNavigation(() => set({ screen: "welcome" })),
       goWorkspace: () => requestNavigation(() => set({ screen: "workspace" })),
       goProfile: () =>
@@ -349,24 +324,6 @@ export function useTripStore() {
             accoms: (d.accoms ?? []).map((a) => ({ id: ++uid.current, ...a })),
           })),
         })),
-      // navigation between explore subviews / pages
-      goExplore: () =>
-        requestNavigation(() => {
-          set({ screen: "explore" });
-          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-        }),
-      exSetTab: (t: ExploreTab) => {
-        set({ exTab: t });
-        requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-      },
-      navPick: (k: ExploreTab) =>
-        requestNavigation(() => {
-          set({ screen: "explore", exTab: k });
-          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-        }),
-      // generating
-      runGenerate,
-      createSchedule: runGenerate,
       // destinations
       updateDest: (id: number, field: keyof Destination, val: string) =>
         setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.id === id ? { ...d, [field]: val } : d)) })),
@@ -537,7 +494,7 @@ export function useTripStore() {
         runAssistant(tripContext(s), history, txt);
       },
     };
-  }, [set, flash, pulseRouting, runGenerate, runAssistant]);
+  }, [set, flash, pulseRouting, runAssistant]);
 
   return { state, actions };
 }

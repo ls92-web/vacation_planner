@@ -88,9 +88,9 @@ export function SavedPlaces() {
           <div className="rounded-[18px] border-2 border-dashed border-line bg-surface/50 p-10 text-center">
             <div className="w-12 h-12 rounded-full bg-tint grid place-items-center mx-auto text-accent"><Heart size={22} strokeWidth={2} /></div>
             <div className="font-display font-bold text-[17px] mt-3">No saved places yet</div>
-            <p className="text-[13.5px] text-muted mt-1.5 max-w-[400px] mx-auto">While browsing attractions, tap the heart on any place to save it — they&apos;ll collect here for quick access.</p>
-            <button onClick={() => actions.goExplore()} className="mt-4 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-[11px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06]">
-              Explore attractions
+            <p className="text-[13.5px] text-muted mt-1.5 max-w-[400px] mx-auto">Ask the AI companion for ideas while planning a trip and save any place it suggests — they&apos;ll collect here for quick access.</p>
+            <button onClick={() => actions.goWelcome()} className="mt-4 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-[11px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06]">
+              Plan with AI
             </button>
           </div>
         ) : (

@@ -6,7 +6,6 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
-  Map as MapIcon,
   PanelLeftClose,
   PanelLeftOpen,
   Plane,
@@ -37,7 +36,6 @@ const SECTIONS: { group: string; items: NavItem[] }[] = [
     items: [
       { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, onClick: (a) => a.goDashboard() },
       { key: "mytrips", label: "My Trips", icon: Plane, onClick: (a) => a.goTrips() },
-      { key: "planner", label: "Planner", icon: MapIcon, onClick: (a) => a.goForm() },
       { key: "saved", label: "Saved Places", icon: Heart, onClick: (a) => a.goSaved() },
     ],
   },
@@ -60,10 +58,6 @@ function activeKeyFor(screen: Screen): string | null {
     case "dashboard": return "dashboard";
     case "trips": return "mytrips";
     case "saved": return "saved";
-    case "form":
-    case "explore":
-    case "generating":
-    case "plan": return "planner";
     case "profile": return "profile";
     case "settings": return "settings";
     default: return null;

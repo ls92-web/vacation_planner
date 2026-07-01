@@ -10,10 +10,6 @@ import { AppShell } from "./shell/AppShell";
 import { Dashboard } from "./screens/Dashboard";
 import { TripsDashboard } from "./trips/TripsDashboard";
 import { SavedPlaces } from "./screens/SavedPlaces";
-import { RouteBuilder } from "./screens/RouteBuilder";
-import { ExploreExperience } from "./explore/ExploreExperience";
-import { GeneratingScreen } from "./screens/Generating";
-import { Itinerary } from "./screens/Itinerary";
 import { ProfilePage } from "./account/ProfilePage";
 import { SettingsPage } from "./account/SettingsPage";
 import { Welcome } from "./welcome/Welcome";
@@ -27,10 +23,6 @@ function Screens() {
       {state.screen === "dashboard" && <Dashboard />}
       {state.screen === "trips" && <TripsDashboard />}
       {state.screen === "saved" && <SavedPlaces />}
-      {state.screen === "form" && <RouteBuilder />}
-      {state.screen === "explore" && <ExploreExperience />}
-      {state.screen === "generating" && <GeneratingScreen />}
-      {state.screen === "plan" && <Itinerary />}
       {state.screen === "profile" && <ProfilePage />}
       {state.screen === "settings" && <SettingsPage />}
       <Toast />

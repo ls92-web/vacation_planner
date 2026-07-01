@@ -116,9 +116,9 @@ export function Dashboard() {
         <section>
           <h2 className="font-display font-bold text-[17px] tracking-[-.01em] mb-3">Quick actions</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button onClick={() => actions.goExplore()} className="rounded-[14px] border border-line bg-surface p-4 text-left cursor-pointer transition hover:border-accent flex items-center gap-3">
+            <button onClick={() => actions.goWelcome()} className="rounded-[14px] border border-line bg-surface p-4 text-left cursor-pointer transition hover:border-accent flex items-center gap-3">
               <span className="w-10 h-10 rounded-[11px] grid place-items-center bg-tint text-accent shrink-0"><Compass size={18} strokeWidth={2} /></span>
-              <div><div className="font-semibold text-[14px]">Explore attractions</div><div className="text-[12px] text-muted">Discover places to add</div></div>
+              <div><div className="font-semibold text-[14px]">Plan with AI</div><div className="text-[12px] text-muted">Describe a trip, watch it build</div></div>
             </button>
             <button onClick={() => actions.goSaved()} className="rounded-[14px] border border-line bg-surface p-4 text-left cursor-pointer transition hover:border-accent flex items-center gap-3">
               <span className="w-10 h-10 rounded-[11px] grid place-items-center bg-tint text-accent shrink-0"><Heart size={18} strokeWidth={2} /></span>
