@@ -170,8 +170,8 @@ body {
 @keyframes vpShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 @keyframes vpRise { from { opacity: 1; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
 
-.vp-fade { animation: vpFade .4s ease forwards; }
-.vp-fade-fast { animation: vpFade .3s ease forwards; }
+.vp-fade { animation: vpFade .5s var(--ease-out-expo) forwards; }
+.vp-fade-fast { animation: vpFade .38s var(--ease-out-expo) forwards; }
 .vp-pop { animation: vpPop .18s ease forwards; }
 .vp-slide-down { animation: vpSlideDown .26s ease forwards; }
 .vp-slide-up { animation: vpSlideUp .3s ease forwards; }
@@ -209,9 +209,9 @@ body {
 @keyframes imm_rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes imm_float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
 @keyframes imm_pulse { 0%, 100% { opacity: .3; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.35); } }
-.imm-rise { animation: imm_rise .6s ease both; }
-.imm-rise-2 { animation: imm_rise .6s ease .08s both; }
-.imm-rise-3 { animation: imm_rise .6s ease .16s both; }
+.imm-rise { animation: imm_rise .7s var(--ease-out-expo) both; }
+.imm-rise-2 { animation: imm_rise .7s var(--ease-out-expo) .09s both; }
+.imm-rise-3 { animation: imm_rise .7s var(--ease-out-expo) .18s both; }
 .imm-input {
   background: rgba(255, 255, 255, .06);
   border: 1px solid rgba(255, 255, 255, .14);

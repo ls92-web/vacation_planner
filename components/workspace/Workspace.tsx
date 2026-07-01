@@ -379,10 +379,9 @@ export function Workspace() {
             </div>
           ))}
           {sending && (
-            <div className="self-start rounded-[16px] px-3.5 py-3 imm-glass" style={{ borderBottomLeftRadius: 4 }}>
-              <span className="inline-flex gap-1">
-                {[0, 1, 2].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-accent" style={{ animation: `imm_pulse 1s ease-in-out ${d * 0.18}s infinite` }} />)}
-              </span>
+            <div className="self-start rounded-[16px] pl-2 pr-3.5 py-2 imm-glass inline-flex items-center gap-2 vp-fade-fast" style={{ borderBottomLeftRadius: 4 }}>
+              <Logo size={22} variant="plain" animated />
+              <span className="text-[12.5px] text-white/70" style={{ animation: "logo_halo 1.8s var(--ease-soft) infinite" }}>Charting your journey…</span>
             </div>
           )}
         </div>
@@ -402,7 +401,7 @@ export function Workspace() {
               placeholder="Tell me how to shape this trip…"
               className="flex-1 resize-none bg-transparent outline-none border-none px-2 py-1.5 text-[14px] leading-relaxed text-white placeholder:text-white/40 max-h-[120px]"
             />
-            <button onClick={() => send()} disabled={sending || !input.trim()} className="shrink-0 w-9 h-9 rounded-[12px] grid place-items-center cursor-pointer disabled:opacity-40" style={{ background: "var(--accent)", color: "#fff" }}>
+            <button onClick={() => send()} disabled={sending || !input.trim()} className="shrink-0 w-9 h-9 rounded-[12px] grid place-items-center cursor-pointer disabled:opacity-40 hover:brightness-[1.08] active:scale-95" style={{ background: "var(--accent)", color: "#fff", transition: "transform .2s var(--ease-spring), filter .2s ease" }}>
               <Send size={16} strokeWidth={2} />
             </button>
           </div>
