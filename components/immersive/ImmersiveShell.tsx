@@ -39,14 +39,25 @@ function ScreenError({ onRetry }: { onRetry: () => void }) {
  */
 export function ImmersiveShell({ children }: { children: ReactNode }) {
   const { state, actions } = useTrip();
+  // Pointer parallax — the whole canvas breathes with the cursor, like Welcome.
+  const onPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const px = e.clientX / window.innerWidth - 0.5;
+    const py = e.clientY / window.innerHeight - 0.5;
+    el.style.setProperty("--px", px.toFixed(3));
+    el.style.setProperty("--py", py.toFixed(3));
+  };
   return (
-    <div className="imm-bg min-h-screen w-full relative font-body overflow-x-hidden">
-      {/* ambient accent glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed left-1/2 -translate-x-1/2"
-        style={{ top: "-16%", width: 720, height: 720, borderRadius: "50%", zIndex: 0, background: "radial-gradient(circle, color-mix(in oklab, var(--accent) 20%, transparent), transparent 62%)" }}
-      />
+    <div
+      onPointerMove={onPointer}
+      className="imm-bg min-h-screen w-full relative font-body overflow-x-hidden"
+      style={{ ["--px" as string]: 0, ["--py" as string]: 0 }}
+    >
+      {/* persistent ambient lights (parallax depth) — shared with Welcome */}
+      <div aria-hidden className="wl-light" style={{ top: "-16%", left: "50%", width: 760, height: 760, background: "radial-gradient(circle, color-mix(in oklab, var(--accent) 20%, transparent), transparent 62%)", transform: "translate(calc(-50% + var(--px) * -22px), calc(var(--py) * -16px))" }} />
+      <div aria-hidden className="wl-light wl-float" style={{ top: "44%", left: "8%", width: 340, height: 340, background: "radial-gradient(circle, rgba(90,150,235,.14), transparent 64%)", transform: "translate(calc(var(--px) * 30px), calc(var(--py) * 22px))" }} />
+      <div aria-hidden className="wl-light wl-float" style={{ top: "8%", right: "6%", left: "auto", width: 300, height: 300, background: "radial-gradient(circle, rgba(120,180,255,.1), transparent 64%)", transform: "translate(calc(var(--px) * -26px), calc(var(--py) * 20px))", animationDelay: "-6s" }} />
+
       <header className="sticky top-0 z-40 flex items-center justify-between px-4 sm:px-6 h-[60px]">
         <button onClick={() => actions.goWelcome()} className="flex items-center gap-2.5 cursor-pointer text-white" title="New journey">
           <Logo size={26} variant="plain" />
@@ -56,7 +67,8 @@ export function ImmersiveShell({ children }: { children: ReactNode }) {
       </header>
       <main className="relative z-10 imm-scroll">
         <ErrorBoundary resetKey={state.screen} fallback={(reset) => <ScreenError onRetry={reset} />}>
-          {children}
+          {/* keyed so each screen rises in — one canvas morphing, not pages swapping */}
+          <div key={state.screen} className="screen-stage">{children}</div>
         </ErrorBoundary>
       </main>
       <UnsavedChangesDialog />

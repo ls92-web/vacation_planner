@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight, Check, MapPin, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { AlertCircle, ArrowRight, Check, MapPin, Pencil, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
 import { useTrip } from "@/lib/store";
 import { useTrips, type Trip } from "@/lib/trips/store";
 import { CityImage } from "@/components/destinations/CityImage";
 import { useTripLoader } from "@/lib/trips/useTripLoader";
-import { ImmersiveHeading } from "@/components/immersive/ImmersiveShell";
+import { useComposeJourney } from "@/lib/trips/useComposeJourney";
+import { JourneyCore, type CoreNode } from "@/components/immersive/JourneyCore";
 
-function TripCard({ trip, active, onOpen }: { trip: Trip; active: boolean; onOpen: () => void }) {
+function TripCard({ trip, active, index, onOpen }: { trip: Trip; active: boolean; index: number; onOpen: () => void }) {
   const { actions } = useTrips();
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(trip.name);
@@ -17,10 +18,15 @@ function TripCard({ trip, active, onOpen }: { trip: Trip; active: boolean; onOpe
   const created = trip.created_at ? new Date(trip.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
 
   return (
-    <div className="imm-glass rounded-[18px] overflow-hidden flex flex-col transition hover:-translate-y-0.5" style={{ boxShadow: "0 12px 34px -22px rgba(0,0,0,.6)", borderColor: active ? "var(--accent)" : undefined }}>
-      <button onClick={onOpen} className="relative h-[120px] w-full block cursor-pointer overflow-hidden text-left">
+    <div
+      className="journey-card imm-glass rounded-[20px] overflow-hidden flex flex-col vp-fade-fast"
+      style={{ animationDelay: `${index * 0.05}s`, borderColor: active ? "var(--accent)" : undefined }}
+    >
+      <button onClick={onOpen} className="relative h-[132px] w-full block cursor-pointer overflow-hidden text-left">
         <CityImage name={city} country={trip.destination.split(",").slice(1).join(",").trim()} className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(6,12,22,.05), rgba(6,12,22,.72))" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(6,12,22,.1) 0%, rgba(6,12,22,.35) 55%, rgba(6,12,22,.86) 100%)" }} />
+        {/* constellation node */}
+        <span className="absolute top-3 left-3.5 z-10 w-2 h-2 rounded-full" style={{ background: "var(--accent)", boxShadow: "0 0 10px 2px color-mix(in oklab, var(--accent) 80%, transparent)" }} />
         {active && <span className="absolute top-2.5 right-2.5 z-10 text-[10.5px] font-bold uppercase tracking-wide text-white px-2 py-0.5 rounded-md" style={{ background: "var(--accent)" }}>Active</span>}
         <div className="absolute bottom-2.5 left-3.5 z-10 text-white flex items-center gap-1.5 text-[12px]" style={{ textShadow: "0 1px 6px rgba(0,0,0,.5)" }}><MapPin size={12} strokeWidth={2} />{city}</div>
       </button>
@@ -51,8 +57,8 @@ function TripCard({ trip, active, onOpen }: { trip: Trip; active: boolean; onOpe
             </div>
           </div>
         ) : (
-          <button onClick={onOpen} className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-[10px] text-white text-[13.5px] font-bold cursor-pointer transition hover:brightness-[1.06]" style={{ background: "var(--accent)" }}>
-            Open journey<ArrowRight size={15} strokeWidth={2} />
+          <button onClick={onOpen} className="journey-open mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-[10px] text-white text-[13.5px] font-bold cursor-pointer" style={{ background: "var(--accent)" }}>
+            Step into journey<ArrowRight size={15} strokeWidth={2} />
           </button>
         )}
       </div>
@@ -64,37 +70,96 @@ export function TripsDashboard() {
   const { ready, trips, activeId, actions } = useTrips();
   const trip = useTrip();
   const loadPlan = useTripLoader();
+  const [warping, setWarping] = useState(false);
+  const [value, setValue] = useState("");
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // The "travel into the journey" transition — a brief warp before the workspace.
+  const playWarp = () => new Promise<void>((res) => { setWarping(true); setTimeout(res, 460); });
+  const { compose, busy, error, setError } = useComposeJourney(playWarp);
 
   const openTrip = async (t: Trip) => {
+    await playWarp();
     actions.select(t.id);
-    trip.actions.goWorkspace(); // open the conversational Journey Board
-    await loadPlan(t.id, t.destination); // hydrate the store (or → retryable error)
+    trip.actions.goWorkspace();
+    await loadPlan(t.id, t.destination);
   };
 
+  // The hub Core reflects your universe of journeys as orbiting stars.
+  const hubNodes: CoreNode[] | undefined = trips.length
+    ? trips.slice(0, 7).map((_, i) => {
+        const n = Math.min(trips.length, 7);
+        const ang = -Math.PI / 2 + (i / n) * 2 * Math.PI;
+        return { x: Math.cos(ang) * 0.6, y: Math.sin(ang) * 0.6, active: i === 0 };
+      })
+    : undefined;
+  const coreState: "idle" | "thinking" | "routing" = busy ? "routing" : value.trim() ? "thinking" : "idle";
+
   return (
-    <div className="max-w-[1100px] mx-auto px-[clamp(16px,3vw,28px)] py-8">
-      <ImmersiveHeading eyebrow="Your journeys" title="Every journey you've imagined" subtitle="Pick up where you left off, or start a new one — the companion remembers each trip's places, pace and plan." />
+    <div className="max-w-[1100px] mx-auto px-[clamp(16px,3vw,28px)] pb-14">
+      {/* ===== hub: the Core + describe-to-create ===== */}
+      <div className="flex flex-col items-center text-center pt-2">
+        <JourneyCore size="clamp(140px,19vw,196px)" state={coreState} nodes={hubNodes} />
+        <h1 className="font-brand font-bold tracking-[-.02em] leading-[1.04] -mt-2" style={{ fontSize: "clamp(30px,5vw,50px)" }}>Your travel universe</h1>
+        <p className="text-white/60 text-[14.5px] mt-2.5 max-w-[460px]">Describe a new journey, or step back into one — the companion remembers every trip’s places, pace and plan.</p>
 
-      <div className="mt-8 grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))" }}>
-        {/* start a new journey → the AI Welcome */}
-        <button
-          onClick={() => trip.actions.goWelcome()}
-          className="imm-glass imm-glass-hover rounded-[18px] grid place-items-center min-h-[240px] cursor-pointer transition text-white"
-        >
-          <div className="flex flex-col items-center gap-2.5 text-center px-4">
-            <div className="w-12 h-12 rounded-full grid place-items-center" style={{ background: "var(--accent)" }}><Plus size={22} strokeWidth={2} className="text-white" /></div>
-            <span className="font-display font-bold text-[15px]">Start a new journey</span>
-            <span className="text-[12px] text-white/55 inline-flex items-center gap-1"><Sparkles size={12} style={{ color: "var(--accent)" }} />Describe it — the AI builds it</span>
+        {/* compose a new journey inline (no modal) */}
+        <div className="w-full max-w-[560px] mt-6 flex items-end gap-2 rounded-[18px] p-2.5 text-left" style={{ background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.14)", backdropFilter: "blur(14px)", boxShadow: "0 24px 60px -28px rgba(0,0,0,.7)" }}>
+          <textarea
+            ref={taRef}
+            value={value}
+            onChange={(e) => { setValue(e.target.value); if (error) setError(null); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); compose(value); } }}
+            rows={1}
+            placeholder="e.g. A week of food and design in Copenhagen…"
+            className="flex-1 resize-none bg-transparent outline-none border-none px-3 py-2.5 text-[15px] leading-relaxed text-white placeholder:text-white/40 max-h-[120px]"
+          />
+          <button
+            onClick={() => compose(value)}
+            disabled={busy || !value.trim()}
+            className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[13px] text-[14px] font-bold cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+            style={{ background: "var(--accent)", color: "#fff", boxShadow: "0 10px 24px -10px var(--accent)", transition: "transform .2s var(--ease-spring), filter .2s ease" }}
+          >
+            {busy ? <><Sparkles size={16} strokeWidth={2} className="animate-pulse" />Charting…</> : <>Plan it<ArrowRight size={16} strokeWidth={2} /></>}
+          </button>
+        </div>
+        {error && (
+          <div className="w-full max-w-[560px] mt-3 flex items-center gap-3 rounded-[14px] px-4 py-3 text-left vp-fade-fast" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(240,168,140,.32)" }} role="alert">
+            <AlertCircle size={17} strokeWidth={2} className="shrink-0" style={{ color: "#F1A88C" }} />
+            <span className="flex-1 text-[13px] leading-snug text-white/85">{error}</span>
+            <button onClick={() => compose(value)} disabled={busy} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12.5px] font-bold text-white cursor-pointer transition hover:brightness-[1.06] disabled:opacity-50" style={{ background: "var(--accent)" }}>
+              <RefreshCw size={13} strokeWidth={2.2} />Try again
+            </button>
           </div>
-        </button>
-
-        {!ready
-          ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="min-h-[240px] rounded-[18px] imm-glass animate-pulse" />)
-          : trips.map((t) => <TripCard key={t.id} trip={t} active={t.id === activeId} onOpen={() => openTrip(t)} />)}
+        )}
       </div>
 
+      {/* ===== constellation of journeys ===== */}
+      {(ready ? trips.length > 0 : true) && (
+        <div className="mt-11">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={13} style={{ color: "var(--accent)" }} />
+            <span className="text-[11.5px] uppercase tracking-[.14em] text-white/55">Your journeys</span>
+            {ready && trips.length > 0 && <span className="text-[11.5px] text-white/35">· {trips.length}</span>}
+          </div>
+          <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(238px,1fr))" }}>
+            {!ready
+              ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="min-h-[248px] rounded-[20px] imm-glass animate-pulse" />)
+              : trips.map((t, i) => <TripCard key={t.id} trip={t} index={i} active={t.id === activeId} onOpen={() => openTrip(t)} />)}
+          </div>
+        </div>
+      )}
+
       {ready && trips.length === 0 && (
-        <p className="text-white/50 text-[13.5px] mt-5">No journeys yet — start your first one above.</p>
+        <p className="text-white/45 text-[13.5px] mt-10 text-center">No journeys yet — describe your first one above and watch it take shape.</p>
+      )}
+
+      {/* warp: travelling into the journey */}
+      {warping && (
+        <div className="fixed inset-0 z-[200] pointer-events-none grid place-items-center">
+          <div className="absolute inset-0 warp-veil" style={{ background: "radial-gradient(circle at 50% 46%, color-mix(in oklab, var(--accent) 26%, transparent), rgba(4,10,20,.92) 68%)" }} />
+          <div className="warp-ring" style={{ width: 120, height: 120, borderRadius: "50%", border: "2px solid var(--accent)", boxShadow: "0 0 44px 6px color-mix(in oklab, var(--accent) 70%, transparent)" }} />
+        </div>
       )}
     </div>
   );

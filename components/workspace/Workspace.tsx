@@ -304,7 +304,7 @@ export function Workspace() {
 
   return (
     <MapsApiProvider>
-    <div className="imm-bg h-screen w-full flex flex-col lg:flex-row overflow-hidden font-body text-white">
+    <div className="imm-bg h-screen w-full flex flex-col lg:flex-row overflow-hidden font-body text-white screen-stage">
       {/* ============ Chat (primary) ============ */}
       <section className="flex flex-col lg:w-[40%] lg:max-w-[520px] h-[52vh] lg:h-full border-b lg:border-b-0 lg:border-r border-white/10" style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(10px)" }}>
         <header className="flex items-center gap-2.5 px-4 h-[58px] border-b border-white/10 shrink-0">
@@ -676,7 +676,10 @@ function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay, budgetByDa
                   const globalDay = ds.globalStart + d + 1;
                   const mins = totalMinutes(dayItems);
                   return (
-                    <div key={d}>
+                    <div key={d} className="relative pl-5 vp-fade-fast" style={{ animationDelay: `${d * 0.06}s` }}>
+                      {/* living timeline: a glowing star node + spine down the day */}
+                      <span className="absolute left-[2px] top-[5px] w-[9px] h-[9px] rounded-full" style={{ background: "var(--accent)", boxShadow: "0 0 8px 1px color-mix(in oklab, var(--accent) 75%, transparent)" }} />
+                      <span aria-hidden className="absolute left-[6px] top-[16px] bottom-[-12px] w-px" style={{ background: "linear-gradient(180deg, color-mix(in oklab, var(--accent) 45%, transparent), transparent)" }} />
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="font-display font-bold text-[13.5px]">Day {globalDay}</span>
                         {weatherByDay.get(globalDay) && <WeatherChip w={weatherByDay.get(globalDay) as DaySignal} />}

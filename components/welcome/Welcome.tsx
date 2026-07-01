@@ -3,17 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowRight, RefreshCw, Sparkles } from "lucide-react";
 import { useTrip } from "@/lib/store";
-import { useTrips } from "@/lib/trips/store";
-import { useTripLoader } from "@/lib/trips/useTripLoader";
-import { composeTrip } from "@/lib/ai-client";
-import { geocodeCity } from "@/lib/geo";
-import { saveTrip } from "@/lib/destinations/repository";
-import type { Destination } from "@/lib/types";
+import { useComposeJourney } from "@/lib/trips/useComposeJourney";
 import { Logo } from "@/components/Logo";
 import { ImmersiveMenu } from "@/components/immersive/ImmersiveMenu";
 import { JourneyCore, type CoreNode } from "@/components/immersive/JourneyCore";
-
-const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
 
 const PROMPTS = [
   "10 days exploring Italy with my family.",
@@ -43,12 +36,9 @@ function nodesFromText(text: string): CoreNode[] | undefined {
 
 export function Welcome() {
   const { actions } = useTrip();
-  const { actions: tripActions } = useTrips();
-  const loadPlan = useTripLoader();
+  const { compose, busy, error, setError } = useComposeJourney();
   const [value, setValue] = useState("");
   const [promptIdx, setPromptIdx] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -71,55 +61,7 @@ export function Welcome() {
   const coreState: "idle" | "thinking" | "routing" = busy ? "routing" : value.trim() ? "thinking" : "idle";
   const coreNodes = nodesFromText(value);
 
-  const start = async () => {
-    const text = value.trim();
-    if (!text || busy) return;
-    setError(null);
-    setBusy(true);
-    try {
-      // The AI reads the words and composes a real trip (destinations + preferences).
-      // A trip is created ONLY on a confident result — never from the raw prompt.
-      const outcome = await composeTrip(text);
-      if (outcome.status !== "ok") {
-        // Transient (busy) or unparseable (empty): create nothing, keep the prompt,
-        // and let the user retry with one click.
-        setBusy(false);
-        setError(
-          outcome.status === "busy"
-            ? "The AI is currently busy. Please try again in a few seconds."
-            : "I couldn’t turn that into a trip yet — try naming a destination or two."
-        );
-        return;
-      }
-      const composed = outcome.trip;
-      const trip = await tripActions.createTrip(composed.name || composed.destinations[0].city, composed.destinations[0].city);
-      if (!trip) throw new Error("createTrip failed");
-      const cursor = new Date();
-      cursor.setDate(cursor.getDate() + 30); // sensible default start ~a month out
-      const dests: Destination[] = [];
-      for (let i = 0; i < composed.destinations.length; i++) {
-        const c = composed.destinations[i];
-        const g = await geocodeCity(c.city, c.country).catch(() => null);
-        const arrive = new Date(cursor);
-        cursor.setDate(cursor.getDate() + c.nights);
-        dests.push({
-          id: i + 1, name: c.city, country: g?.countryName || c.country || "", countryCode: g?.countryCode || "",
-          lat: g?.lat, lng: g?.lng, image: null, saved: true, expanded: false,
-          arrive: fmtDate(arrive), depart: fmtDate(cursor), accoms: [], budgetOverride: null,
-        });
-      }
-      await saveTrip(trip.id, dests, "standard", {}, composed.preferences || {});
-      // Enter the conversational workspace, hydrating the store from what we
-      // just saved (the workspace reads the store; loadPlan populates it).
-      actions.goWorkspace();
-      await loadPlan(trip.id, composed.destinations[0].city);
-    } catch {
-      // A confident trip failed to persist (rare DB/network hiccup) — surface it
-      // for retry rather than dropping the user into a half-built trip.
-      setBusy(false);
-      setError("Something went wrong starting your trip. Please try again.");
-    }
-  };
+  const start = () => compose(value);
 
   return (
     <div

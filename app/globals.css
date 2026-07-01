@@ -195,6 +195,24 @@ body {
 }
 @media (prefers-reduced-motion: reduce) { .burst-dot { display: none; } }
 
+/* ===== One continuous canvas — cinematic screen transitions ===== */
+@keyframes screen_in { from { opacity: 0; transform: translateY(12px) scale(.994); } to { opacity: 1; transform: none; } }
+.screen-stage { animation: screen_in .5s var(--ease-out-expo) both; }
+@media (prefers-reduced-motion: reduce) { .screen-stage { animation: none; } }
+
+/* warp — "travel into" a journey when opening it */
+@keyframes warp_flash { 0% { opacity: 0; transform: scale(.2); } 40% { opacity: 1; } 100% { opacity: 0; transform: scale(3.4); } }
+@keyframes warp_veil { 0% { opacity: 0; } 55% { opacity: 1; } 100% { opacity: 1; } }
+.warp-veil { animation: warp_veil .5s var(--ease-soft) forwards; }
+.warp-ring { animation: warp_flash .55s var(--ease-out-expo) forwards; }
+@media (prefers-reduced-motion: reduce) { .warp-ring { display: none; } }
+
+/* ===== Living journey cards (Trip List) ===== */
+.journey-card { position: relative; transition: transform .3s var(--ease-spring), box-shadow .3s ease, border-color .25s ease; }
+.journey-card:hover { transform: translateY(-3px); border-color: color-mix(in oklab, var(--accent) 42%, transparent); box-shadow: 0 22px 50px -26px rgba(0,0,0,.7), 0 0 0 1px color-mix(in oklab, var(--accent) 14%, transparent); }
+.journey-card .journey-open { transition: transform .25s var(--ease-spring), filter .2s ease; }
+.journey-card:hover .journey-open { filter: brightness(1.07); }
+
 /* ===== Welcome ambient lights ===== */
 .wl-light { position: absolute; pointer-events: none; border-radius: 50%; z-index: 0; will-change: transform; }
 @keyframes wl_float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -22px; } }

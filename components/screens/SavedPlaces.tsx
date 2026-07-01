@@ -6,8 +6,9 @@ import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { getRepository, type SavedEntry } from "@/lib/itinerary/repository";
 import { placeLink } from "@/lib/maps";
+import { JourneyCore, type CoreNode } from "@/components/immersive/JourneyCore";
 
-function PlaceCard({ entry }: { entry: SavedEntry }) {
+function PlaceCard({ entry, index }: { entry: SavedEntry; index: number }) {
   const p = entry.place;
   const href = placeLink({ name: p.name, position: p.position, placeId: p.placeId });
   return (
@@ -15,16 +16,18 @@ function PlaceCard({ entry }: { entry: SavedEntry }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="imm-glass imm-glass-hover group rounded-[14px] overflow-hidden flex cursor-pointer transition hover:-translate-y-0.5"
-      style={{ boxShadow: "0 12px 30px -22px rgba(0,0,0,.6)" }}
+      className="journey-card imm-glass group rounded-[14px] overflow-hidden flex cursor-pointer vp-fade-fast"
+      style={{ boxShadow: "0 12px 30px -22px rgba(0,0,0,.6)", animationDelay: `${Math.min(index, 10) * 0.04}s` }}
     >
-      <div className="w-[84px] shrink-0" style={{ background: "rgba(255,255,255,.06)" }}>
+      <div className="relative w-[84px] shrink-0" style={{ background: "rgba(255,255,255,.06)" }}>
         {p.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={p.photoUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
         ) : (
           <span className="w-full h-full grid place-items-center" style={{ color: "var(--accent)" }}><MapPin size={18} /></span>
         )}
+        {/* constellation node */}
+        <span className="absolute top-2 left-2 w-1.5 h-1.5 rounded-full" style={{ background: "var(--accent)", boxShadow: "0 0 8px 1px color-mix(in oklab, var(--accent) 80%, transparent)" }} />
       </div>
       <div className="flex-1 min-w-0 p-3 text-white">
         <div className="font-semibold text-[14px] truncate">{p.name}</div>
@@ -72,13 +75,27 @@ export function SavedPlaces() {
     return byTrip;
   }, [entries]);
 
+  const total = entries?.length ?? 0;
+  // Saved places form a constellation on the Core.
+  const savedNodes: CoreNode[] | undefined = total
+    ? Array.from({ length: Math.min(total, 9) }, (_, i) => {
+        const n = Math.min(total, 9);
+        const ang = -Math.PI / 2 + (i / n) * 2 * Math.PI + (i % 2 ? 0.4 : 0);
+        const rad = 0.4 + (i % 3) * 0.18;
+        return { x: Math.cos(ang) * rad, y: Math.sin(ang) * rad, active: i === 0 };
+      })
+    : undefined;
+
   return (
     <div className="min-h-full text-white">
-      <div className="max-w-[1000px] mx-auto px-[clamp(16px,3vw,28px)] py-8">
-        <div className="mb-7 imm-rise">
-          <div className="inline-flex items-center gap-1.5 text-[11.5px] uppercase tracking-[.12em] text-white/55"><Heart size={12} style={{ color: "var(--accent)" }} />Saved</div>
-          <h1 className="font-brand font-bold tracking-[-.01em] mt-2" style={{ fontSize: "clamp(28px,4.5vw,44px)" }}>Places you've saved</h1>
-          <p className="text-white/60 text-[14.5px] mt-2">Everything the companion suggested that caught your eye, grouped by journey.</p>
+      <div className="max-w-[1000px] mx-auto px-[clamp(16px,3vw,28px)] py-6">
+        <div className="mb-8 flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-6 text-center sm:text-left imm-rise">
+          <JourneyCore size="clamp(120px,15vw,160px)" state="idle" nodes={savedNodes} className="shrink-0" />
+          <div className="sm:pt-4">
+            <div className="inline-flex items-center gap-1.5 text-[11.5px] uppercase tracking-[.12em] text-white/55"><Heart size={12} style={{ color: "var(--accent)" }} />Saved</div>
+            <h1 className="font-brand font-bold tracking-[-.02em] mt-2" style={{ fontSize: "clamp(28px,4.5vw,44px)" }}>Your constellation of places</h1>
+            <p className="text-white/60 text-[14.5px] mt-2 max-w-[520px]">Every place the companion suggested that caught your eye{total ? ` — ${total} saved` : ""}, grouped by journey.</p>
+          </div>
         </div>
 
         {entries === null ? (
@@ -107,7 +124,7 @@ export function SavedPlaces() {
                     <div key={dest}>
                       <div className="text-[12px] font-bold uppercase tracking-[.05em] text-white/55 mb-2 flex items-center gap-1.5"><MapPin size={12} strokeWidth={2} style={{ color: "var(--accent)" }} />{dest}</div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {places.map((e) => <PlaceCard key={`${e.tripId}-${e.place.id}`} entry={e} />)}
+                        {places.map((e, i) => <PlaceCard key={`${e.tripId}-${e.place.id}`} entry={e} index={i} />)}
                       </div>
                     </div>
                   ))}
