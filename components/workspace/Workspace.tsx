@@ -323,7 +323,7 @@ export function Workspace() {
 
       {/* ============ Live journey ============ */}
       <section className="flex-1 overflow-y-auto vp-scroll">
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} actions={actions} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} />
       </section>
 
       <style dangerouslySetInnerHTML={{ __html: `@keyframes vpw_pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.3)}}` }} />
@@ -332,10 +332,9 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, actions, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
-  actions: ReturnType<typeof useTrip>["actions"];
   itinerary: ItineraryItem[];
   onRemoveStop: (placeId: string) => void;
   weatherByDay: Map<number, DaySignal>;
@@ -361,7 +360,7 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
         <div>
           <Compass size={40} strokeWidth={1.5} className="text-accent mx-auto" />
           <div className="font-display font-bold text-[18px] mt-3">Your journey will appear here</div>
-          <p className="text-muted text-[13.5px] mt-1 max-w-[320px]">Tell the companion where you'd like to go and watch the trip build itself.</p>
+          <p className="text-muted text-[13.5px] mt-1 max-w-[320px]">Tell the companion where you&apos;d like to go and watch the trip build itself.</p>
         </div>
       </div>
     );

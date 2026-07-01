@@ -12,7 +12,6 @@ import { computeBudget, formatMoney, type BudgetLevel, type Currency } from "./e
 // levels from Google Places enrichment). Advisory only.
 
 const cityKey = (n: string) => n.split(",")[0].trim().toLowerCase();
-const cityName = (n: string) => n.split(",")[0].trim();
 
 /** "$"–"$$$$" from a Google price level (0 = free). */
 export const priceSym = (lvl: number | null | undefined): string =>

@@ -12,7 +12,6 @@ import { useAuth } from "@/lib/auth/store";
 import { computeBudget, convertCostText, formatMoney } from "@/lib/budget/estimate";
 import { useCurrency } from "@/lib/budget/useCurrency";
 import type { LatLng } from "@/lib/maps";
-import type { Destination } from "@/lib/types";
 import type { BookTemplate } from "./templates";
 
 const cityKey = (name: string) => name.split(",")[0].trim().toLowerCase();
