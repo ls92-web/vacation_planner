@@ -53,6 +53,30 @@ function estVisit(types?: string[]): string {
   return "~2h";
 }
 
+/** The companion "speaks" — reveals its reply progressively, like it's thinking aloud. */
+function TypedText({ text, onTick }: { text: string; onTick?: () => void }) {
+  const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const [n, setN] = useState(reduce ? text.length : 0);
+  useEffect(() => {
+    if (reduce) { setN(text.length); return; }
+    let i = 0;
+    const id = setInterval(() => {
+      i = Math.min(text.length, i + 2);
+      setN(i);
+      onTick?.();
+      if (i >= text.length) clearInterval(id);
+    }, 16);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+  return (
+    <>
+      {text.slice(0, n)}
+      {n < text.length && <span className="type-caret" aria-hidden />}
+    </>
+  );
+}
+
 export function Workspace() {
   const { state, actions } = useTrip();
   const { activeTrip, actions: tripActions } = useTrips();
@@ -60,6 +84,8 @@ export function Workspace() {
   const currency = useCurrency();
 
   const [messages, setMessages] = useState<ChatTurn[]>([]);
+  // Which assistant message is currently "being spoken" (streamed in). -1 = none.
+  const [animateIdx, setAnimateIdx] = useState(-1);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   // Particle bursts that flow from a tapped action toward the AI brandmark.
@@ -210,6 +236,7 @@ export function Workspace() {
     greeted.current = true;
     const cities = saved.map((d) => d.name).join(", ");
     setMessages([{ role: "assistant", content: `Your ${struct.name} is taking shape — ${cities}. Tell me how you'd like to shape it: add a city, change how long you stay, adjust the pace or who's coming, or ask me anything.` }]);
+    setAnimateIdx(0); // the companion "arrives" — its first words stream in
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saved.length, messages.length, activeTrip?.id]);
 
@@ -283,10 +310,12 @@ export function Workspace() {
         }
         const full = [...afterUser, { role: "assistant" as const, content: res.reply, suggestions: rich }];
         setMessages(full);
+        setAnimateIdx(full.length - 1);
         saveChat(activeTrip.id, full);
       } else {
         const full = [...afterUser, { role: "assistant" as const, content: "I couldn't update that just now — mind rephrasing?" }];
         setMessages(full);
+        setAnimateIdx(full.length - 1);
         saveChat(activeTrip.id, full);
       }
     } finally {
@@ -327,7 +356,9 @@ export function Workspace() {
                   ? { background: "var(--accent)", color: "#fff", borderBottomRightRadius: 4 }
                   : { background: "rgba(255,255,255,.07)", color: "#fff", border: "1px solid rgba(255,255,255,.12)", borderBottomLeftRadius: 4 }}
               >
-                {m.content}
+                {m.role === "assistant" && i === animateIdx
+                  ? <TypedText text={m.content} onTick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })} />
+                  : m.content}
               </div>
               {m.role === "assistant" && m.suggestions?.length ? (
                 <div className="mt-2 flex flex-col gap-2">

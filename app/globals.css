@@ -195,6 +195,10 @@ body {
 }
 @media (prefers-reduced-motion: reduce) { .burst-dot { display: none; } }
 
+/* ===== The companion "speaks" — streamed reply caret ===== */
+@keyframes type_blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.type-caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; border-radius: 1px; background: var(--accent); animation: type_blink 1s steps(1) infinite; }
+
 /* ===== One continuous canvas — cinematic screen transitions ===== */
 @keyframes screen_in { from { opacity: 0; transform: translateY(12px) scale(.994); } to { opacity: 1; transform: none; } }
 .screen-stage { animation: screen_in .5s var(--ease-out-expo) both; }
