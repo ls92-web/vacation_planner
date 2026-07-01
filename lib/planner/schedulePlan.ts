@@ -20,7 +20,7 @@ const INDOOR_TYPES = ["museum", "art_gallery", "restaurant", "cafe", "bar", "sho
 const OUTDOOR_TYPES = ["park", "tourist_attraction", "natural_feature", "beach", "zoo", "amusement_park", "stadium", "campground", "hiking_area", "garden", "plaza"];
 
 /** Best-effort indoor/outdoor classification, so weather reasoning knows a stop's exposure. */
-function venueEnv(place: ExplorePlace): "indoor" | "outdoor" | "" {
+export function venueEnv(place: ExplorePlace): "indoor" | "outdoor" | "" {
   if (place.indoor === true) return "indoor";
   const types = place.googleTypes ?? [];
   if (types.some((t) => INDOOR_TYPES.includes(t))) return "indoor";

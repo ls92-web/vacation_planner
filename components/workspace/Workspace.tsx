@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Clock, Compass, MapPin, Moon, Plus, Send, Sparkles, Wallet, X } from "lucide-react";
+import { ArrowRight, Check, Clock, Compass, Lightbulb, MapPin, Moon, Plus, Send, Sparkles, Wallet, X } from "lucide-react";
 import { queryLink } from "@/lib/maps";
 import { getRepository } from "@/lib/itinerary/repository";
 import { geocodeCity } from "@/lib/geo";
@@ -13,6 +13,7 @@ import { buildWeatherContext, type DaySignal } from "@/lib/weather/signal";
 import { describeWeather } from "@/lib/weather/codes";
 import { buildBudgetContext, type BudgetDaySignal } from "@/lib/budget/signal";
 import { buildTransportContext } from "@/lib/planner/transportSignal";
+import { deriveInsights, nextActions, type Insight } from "@/lib/planner/insights";
 import { withSave } from "@/lib/ui/saveStatus";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
@@ -34,8 +35,6 @@ import { Logo } from "@/components/Logo";
 
 const sigOf = (t: ComposedTrip) =>
   JSON.stringify({ n: t.name, d: t.destinations.map((x) => `${x.city.toLowerCase()}#${x.nights}`), p: t.preferences });
-
-const QUICK = ["Plan my days", "What should we do there?", "Optimize for the weather", "Make day 1 less busy"];
 
 /** Stable id for a suggested place, so saving is idempotent and "saved" survives reload. */
 const suggestionId = (s: PlaceSuggestion) => `sugg:${s.city.toLowerCase()}:${s.name.toLowerCase()}`.replace(/\s+/g, "-");
@@ -71,6 +70,13 @@ export function Workspace() {
   );
 
   const saved = useMemo(() => state.destinations.filter((d) => d.saved && d.name.trim()), [state.destinations]);
+  // Proactive intelligence: the companion's own observations about the current plan.
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const insights = useMemo(
+    () => deriveInsights(saved, itinerary, weatherByDay, budget.byDay, state.budgetLevel, state.transports),
+    [saved, itinerary, weatherByDay, budget.byDay, state.budgetLevel, state.transports]
+  );
+  const activeInsights = insights.filter((i) => !dismissed.has(i.id));
   const travelers = state.adults + state.kids;
   const struct: ComposedTrip = useMemo(
     () => ({
@@ -300,13 +306,11 @@ export function Workspace() {
         </div>
 
         <div className="shrink-0 px-3 pb-3 pt-1">
-          {messages.length <= 1 && (
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {QUICK.map((q) => (
-                <button key={q} onClick={() => send(q)} disabled={sending} className="imm-glass imm-glass-hover px-2.5 py-1.5 rounded-full text-[12px] font-semibold text-white/70 cursor-pointer hover:text-white disabled:opacity-50 transition">{q}</button>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {nextActions(saved, itinerary).map((q) => (
+              <button key={q} onClick={() => send(q)} disabled={sending} className="imm-glass imm-glass-hover px-2.5 py-1.5 rounded-full text-[12px] font-semibold text-white/70 cursor-pointer hover:text-white disabled:opacity-50 transition">{q}</button>
+            ))}
+          </div>
           <div className="imm-glass flex items-end gap-2 rounded-[16px] p-2" style={{ boxShadow: "0 8px 24px -16px rgba(0,0,0,.5)" }}>
             <textarea
               value={input}
@@ -325,7 +329,7 @@ export function Workspace() {
 
       {/* ============ Live journey ============ */}
       <section className="flex-1 overflow-y-auto imm-scroll">
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} onInsightAction={(m, id) => { setDismissed((prev) => new Set(prev).add(id)); send(m); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
 
       <style dangerouslySetInnerHTML={{ __html: `@keyframes vpw_pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.3)}}` }} />
@@ -334,7 +338,7 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports, insights, onInsightAction, onInsightDismiss }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   itinerary: ItineraryItem[];
@@ -342,6 +346,9 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
   weatherByDay: Map<number, DaySignal>;
   budgetByDay: Map<number, BudgetDaySignal>;
   transports: Record<string, string>;
+  insights: Insight[];
+  onInsightAction: (message: string, id: string) => void;
+  onInsightDismiss: (id: string) => void;
 }) {
   const markers: MapMarker[] = saved
     .filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0))
@@ -370,6 +377,9 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
 
   return (
     <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] py-6">
+      {/* proactive intelligence */}
+      <InsightBar insights={insights} onAction={onInsightAction} onDismiss={onInsightDismiss} />
+
       {/* map */}
       <div className="relative rounded-[18px] overflow-hidden border border-white/12 h-[260px]">
         <ErrorBoundary fallback={() => <div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px]">Map unavailable</div>}>
@@ -449,6 +459,27 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
 /* ---------------- the living day-by-day schedule ---------------- */
 const totalMinutes = (items: ItineraryItem[]) => items.reduce((s, it) => s + (it.durationMin ?? it.place.estDurationMin), 0);
 const fmtHrs = (min: number) => { const h = Math.floor(min / 60); const m = min % 60; return h ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`; };
+
+/** Proactive, dismissible AI observations — acting on one sends its pre-written prompt. */
+function InsightBar({ insights, onAction, onDismiss }: { insights: Insight[]; onAction: (message: string, id: string) => void; onDismiss: (id: string) => void }) {
+  if (!insights.length) return null;
+  return (
+    <div className="mb-4 flex flex-col gap-2">
+      {insights.map((it) => (
+        <div key={it.id} className="imm-glass rounded-[14px] px-3.5 py-3 flex items-start gap-3 vp-fade-fast">
+          <span className="w-8 h-8 rounded-full grid place-items-center shrink-0 mt-0.5" style={{ background: "rgba(255,255,255,.08)", color: "var(--accent)" }}><Lightbulb size={15} strokeWidth={2} /></span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] text-white/85 leading-snug">{it.text}</div>
+            <div className="mt-2 flex items-center gap-3">
+              <button onClick={() => onAction(it.message, it.id)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-bold text-white cursor-pointer transition hover:brightness-[1.06]" style={{ background: "var(--accent)" }}>{it.actionLabel}<ArrowRight size={12} strokeWidth={2.2} /></button>
+              <button onClick={() => onDismiss(it.id)} className="text-[12px] font-semibold text-white/45 hover:text-white/70 cursor-pointer transition">Dismiss</button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function WeatherChip({ w }: { w: DaySignal }) {
   const Icon = describeWeather(w.code).icon;
