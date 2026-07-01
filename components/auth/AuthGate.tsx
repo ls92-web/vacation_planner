@@ -9,11 +9,11 @@ import { Onboarding } from "./Onboarding";
 
 function Splash() {
   return (
-    <div className="min-h-screen grid place-items-center" style={{ background: "var(--bg)" }}>
+    <div className="imm-bg min-h-screen grid place-items-center text-white">
       <div className="flex flex-col items-center gap-4">
         <Logo size={52} />
-        <div className="font-brand font-semibold text-[22px] tracking-[-.01em] text-ink">Itinera</div>
-        <div className="w-5 h-5 border-2 border-line border-t-accent rounded-full vp-spin" />
+        <div className="font-brand font-semibold text-[22px] tracking-[-.01em]">Itinera</div>
+        <div className="w-5 h-5 border-2 border-white/20 rounded-full vp-spin" style={{ borderTopColor: "var(--accent)" }} />
       </div>
     </div>
   );
@@ -21,12 +21,12 @@ function Splash() {
 
 function ConfigNotice() {
   return (
-    <div className="min-h-screen grid place-items-center p-6" style={{ background: "var(--bg)" }}>
+    <div className="imm-bg min-h-screen grid place-items-center p-6 text-white">
       <div className="max-w-[440px] text-center flex flex-col items-center gap-4">
         <Logo size={48} />
-        <div className="font-brand font-semibold text-[22px] tracking-[-.01em] text-ink">Itinera</div>
-        <h1 className="font-display font-bold text-[18px] text-ink">Sign-in isn&apos;t available</h1>
-        <p className="text-[14px] text-muted leading-relaxed">
+        <div className="font-brand font-semibold text-[22px] tracking-[-.01em]">Itinera</div>
+        <h1 className="font-display font-bold text-[18px]">Sign-in isn&apos;t available</h1>
+        <p className="text-[14px] text-white/60 leading-relaxed">
           This deployment is missing its Supabase configuration. Set{" "}
           <code className="font-mono text-[12.5px]">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
           <code className="font-mono text-[12.5px]">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in the hosting

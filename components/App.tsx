@@ -6,39 +6,37 @@ import { TripsProvider } from "@/lib/trips/store";
 import { UIProvider } from "@/lib/ui/store";
 import { AuthGate } from "./auth/AuthGate";
 import { ThemeApplier } from "./theme/ThemeApplier";
-import { AppShell } from "./shell/AppShell";
-import { Dashboard } from "./screens/Dashboard";
+import { ImmersiveShell } from "./immersive/ImmersiveShell";
 import { TripsDashboard } from "./trips/TripsDashboard";
 import { SavedPlaces } from "./screens/SavedPlaces";
-import { ProfilePage } from "./account/ProfilePage";
-import { SettingsPage } from "./account/SettingsPage";
 import { Welcome } from "./welcome/Welcome";
 import { Workspace } from "./workspace/Workspace";
 import { Toast } from "./Toast";
 
+/** Secondary immersive screens (reached from the floating menu): My journeys + Saved. */
 function Screens() {
   const { state } = useTrip();
   return (
     <>
-      {state.screen === "dashboard" && <Dashboard />}
-      {state.screen === "trips" && <TripsDashboard />}
-      {state.screen === "saved" && <SavedPlaces />}
-      {state.screen === "profile" && <ProfilePage />}
-      {state.screen === "settings" && <SettingsPage />}
+      {state.screen === "saved" ? <SavedPlaces /> : <TripsDashboard />}
       <Toast />
     </>
   );
 }
 
-/** Boots into the immersive Welcome (no chrome); everything else runs in the AppShell. */
+/**
+ * One continuous immersive experience — no sidebar, no admin dashboard.
+ * Welcome (start) and the Workspace (Journey Board) own their full-screen layout;
+ * everything else rides the shared immersive shell.
+ */
 function Shell() {
   const { state } = useTrip();
-  if (state.screen === "welcome") return <><Welcome /><Toast /></>;
+  if (state.screen === "welcome" || state.screen === "dashboard") return <><Welcome /><Toast /></>;
   if (state.screen === "workspace") return <><Workspace /><Toast /></>;
   return (
-    <AppShell>
+    <ImmersiveShell>
       <Screens />
-    </AppShell>
+    </ImmersiveShell>
   );
 }
 

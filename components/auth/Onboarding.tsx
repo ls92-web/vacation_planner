@@ -51,20 +51,21 @@ export function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center px-4 py-10" style={{ background: "var(--bg)" }}>
-      <div className="w-full max-w-[640px] vp-fade">
+    <div className="imm-bg min-h-screen grid place-items-center px-4 py-10 text-white relative overflow-hidden">
+      <div aria-hidden className="pointer-events-none absolute left-1/2 -translate-x-1/2" style={{ top: "-14%", width: 720, height: 720, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in oklab, var(--accent) 20%, transparent), transparent 62%)" }} />
+      <div className="relative w-full max-w-[640px] imm-rise">
         <div className="flex items-center gap-2.5 mb-5">
           <Logo size={30} />
-          <span className="font-brand font-semibold text-[20px] tracking-[-.01em] text-ink">Itinera</span>
+          <span className="font-brand font-semibold text-[20px] tracking-[-.01em]">Itinera</span>
         </div>
-        <div className="bg-surface border border-line rounded-[22px] p-6 sm:p-8" style={{ boxShadow: "0 20px 50px -24px rgba(0,0,0,.25)" }}>
-          <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[.05em] text-accent">
+        <div className="imm-glass rounded-[22px] p-6 sm:p-8" style={{ boxShadow: "0 40px 90px -30px rgba(0,0,0,.8)" }}>
+          <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-[.05em]" style={{ color: "var(--accent)" }}>
             <Sparkle size={14} strokeWidth={1.8} />A quick setup
           </div>
           <div className="font-brand font-semibold text-[28px] tracking-[-.01em] mt-1.5">
             Welcome{state.profile?.full_name ? `, ${state.profile.full_name.split(" ")[0]}` : ""}.
           </div>
-          <p className="text-muted text-[14px] mt-1.5">Five quick taps so the AI tailors every plan to you. You can change these any time.</p>
+          <p className="text-white/60 text-[14px] mt-1.5">Five quick taps so the AI tailors every plan to you. You can change these any time.</p>
 
           <div className="mt-6 flex flex-col gap-5">
             {QUESTIONS.map((question) => (
@@ -78,7 +79,7 @@ export function Onboarding() {
                         key={o}
                         onClick={() => set(question.key, o)}
                         className="px-3.5 py-2 rounded-full border text-[13px] font-semibold cursor-pointer transition"
-                        style={{ borderColor: on ? "var(--accent)" : "var(--line)", background: on ? "var(--accent)" : "#fff", color: on ? "#fff" : "var(--ink)" }}
+                        style={{ borderColor: on ? "var(--accent)" : "rgba(255,255,255,.15)", background: on ? "var(--accent)" : "rgba(255,255,255,.06)", color: "#fff" }}
                       >
                         {o}
                       </button>
@@ -98,7 +99,7 @@ export function Onboarding() {
                       key={String(v)}
                       onClick={() => setFamily(v)}
                       className="px-4 py-2 rounded-full border text-[13px] font-semibold cursor-pointer transition"
-                      style={{ borderColor: on ? "var(--accent)" : "var(--line)", background: on ? "var(--accent)" : "#fff", color: on ? "#fff" : "var(--ink)" }}
+                      style={{ borderColor: on ? "var(--accent)" : "rgba(255,255,255,.15)", background: on ? "var(--accent)" : "rgba(255,255,255,.06)", color: "#fff" }}
                     >
                       {v ? "Yes, prioritize family-friendly" : "No, show everything"}
                     </button>
@@ -109,7 +110,7 @@ export function Onboarding() {
 
             <div>
               <div className="text-[13.5px] font-semibold mb-1">Choose your colour theme</div>
-              <p className="text-[12px] text-muted mb-2.5">Sets the look of the whole app — you can change it anytime in Settings.</p>
+              <p className="text-[12px] text-white/55 mb-2.5">Sets the look of the whole app — you can change it anytime from your account.</p>
               <ThemePicker value={theme} onChange={pickTheme} />
             </div>
           </div>

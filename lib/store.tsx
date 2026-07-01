@@ -259,11 +259,8 @@ export function useTripStore() {
           set({ screen: "trips" });
           requestAnimationFrame(() => window.scrollTo({ top: 0 }));
         }),
-      goDashboard: () =>
-        requestNavigation(() => {
-          set({ screen: "dashboard" });
-          requestAnimationFrame(() => window.scrollTo({ top: 0 }));
-        }),
+      // Dashboard retired in the immersive redesign — "home" is the Welcome (or the active trip).
+      goDashboard: () => requestNavigation(() => set({ screen: "welcome" })),
       goSaved: () =>
         requestNavigation(() => {
           set({ screen: "saved" });

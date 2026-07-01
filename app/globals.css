@@ -130,6 +130,40 @@ body {
 .vp-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .14); border-radius: 9px; }
 .vp-scroll::-webkit-scrollbar-track { background: transparent; }
 
+/* ===== Immersive AI canvas (dark navy) — the app-wide experience shell.
+   A fixed aesthetic (navy gradient + glass + the theme's accent glow) shared by
+   Welcome, the Journey Board (Workspace), auth, and the immersive screens. */
+.imm-bg {
+  background: radial-gradient(125% 120% at 50% -10%, #1a2c4d 0%, #0c1828 48%, #060c16 100%);
+  color: #fff;
+}
+.imm-glass {
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .12);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.imm-glass-hover:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .2); }
+.imm-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+.imm-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .16); border-radius: 9px; }
+.imm-scroll { scrollbar-color: rgba(255, 255, 255, .18) transparent; }
+
+@keyframes imm_rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes imm_float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+@keyframes imm_pulse { 0%, 100% { opacity: .3; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.35); } }
+.imm-rise { animation: imm_rise .6s ease both; }
+.imm-rise-2 { animation: imm_rise .6s ease .08s both; }
+.imm-rise-3 { animation: imm_rise .6s ease .16s both; }
+.imm-input {
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .14);
+  color: #fff;
+  transition: border-color .18s ease, background-color .18s ease;
+}
+.imm-input::placeholder { color: rgba(255, 255, 255, .38); }
+.imm-input:focus { border-color: var(--accent); background: rgba(255, 255, 255, .09); }
+.imm-input option { color: #111; }
+
 /* ===== Google Maps markers (elegant teardrop + subtle micro-interaction) ===== */
 .vp-marker {
   width: 30px;

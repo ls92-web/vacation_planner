@@ -29,6 +29,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import type { LatLng, MapMarker } from "@/lib/maps";
 import { CityImage } from "@/components/destinations/CityImage";
 import { ExportControl } from "@/components/export/ExportButton";
+import { ImmersiveMenu } from "@/components/immersive/ImmersiveMenu";
 import { Logo } from "@/components/Logo";
 
 const sigOf = (t: ComposedTrip) =>
@@ -228,27 +229,28 @@ export function Workspace() {
 
   return (
     <MapsApiProvider>
-    <div className="h-screen w-full flex flex-col lg:flex-row overflow-hidden" style={{ background: "var(--bg)" }}>
+    <div className="imm-bg h-screen w-full flex flex-col lg:flex-row overflow-hidden font-body text-white">
       {/* ============ Chat (primary) ============ */}
-      <section className="flex flex-col lg:w-[40%] lg:max-w-[520px] h-[52vh] lg:h-full border-b lg:border-b-0 lg:border-r border-line" style={{ background: "color-mix(in oklab, var(--bg) 55%, #fff)" }}>
-        <header className="flex items-center gap-2.5 px-4 h-[58px] border-b border-line shrink-0">
+      <section className="flex flex-col lg:w-[40%] lg:max-w-[520px] h-[52vh] lg:h-full border-b lg:border-b-0 lg:border-r border-white/10" style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(10px)" }}>
+        <header className="flex items-center gap-2.5 px-4 h-[58px] border-b border-white/10 shrink-0">
           <button onClick={actions.goWelcome} title="New journey" className="flex items-center gap-2 cursor-pointer">
             <Logo size={26} />
           </button>
           <div className="min-w-0 flex-1">
             <div className="font-display font-bold text-[15px] leading-tight truncate">{activeTrip?.name || "Your trip"}</div>
-            <div className="text-[11.5px] text-muted flex items-center gap-1"><Sparkles size={11} className="text-accent" />AI travel companion</div>
+            <div className="text-[11.5px] text-white/55 flex items-center gap-1"><Sparkles size={11} style={{ color: "var(--accent)" }} />AI travel companion</div>
           </div>
+          <ImmersiveMenu />
         </header>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto vp-scroll px-4 py-4 flex flex-col gap-3">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto imm-scroll px-4 py-4 flex flex-col gap-3">
           {messages.map((m, i) => (
             <div key={i} className={`max-w-[88%] ${m.role === "user" ? "self-end" : "self-start"}`}>
               <div
                 className="rounded-[16px] px-3.5 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap"
                 style={m.role === "user"
                   ? { background: "var(--accent)", color: "#fff", borderBottomRightRadius: 4 }
-                  : { background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--line)", borderBottomLeftRadius: 4 }}
+                  : { background: "rgba(255,255,255,.07)", color: "#fff", border: "1px solid rgba(255,255,255,.12)", borderBottomLeftRadius: 4 }}
               >
                 {m.content}
               </div>
@@ -257,17 +259,17 @@ export function Workspace() {
                   {m.suggestions.map((s, si) => {
                     const isSaved = savedIds.has(suggestionId(s));
                     return (
-                      <div key={si} className="rounded-[14px] border border-line bg-surface px-3.5 py-2.5 vp-fade-fast">
+                      <div key={si} className="imm-glass rounded-[14px] px-3.5 py-2.5 vp-fade-fast">
                         <div className="font-display font-bold text-[13.5px] leading-tight">{s.name}</div>
-                        <div className="text-[11px] text-muted">{s.city}</div>
-                        {s.why && <div className="text-[12px] text-ink/80 mt-1 leading-snug">{s.why}</div>}
+                        <div className="text-[11px] text-white/50">{s.city}</div>
+                        {s.why && <div className="text-[12px] text-white/75 mt-1 leading-snug">{s.why}</div>}
                         <div className="mt-2 flex items-center gap-2">
                           <button
                             onClick={() => saveSuggestion(s)}
                             disabled={isSaved}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11.5px] font-semibold transition cursor-pointer disabled:cursor-default"
                             style={isSaved
-                              ? { background: "var(--tint)", color: "var(--accent)" }
+                              ? { background: "rgba(255,255,255,.12)", color: "#fff" }
                               : { background: "var(--accent)", color: "#fff" }}
                           >
                             {isSaved ? <><Check size={12} />Saved</> : <><Plus size={12} />Save</>}
@@ -276,7 +278,7 @@ export function Workspace() {
                             href={queryLink(`${s.name}, ${s.city}`)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-line text-[11.5px] font-semibold text-muted cursor-pointer hover:text-accent hover:border-accent transition"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-white/15 text-[11.5px] font-semibold text-white/70 cursor-pointer hover:text-white hover:border-white/35 transition"
                           >
                             <MapPin size={12} />Map
                           </a>
@@ -289,7 +291,7 @@ export function Workspace() {
             </div>
           ))}
           {sending && (
-            <div className="self-start rounded-[16px] px-3.5 py-3 bg-surface border border-line" style={{ borderBottomLeftRadius: 4 }}>
+            <div className="self-start rounded-[16px] px-3.5 py-3 imm-glass" style={{ borderBottomLeftRadius: 4 }}>
               <span className="inline-flex gap-1">
                 {[0, 1, 2].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-accent" style={{ animation: `vpw_pulse 1s ease-in-out ${d * 0.18}s infinite` }} />)}
               </span>
@@ -301,18 +303,18 @@ export function Workspace() {
           {messages.length <= 1 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
               {QUICK.map((q) => (
-                <button key={q} onClick={() => send(q)} disabled={sending} className="px-2.5 py-1.5 rounded-full border border-line bg-surface text-[12px] font-semibold text-muted cursor-pointer hover:text-accent hover:border-accent disabled:opacity-50">{q}</button>
+                <button key={q} onClick={() => send(q)} disabled={sending} className="imm-glass imm-glass-hover px-2.5 py-1.5 rounded-full text-[12px] font-semibold text-white/70 cursor-pointer hover:text-white disabled:opacity-50 transition">{q}</button>
               ))}
             </div>
           )}
-          <div className="flex items-end gap-2 rounded-[16px] border border-line bg-surface p-2" style={{ boxShadow: "0 8px 24px -16px rgba(0,0,0,.4)" }}>
+          <div className="imm-glass flex items-end gap-2 rounded-[16px] p-2" style={{ boxShadow: "0 8px 24px -16px rgba(0,0,0,.5)" }}>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
               rows={1}
               placeholder="Tell me how to shape this trip…"
-              className="flex-1 resize-none bg-transparent outline-none border-none px-2 py-1.5 text-[14px] leading-relaxed text-ink placeholder:text-muted max-h-[120px]"
+              className="flex-1 resize-none bg-transparent outline-none border-none px-2 py-1.5 text-[14px] leading-relaxed text-white placeholder:text-white/40 max-h-[120px]"
             />
             <button onClick={() => send()} disabled={sending || !input.trim()} className="shrink-0 w-9 h-9 rounded-[12px] grid place-items-center cursor-pointer disabled:opacity-40" style={{ background: "var(--accent)", color: "#fff" }}>
               <Send size={16} strokeWidth={2} />
@@ -322,7 +324,7 @@ export function Workspace() {
       </section>
 
       {/* ============ Live journey ============ */}
-      <section className="flex-1 overflow-y-auto vp-scroll">
+      <section className="flex-1 overflow-y-auto imm-scroll">
         <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} />
       </section>
 
@@ -356,11 +358,11 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
 
   if (!saved.length) {
     return (
-      <div className="h-full grid place-items-center p-8 text-center">
+      <div className="h-full grid place-items-center p-8 text-center text-white">
         <div>
-          <Compass size={40} strokeWidth={1.5} className="text-accent mx-auto" />
+          <Compass size={40} strokeWidth={1.5} className="mx-auto" style={{ color: "var(--accent)" }} />
           <div className="font-display font-bold text-[18px] mt-3">Your journey will appear here</div>
-          <p className="text-muted text-[13.5px] mt-1 max-w-[320px]">Tell the companion where you&apos;d like to go and watch the trip build itself.</p>
+          <p className="text-white/55 text-[13.5px] mt-1 max-w-[320px]">Tell the companion where you&apos;d like to go and watch the trip build itself.</p>
         </div>
       </div>
     );
@@ -369,7 +371,7 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
   return (
     <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] py-6">
       {/* map */}
-      <div className="relative rounded-[18px] overflow-hidden border border-line h-[260px]">
+      <div className="relative rounded-[18px] overflow-hidden border border-white/12 h-[260px]">
         <ErrorBoundary fallback={() => <div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px]">Map unavailable</div>}>
           <GoogleMap center={center} zoom={5} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px]">Map preview</div>}>
             <DestinationMarkers markers={markers} />
@@ -378,13 +380,13 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
       </div>
 
       {/* summary strip */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
-        <span className="inline-flex items-center gap-1.5"><MapPin size={14} className="text-accent" />{saved.length} {saved.length === 1 ? "city" : "cities"}</span>
-        <span className="inline-flex items-center gap-1.5"><Moon size={14} className="text-accent" />{totalNights} night{totalNights !== 1 ? "s" : ""}</span>
-        <span className="inline-flex items-center gap-1.5 text-muted">{span}</span>
-        <span className="inline-flex items-center gap-1.5 ml-auto font-bold"><Wallet size={14} className="text-accent" />{formatMoney(budgetTotal, currency)}</span>
+      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-white/85">
+        <span className="inline-flex items-center gap-1.5"><MapPin size={14} style={{ color: "var(--accent)" }} />{saved.length} {saved.length === 1 ? "city" : "cities"}</span>
+        <span className="inline-flex items-center gap-1.5"><Moon size={14} style={{ color: "var(--accent)" }} />{totalNights} night{totalNights !== 1 ? "s" : ""}</span>
+        <span className="inline-flex items-center gap-1.5 text-white/55">{span}</span>
+        <span className="inline-flex items-center gap-1.5 ml-auto font-bold text-white"><Wallet size={14} style={{ color: "var(--accent)" }} />{formatMoney(budgetTotal, currency)}</span>
       </div>
-      {preferences && <div className="mt-2 text-[12px] text-muted">{preferences}</div>}
+      {preferences && <div className="mt-2 text-[12px] text-white/55">{preferences}</div>}
 
       {/* the journey */}
       <div className="mt-5 flex flex-col">
@@ -393,17 +395,17 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
           const n = nightsBetween(d.arrive, d.depart);
           return (
             <div key={d.id}>
-              <div className="flex gap-3.5 rounded-[18px] border border-line bg-surface overflow-hidden vp-fade-fast">
-                <div className="w-[112px] shrink-0 relative bg-tint">
+              <div className="imm-glass flex gap-3.5 rounded-[18px] overflow-hidden vp-fade-fast">
+                <div className="w-[112px] shrink-0 relative" style={{ background: "rgba(255,255,255,.06)" }}>
                   <CityImage name={d.name} country={d.country} className="absolute inset-0 w-full h-full object-cover" />
                   <span className="absolute top-2 left-2 w-6 h-6 rounded-full grid place-items-center text-[11px] font-bold text-white" style={{ background: "var(--accent)" }}>{i + 1}</span>
                 </div>
                 <div className="flex-1 min-w-0 py-3 pr-3">
                   <div className="font-display font-bold text-[16px] truncate">{d.name}</div>
-                  <div className="text-[12px] text-muted truncate">{d.country}</div>
+                  <div className="text-[12px] text-white/50 truncate">{d.country}</div>
                   <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11.5px]">
-                    {d.arrive && <span className="px-2 py-0.5 rounded-md bg-tint text-ink">{fmtMonthDay(d.arrive)} – {fmtMonthDay(d.depart)}</span>}
-                    <span className="px-2 py-0.5 rounded-md bg-tint text-ink">{n ?? "—"} night{n !== 1 ? "s" : ""}</span>
+                    {d.arrive && <span className="px-2 py-0.5 rounded-md text-white/80" style={{ background: "rgba(255,255,255,.08)" }}>{fmtMonthDay(d.arrive)} – {fmtMonthDay(d.depart)}</span>}
+                    <span className="px-2 py-0.5 rounded-md text-white/80" style={{ background: "rgba(255,255,255,.08)" }}>{n ?? "—"} night{n !== 1 ? "s" : ""}</span>
                   </div>
                 </div>
               </div>
@@ -412,9 +414,9 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
                 const mode = (transports[rec.key] || rec.recMode) as typeof rec.recMode;
                 const tpl = rec.override && rec.override.mode === mode ? rec.override : MODE_TEMPLATES[mode];
                 return (
-                  <div className="flex items-center gap-2 py-2 pl-[52px] text-[11.5px] text-muted">
-                    <span className="w-px h-4" style={{ background: "var(--line)" }} />
-                    <span className="font-semibold text-ink">{mode}</span>
+                  <div className="flex items-center gap-2 py-2 pl-[52px] text-[11.5px] text-white/55">
+                    <span className="w-px h-4" style={{ background: "rgba(255,255,255,.2)" }} />
+                    <span className="font-semibold text-white/90">{mode}</span>
                     <span>· {tpl.duration} · {convertCostText(tpl.cost, currency)} → {next.name}</span>
                   </div>
                 );
@@ -435,9 +437,9 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
           center={center}
           transportMode="walk"
           units="km"
-          label="Export"
+          label="Export your travel document"
           disabled={!itinerary.length}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] bg-accent text-white text-[13.5px] font-bold cursor-pointer transition hover:brightness-[1.06] disabled:opacity-40"
         />
       </div>
     </div>
@@ -455,7 +457,7 @@ function WeatherChip({ w }: { w: DaySignal }) {
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
       title={`${w.label}${w.seasonal ? " (seasonal average)" : ""}${w.hot ? " · hot" : ""}${w.rain ? " · rain likely" : ""}`}
-      style={alert ? { background: "#FCEFD6", color: "#9A6512" } : { background: "var(--tint)", color: "var(--accent)" }}
+      style={alert ? { background: "#FCEFD6", color: "#9A6512" } : { background: "rgba(255,255,255,.1)", color: "#fff" }}
     >
       <Icon size={12} strokeWidth={2} />{Math.round(w.tMax)}°{w.rain ? " · rain" : w.hot ? " · hot" : ""}
     </span>
@@ -487,9 +489,9 @@ function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay, budgetByDa
 }) {
   if (!itinerary.length) {
     return (
-      <div className="mt-6 rounded-[16px] border border-dashed border-line px-4 py-5 text-center">
+      <div className="mt-6 rounded-[16px] border border-dashed border-white/15 px-4 py-5 text-center text-white">
         <div className="font-display font-bold text-[14.5px]">No day-by-day plan yet</div>
-        <p className="text-muted text-[12.5px] mt-1 max-w-[420px] mx-auto">Ask the companion to <span className="text-ink font-semibold">“plan my days”</span> — then refine it by chat: move stops between days, reorder, make a day less busy, or swap in alternatives.</p>
+        <p className="text-white/55 text-[12.5px] mt-1 max-w-[420px] mx-auto">Ask the companion to <span className="text-white font-semibold">“plan my days”</span> — then refine it by chat: move stops between days, reorder, make a day less busy, or swap in alternatives.</p>
       </div>
     );
   }
@@ -500,15 +502,15 @@ function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay, budgetByDa
 
   return (
     <div className="mt-6">
-      <div className="font-display font-bold text-[16px] mb-3 flex items-center gap-2"><Sparkles size={15} className="text-accent" />Your itinerary</div>
+      <div className="font-display font-bold text-[16px] mb-3 flex items-center gap-2 text-white"><Sparkles size={15} style={{ color: "var(--accent)" }} />Your itinerary</div>
       <div className="flex flex-col gap-4">
         {struct.map((ds) => {
           const cityItems = itinerary.filter((it) => (it.destId ? cityKey(it.destId) : firstKey) === cityKey(ds.city));
           return (
-            <div key={ds.destId} className="rounded-[16px] border border-line bg-surface overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-line flex items-center justify-between">
+            <div key={ds.destId} className="imm-glass rounded-[16px] overflow-hidden text-white">
+              <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between">
                 <div className="font-display font-bold text-[14.5px]">{ds.city}</div>
-                <div className="text-[11.5px] text-muted">{cityItems.length} stop{cityItems.length !== 1 ? "s" : ""}</div>
+                <div className="text-[11.5px] text-white/50">{cityItems.length} stop{cityItems.length !== 1 ? "s" : ""}</div>
               </div>
               <div className="p-3 flex flex-col gap-3">
                 {Array.from({ length: ds.nights }).map((_, d) => {
@@ -521,7 +523,7 @@ function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay, budgetByDa
                         <span className="font-display font-bold text-[13.5px]">Day {globalDay}</span>
                         {weatherByDay.get(globalDay) && <WeatherChip w={weatherByDay.get(globalDay) as DaySignal} />}
                         {budgetByDay.get(globalDay) && <BudgetChip premium={(budgetByDay.get(globalDay) as BudgetDaySignal).premium} level={budgetLevel} />}
-                        {dayItems.length > 0 && <span className="text-[11px] text-muted inline-flex items-center gap-1"><Clock size={11} />{fmtHrs(mins)} planned</span>}
+                        {dayItems.length > 0 && <span className="text-[11px] text-white/50 inline-flex items-center gap-1"><Clock size={11} />{fmtHrs(mins)} planned</span>}
                       </div>
                       {dayItems.length ? (
                         <div className="flex flex-col gap-1.5">
@@ -533,24 +535,24 @@ function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay, budgetByDa
                               p.hours ?? "",
                             ].filter(Boolean).join(" · ");
                             return (
-                              <div key={p.id} className="group flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] border border-line bg-bg">
-                                <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.04em] text-accent w-[54px]">{SLOT_LABELS[it.slot]}</span>
+                              <div key={p.id} className="group flex items-center gap-2.5 px-2.5 py-2 rounded-[10px]" style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)" }}>
+                                <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.04em] w-[54px]" style={{ color: "var(--accent)" }}>{SLOT_LABELS[it.slot]}</span>
                                 {p.photoUrl && (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img src={p.photoUrl} alt="" loading="lazy" className="w-9 h-9 rounded-[7px] object-cover shrink-0" />
                                 )}
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-[13px] font-semibold text-ink truncate">{p.name}</div>
-                                  {meta && <div className="text-[11px] text-muted truncate">{meta}</div>}
+                                  <div className="text-[13px] font-semibold text-white truncate">{p.name}</div>
+                                  {meta && <div className="text-[11px] text-white/50 truncate">{meta}</div>}
                                 </div>
-                                <span className="shrink-0 text-[11px] text-muted">{fmtHrs(it.durationMin ?? p.estDurationMin)}</span>
-                                <button onClick={() => onRemoveStop(p.id)} title="Remove" className="shrink-0 w-6 h-6 rounded-md border border-line text-muted grid place-items-center cursor-pointer hover:text-[#b3402f] hover:border-[#b3402f] opacity-0 group-hover:opacity-100 transition"><X size={12} strokeWidth={2} /></button>
+                                <span className="shrink-0 text-[11px] text-white/50">{fmtHrs(it.durationMin ?? p.estDurationMin)}</span>
+                                <button onClick={() => onRemoveStop(p.id)} title="Remove" className="shrink-0 w-6 h-6 rounded-md border border-white/15 text-white/50 grid place-items-center cursor-pointer hover:text-[#F1A88C] hover:border-[#F1A88C] opacity-0 group-hover:opacity-100 transition"><X size={12} strokeWidth={2} /></button>
                               </div>
                             );
                           })}
                         </div>
                       ) : (
-                        <div className="text-[11.5px] text-muted px-2.5 py-2 rounded-[10px] border border-dashed border-line">Free day — ask to add something or keep it open.</div>
+                        <div className="text-[11.5px] text-white/50 px-2.5 py-2 rounded-[10px] border border-dashed border-white/15">Free day — ask to add something or keep it open.</div>
                       )}
                     </div>
                   );

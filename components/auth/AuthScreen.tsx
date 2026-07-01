@@ -10,8 +10,8 @@ type Mode = "signin" | "signup" | "forgot" | "reset";
 const TRAVEL_STYLES = ["Relaxed", "Balanced", "Busy", "Family-friendly", "Luxury", "Budget-friendly"];
 const TRANSPORTS = ["Walking", "Driving", "Public transport"];
 
-const label = "text-[12.5px] font-semibold text-ink";
-const input = "w-full mt-1.5 px-3.5 py-[12px] border border-line rounded-xl text-[14.5px] bg-white outline-none vp-input";
+const label = "text-[12.5px] font-semibold text-white/80";
+const input = "w-full mt-1.5 px-3.5 py-[12px] rounded-xl text-[14.5px] outline-none imm-input";
 
 function Field({ children }: { children: React.ReactNode }) {
   return <div className="mt-4">{children}</div>;
@@ -144,36 +144,17 @@ export function AuthScreen() {
   }
 
   return (
-    <div className="min-h-screen flex flex-wrap">
-      {/* brand panel */}
-      <div
-        className="flex-[1_1_440px] min-h-[280px] relative overflow-hidden text-white flex flex-col justify-between"
-        style={{ background: "var(--brand-deep)", padding: "clamp(32px,4vw,60px)" }}
-      >
-        <div className="relative flex items-center gap-[11px]">
-          <Logo size={36} tile="rgba(255,255,255,.16)" />
-          <span className="font-brand font-semibold text-[23px] tracking-[-.01em]">Itinera</span>
+    <div className="imm-bg min-h-screen relative flex items-center justify-center p-5 text-white overflow-hidden">
+      {/* ambient accent glow */}
+      <div aria-hidden className="pointer-events-none absolute left-1/2 -translate-x-1/2" style={{ top: "-14%", width: 720, height: 720, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in oklab, var(--accent) 22%, transparent), transparent 62%)" }} />
+      <div className="relative w-full max-w-[440px] imm-glass rounded-[24px] p-[clamp(24px,4vw,38px)] imm-scroll imm-rise" style={{ boxShadow: "0 40px 90px -30px rgba(0,0,0,.8)", maxHeight: "94vh", overflowY: "auto" }}>
+        <div className="flex items-center gap-2.5 mb-6">
+          <Logo size={30} tile="rgba(255,255,255,.16)" />
+          <span className="font-brand font-semibold text-[21px] tracking-[-.01em]">Itinera</span>
         </div>
-        <div className="relative">
-          <div className="font-brand font-semibold leading-[1.08] tracking-[-.01em] text-balance" style={{ fontSize: "clamp(30px,3.4vw,46px)" }}>
-            Plan beautifully.<br />Travel effortlessly.
-          </div>
-          <p className="mt-[18px] max-w-[420px] text-[15.5px] leading-[1.6] text-white/80">
-            Create AI-powered itineraries, organize hotels, discover attractions, manage budgets, and export beautiful travel plans—all in one private workspace.
-          </p>
-          <div className="mt-[26px] flex gap-[22px] flex-wrap text-[13px] text-white/85">
-            <div><div className="font-display text-[24px] font-bold">Private</div>your data, only yours</div>
-            <div><div className="font-display text-[24px] font-bold">AI</div>smart day analysis</div>
-            <div><div className="font-display text-[24px] font-bold">PDF</div>premium exports</div>
-          </div>
-        </div>
-      </div>
-
-      {/* form panel */}
-      <div className="flex-[1_1_460px] flex items-center justify-center" style={{ padding: "clamp(28px,4vw,56px)" }}>
-        <form onSubmit={submit} className="w-full max-w-[420px] vp-fade">
-          <div className="font-display font-bold text-[27px] tracking-[-.01em]">{title}</div>
-          <p className="text-muted mt-[7px] text-[14.5px]">{subtitle}</p>
+        <form onSubmit={submit} className="w-full">
+          <div className="font-brand font-bold text-[27px] tracking-[-.01em] leading-tight">{title}</div>
+          <p className="text-white/60 mt-[7px] text-[14.5px]">{subtitle}</p>
 
           {notice && (
             <div className="mt-4 flex items-start gap-2 px-3.5 py-3 rounded-xl text-[13px]" style={{ background: "#E4F4F2", color: "#0A7A76" }}>
@@ -198,7 +179,7 @@ export function AuthScreen() {
                 </div>
                 <PasswordInput value={password} onChange={setPassword} show={showPw} toggle={() => setShowPw((s) => !s)} autoComplete="current-password" />
               </Field>
-              <label className="mt-4 flex items-center gap-2 text-[13px] text-muted cursor-pointer select-none">
+              <label className="mt-4 flex items-center gap-2 text-[13px] text-white/70 cursor-pointer select-none">
                 <Checkbox checked={remember} onChange={setRemember} /> Remember me on this device
               </label>
               <Submit loading={loading}>Sign in</Submit>
@@ -261,7 +242,7 @@ export function AuthScreen() {
                     <label className={label}>Number of travelers</label>
                     <input type="number" min={1} max={12} value={travelers} onChange={(e) => setTravelers(e.target.value)} placeholder="2" className={input} />
                   </div>
-                  <label className="flex items-center gap-2 text-[13px] text-muted cursor-pointer select-none">
+                  <label className="flex items-center gap-2 text-[13px] text-white/70 cursor-pointer select-none">
                     <Checkbox checked={withChildren} onChange={setWithChildren} /> Traveling with children
                   </label>
                   {withChildren && (
@@ -273,7 +254,7 @@ export function AuthScreen() {
                 </div>
               )}
 
-              <label className="mt-4 flex items-start gap-2 text-[13px] text-muted cursor-pointer select-none">
+              <label className="mt-4 flex items-start gap-2 text-[13px] text-white/70 cursor-pointer select-none">
                 <Checkbox checked={terms} onChange={setTerms} /> <span>I agree to the <span className="text-accent font-semibold">Terms</span> &amp; <span className="text-accent font-semibold">Privacy Policy</span>.</span>
               </label>
               <Submit loading={loading}>Create account</Submit>
@@ -317,7 +298,7 @@ function PasswordInput({ value, onChange, show, toggle, autoComplete }: { value:
   return (
     <div className="relative">
       <input type={show ? "text" : "password"} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} placeholder="••••••••" className={`${input} pr-10`} />
-      <button type="button" onClick={toggle} className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-muted hover:text-ink cursor-pointer" tabIndex={-1}>
+      <button type="button" onClick={toggle} className="absolute right-3 top-1/2 -translate-y-1/2 mt-0.5 text-white/50 hover:text-white cursor-pointer" tabIndex={-1}>
         {show ? <EyeOff size={16} strokeWidth={2} /> : <Eye size={16} strokeWidth={2} />}
       </button>
     </div>
@@ -326,7 +307,7 @@ function PasswordInput({ value, onChange, show, toggle, autoComplete }: { value:
 
 function Checkbox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button type="button" onClick={() => onChange(!checked)} className="w-[18px] h-[18px] rounded-[6px] border grid place-items-center shrink-0 cursor-pointer transition" style={{ borderColor: checked ? "var(--accent)" : "var(--line)", background: checked ? "var(--accent)" : "#fff" }}>
+    <button type="button" onClick={() => onChange(!checked)} className="w-[18px] h-[18px] rounded-[6px] border grid place-items-center shrink-0 cursor-pointer transition" style={{ borderColor: checked ? "var(--accent)" : "rgba(255,255,255,.3)", background: checked ? "var(--accent)" : "rgba(255,255,255,.06)" }}>
       {checked && <Check size={12} strokeWidth={3} className="text-white" />}
     </button>
   );
@@ -335,10 +316,10 @@ function Checkbox({ checked, onChange }: { checked: boolean; onChange: (v: boole
 function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
   return (
     <div className="relative mt-1.5">
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-[12px] border border-line rounded-xl text-[14px] bg-white outline-none appearance-none cursor-pointer vp-input">
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3.5 py-[12px] rounded-xl text-[14px] outline-none appearance-none cursor-pointer imm-input">
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
-      <ChevronDown size={15} strokeWidth={2} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+      <ChevronDown size={15} strokeWidth={2} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 pointer-events-none" />
     </div>
   );
 }
@@ -353,5 +334,5 @@ function Submit({ loading, children }: { loading: boolean; children: React.React
 }
 
 function Switch({ children }: { children: React.ReactNode }) {
-  return <div className="mt-[18px] text-center text-[13.5px] text-muted">{children}</div>;
+  return <div className="mt-[18px] text-center text-[13.5px] text-white/60">{children}</div>;
 }

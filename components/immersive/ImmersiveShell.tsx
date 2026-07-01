@@ -1,0 +1,76 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { RefreshCw, Sparkles, TriangleAlert } from "lucide-react";
+import { useTrip } from "@/lib/store";
+import { Logo } from "@/components/Logo";
+import { ImmersiveMenu } from "./ImmersiveMenu";
+import { UnsavedChangesDialog } from "@/components/ui/UnsavedChangesDialog";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+
+/** Dark, on-theme fallback when an immersive screen errors — chrome stays usable. */
+function ScreenError({ onRetry }: { onRetry: () => void }) {
+  const { actions } = useTrip();
+  return (
+    <div className="min-h-[60vh] grid place-items-center p-6 text-white">
+      <div className="max-w-[420px] text-center flex flex-col items-center gap-3">
+        <span className="w-12 h-12 rounded-full grid place-items-center" style={{ background: "rgba(241,168,140,.14)", color: "#F1A88C" }}>
+          <TriangleAlert size={22} strokeWidth={2} />
+        </span>
+        <h2 className="font-display font-bold text-[18px]">Something went wrong here</h2>
+        <p className="text-[13.5px] text-white/60 leading-relaxed">Your data is safe. Try again, or head back to the start.</p>
+        <div className="flex items-center gap-2.5 mt-1">
+          <button onClick={onRetry} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] text-white text-[13.5px] font-bold cursor-pointer transition" style={{ background: "var(--accent)" }}>
+            <RefreshCw size={15} strokeWidth={2.2} />Try again
+          </button>
+          <button onClick={() => { actions.goWelcome(); onRetry(); }} className="imm-glass imm-glass-hover px-4 py-2.5 rounded-[12px] text-white text-[13.5px] font-bold cursor-pointer transition">
+            Start over
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The immersive canvas for secondary screens (My journeys, Saved). Dark navy
+ * gradient + ambient accent glow + a single floating menu — no sidebar, no
+ * admin top bar. Welcome and the Workspace render their own immersive layout.
+ */
+export function ImmersiveShell({ children }: { children: ReactNode }) {
+  const { state, actions } = useTrip();
+  return (
+    <div className="imm-bg min-h-screen w-full relative font-body overflow-x-hidden">
+      {/* ambient accent glow */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed left-1/2 -translate-x-1/2"
+        style={{ top: "-16%", width: 720, height: 720, borderRadius: "50%", zIndex: 0, background: "radial-gradient(circle, color-mix(in oklab, var(--accent) 20%, transparent), transparent 62%)" }}
+      />
+      <header className="sticky top-0 z-40 flex items-center justify-between px-4 sm:px-6 h-[60px]">
+        <button onClick={() => actions.goWelcome()} className="flex items-center gap-2.5 cursor-pointer text-white" title="New journey">
+          <Logo size={26} />
+          <span className="font-brand font-semibold text-[19px] tracking-[-.01em]">Itinera</span>
+        </button>
+        <ImmersiveMenu />
+      </header>
+      <main className="relative z-10 imm-scroll">
+        <ErrorBoundary resetKey={state.screen} fallback={(reset) => <ScreenError onRetry={reset} />}>
+          {children}
+        </ErrorBoundary>
+      </main>
+      <UnsavedChangesDialog />
+    </div>
+  );
+}
+
+/** Small helper so screens can show a consistent immersive page heading. */
+export function ImmersiveHeading({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) {
+  return (
+    <div className="imm-rise">
+      {eyebrow && <div className="inline-flex items-center gap-1.5 text-[11.5px] uppercase tracking-[.12em] text-white/55"><Sparkles size={12} style={{ color: "var(--accent)" }} />{eyebrow}</div>}
+      <h1 className="font-brand font-bold tracking-[-.01em] mt-2" style={{ fontSize: "clamp(28px,4.5vw,44px)" }}>{title}</h1>
+      {subtitle && <p className="text-white/60 text-[14.5px] mt-2 max-w-[560px]">{subtitle}</p>}
+    </div>
+  );
+}

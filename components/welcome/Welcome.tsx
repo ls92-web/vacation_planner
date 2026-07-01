@@ -10,6 +10,7 @@ import { geocodeCity } from "@/lib/geo";
 import { saveTrip } from "@/lib/destinations/repository";
 import type { Destination } from "@/lib/types";
 import { Logo } from "@/components/Logo";
+import { ImmersiveMenu } from "@/components/immersive/ImmersiveMenu";
 
 const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -143,6 +144,8 @@ export function Welcome() {
         <Logo size={30} />
         <span className="font-brand font-semibold text-[20px] tracking-[-.01em]">Itinera</span>
       </div>
+      {/* floating menu */}
+      <div className="absolute top-5 right-5 z-20"><ImmersiveMenu /></div>
 
       {/* content */}
       <div className="relative z-10 w-full max-w-[640px] text-center" style={{ marginTop: "min(34vw, 320px)" }}>
