@@ -119,11 +119,16 @@ export type ScheduleOp =
  * curated places; reorder sets the order within one day-slot. Everything else
  * is untouched. Positions are re-sequenced per (destId, day, slot) at the end.
  */
+/** Real-place data overlaid onto an added stop (from a Google Places lookup). */
+export type AddEnrichment = Partial<ExplorePlace>;
+
 export function applyScheduleOps(
   current: ItineraryItem[],
   ops: ScheduleOp[],
   refMap: Record<string, ItineraryItem>,
-  destinations: Destination[]
+  destinations: Destination[],
+  /** Optional resolver returning real-place data for an `add` op (by its index in `ops`). */
+  enrich?: (index: number) => AddEnrichment | null | undefined
 ): ItineraryItem[] {
   const struct = dayStructure(destinations);
   if (!struct.length) return current;
@@ -144,7 +149,8 @@ export function applyScheduleOps(
   let nextOrd = current.length + 1000;
   const reorders = new Map<string, string[]>(); // bucket → desired place-id order
 
-  for (const op of ops) {
+  for (let opIndex = 0; opIndex < ops.length; opIndex++) {
+    const op = ops[opIndex];
     if (op.op === "remove") {
       const id = refToId(op.ref);
       if (id) byId.delete(id);
@@ -161,18 +167,28 @@ export function applyScheduleOps(
       if (!op.name) continue;
       const ds = destForCity(op.city, op.day);
       const slot = validSlot(op.slot);
-      const id = `new:${cityKey(ds.city)}:${slugify(op.name)}:${nextOrd}`;
-      if (byId.has(id)) continue;
+      const ex = enrich?.(opIndex) ?? undefined; // real Google Places data, when available
+      const id = ex?.id || `new:${cityKey(ds.city)}:${slugify(op.name)}:${nextOrd}`;
+      if (byId.has(id)) continue; // e.g. this place_id is already scheduled
       const place: ExplorePlace = {
         id,
-        name: op.name,
+        placeId: ex?.id,
+        name: ex?.name || op.name,
         category: op.category || "Recommended",
-        position: { lat: ds.lat ?? 0, lng: ds.lng ?? 0 },
-        description: op.why || "",
+        position: ex?.position ?? { lat: ds.lat ?? 0, lng: ds.lng ?? 0 },
+        rating: ex?.rating,
+        reviews: ex?.reviews,
+        priceLevel: ex?.priceLevel,
+        openNow: ex?.openNow,
+        hours: ex?.hours,
+        photoUrl: ex?.photoUrl,
+        address: ex?.address,
+        description: op.why || ex?.description || "",
         tags: [],
         estDurationMin: op.durationMin || 90,
         recommendedSlot: slot,
-        source: "curated",
+        googleTypes: ex?.googleTypes,
+        source: ex?.source === "google" ? "google" : "curated",
       };
       byId.set(id, { item: { place, destId: ds.destId, day: localDayIn(ds, op.day), slot, position: 0, durationMin: op.durationMin }, ord: nextOrd++ });
     } else if (op.op === "reorder") {

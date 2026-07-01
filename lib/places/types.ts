@@ -11,6 +11,8 @@ export const SLOT_LABELS: Record<Slot, string> = {
 /** A real place (Google Places) or curated fallback, in the app's normalized shape. */
 export interface ExplorePlace {
   id: string;
+  /** Google Places place_id, when known (distinct from the app's internal id). */
+  placeId?: string;
   name: string;
   category: string; // the category key it was discovered under
   position: LatLng;
@@ -18,6 +20,8 @@ export interface ExplorePlace {
   reviews?: number;
   priceLevel?: number; // 0 (free) – 4 (very expensive)
   openNow?: boolean;
+  /** Short human-readable opening hours for today (e.g. "9:00 AM – 6:00 PM"), when known. */
+  hours?: string;
   photoUrl?: string;
   address?: string;
   description?: string;

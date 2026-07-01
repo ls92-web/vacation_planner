@@ -9,7 +9,7 @@ import { placeLink } from "@/lib/maps";
 
 function PlaceCard({ entry }: { entry: SavedEntry }) {
   const p = entry.place;
-  const href = placeLink({ name: p.name, position: p.position });
+  const href = placeLink({ name: p.name, position: p.position, placeId: p.placeId });
   return (
     <a
       href={href}

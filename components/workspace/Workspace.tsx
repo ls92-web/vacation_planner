@@ -8,6 +8,7 @@ import { geocodeCity } from "@/lib/geo";
 import { SLOT_LABELS, SLOTS, type ExplorePlace, type ItineraryItem } from "@/lib/places";
 import { planTrip, type PlaceSuggestion } from "@/lib/ai-client";
 import { applyScheduleOps, dayStructure, serializeSchedule } from "@/lib/planner/schedulePlan";
+import { lookupPlace } from "@/lib/places/lookup";
 import { withSave } from "@/lib/ui/saveStatus";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
@@ -88,18 +89,30 @@ export function Workspace() {
     const id = suggestionId(s);
     if (savedIds.has(id)) return;
     setSavedIds((prev) => new Set(prev).add(id)); // optimistic
-    // Best-effort coords: try the place name, fall back to the city centre so the
-    // saved pin lands in the right place (never 0,0). The Maps deep link below
-    // still opens by name for exact discovery.
-    let g = await geocodeCity(s.name, s.city).catch(() => null);
-    if (!g || (g.lat === 0 && g.lng === 0)) g = await geocodeCity(s.city).catch(() => null);
-    const place: ExplorePlace = {
-      id, name: s.name, category: "Recommended",
-      position: { lat: g?.lat ?? 0, lng: g?.lng ?? 0 },
-      address: s.city,
-      description: s.why, tags: [], estDurationMin: 120, recommendedSlot: "morning",
-      source: "curated",
-    };
+    // Prefer real Google Places data (name/coords/photo/rating/hours/place_id).
+    // Fall back to a city-centre geocode so the saved pin never lands at 0,0; the
+    // card's Maps deep link still opens by name for exact discovery.
+    const hit = await lookupPlace(`${s.name}, ${s.city}`).catch(() => null);
+    let place: ExplorePlace;
+    if (hit) {
+      place = {
+        id, placeId: hit.id, name: hit.name || s.name, category: "Recommended",
+        position: hit.position ?? { lat: 0, lng: 0 },
+        rating: hit.rating, reviews: hit.reviews, priceLevel: hit.priceLevel, openNow: hit.openNow,
+        hours: hit.hours, photoUrl: hit.photoUrl, address: hit.address ?? s.city,
+        description: s.why || hit.description || "", tags: [], estDurationMin: 120, recommendedSlot: "morning",
+        googleTypes: hit.googleTypes, source: "google",
+      };
+    } else {
+      let g = await geocodeCity(s.name, s.city).catch(() => null);
+      if (!g || (g.lat === 0 && g.lng === 0)) g = await geocodeCity(s.city).catch(() => null);
+      place = {
+        id, name: s.name, category: "Recommended",
+        position: { lat: g?.lat ?? 0, lng: g?.lng ?? 0 },
+        address: s.city, description: s.why, tags: [], estDurationMin: 120, recommendedSlot: "morning",
+        source: "curated",
+      };
+    }
     try {
       await getRepository().setFavorite(activeTrip.id, s.city, place, true);
     } catch {
@@ -138,9 +151,23 @@ export function Workspace() {
           if (res.trip.name && res.trip.name !== activeTrip.name) await tripActions.rename(activeTrip.id, res.trip.name);
           await loadPlan(activeTrip.id, res.trip.destinations[0].city);
         }
-        // (2) Schedule change → apply minimal edit ops onto the live stops (preserving the rest) + persist.
+        // (2) Schedule change → enrich added stops with real Google Places data,
+        //     then apply minimal edit ops onto the live stops (preserving the rest) + persist.
         if (res.ops) {
-          const items = applyScheduleOps(itineraryRef.current, res.ops, refMap, state.destinations);
+          const ck = (n: string) => n.split(",")[0].trim().toLowerCase();
+          const cityCenter = (city: string): LatLng | null => {
+            const d = saved.find((x) => ck(x.name) === ck(city));
+            return d && typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0) ? { lat: d.lat, lng: d.lng } : null;
+          };
+          const enrichByIndex = new Map<number, Awaited<ReturnType<typeof lookupPlace>>>();
+          await Promise.all(
+            res.ops.map(async (op, i) => {
+              if (op.op !== "add" || !op.name) return;
+              const hit = await lookupPlace(`${op.name}, ${op.city}`, cityCenter(op.city));
+              if (hit) enrichByIndex.set(i, hit);
+            })
+          );
+          const items = applyScheduleOps(itineraryRef.current, res.ops, refMap, state.destinations, (i) => enrichByIndex.get(i) ?? undefined);
           setItinerary(items);
           withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", items));
         }
@@ -166,6 +193,7 @@ export function Workspace() {
   };
 
   return (
+    <MapsApiProvider>
     <div className="h-screen w-full flex flex-col lg:flex-row overflow-hidden" style={{ background: "var(--bg)" }}>
       {/* ============ Chat (primary) ============ */}
       <section className="flex flex-col lg:w-[40%] lg:max-w-[520px] h-[52vh] lg:h-full border-b lg:border-b-0 lg:border-r border-line" style={{ background: "color-mix(in oklab, var(--bg) 55%, #fff)" }}>
@@ -266,6 +294,7 @@ export function Workspace() {
 
       <style dangerouslySetInnerHTML={{ __html: `@keyframes vpw_pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.3)}}` }} />
     </div>
+    </MapsApiProvider>
   );
 }
 
@@ -306,11 +335,9 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
       {/* map */}
       <div className="relative rounded-[18px] overflow-hidden border border-line h-[260px]">
         <ErrorBoundary fallback={() => <div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px]">Map unavailable</div>}>
-          <MapsApiProvider>
-            <GoogleMap center={center} zoom={5} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px]">Map preview</div>}>
-              <DestinationMarkers markers={markers} />
-            </GoogleMap>
-          </MapsApiProvider>
+          <GoogleMap center={center} zoom={5} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px]">Map preview</div>}>
+            <DestinationMarkers markers={markers} />
+          </GoogleMap>
         </ErrorBoundary>
       </div>
 
@@ -427,17 +454,29 @@ function ScheduleView({ saved, itinerary, onRemoveStop }: {
                       </div>
                       {dayItems.length ? (
                         <div className="flex flex-col gap-1.5">
-                          {dayItems.map((it) => (
-                            <div key={it.place.id} className="group flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] border border-line bg-bg">
-                              <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.04em] text-accent w-[54px]">{SLOT_LABELS[it.slot]}</span>
-                              <div className="min-w-0 flex-1">
-                                <div className="text-[13px] font-semibold text-ink truncate">{it.place.name}</div>
-                                {it.place.category && it.place.category !== "Recommended" && <div className="text-[11px] text-muted truncate">{it.place.category}</div>}
+                          {dayItems.map((it) => {
+                            const p = it.place;
+                            const meta = [
+                              p.category && p.category !== "Recommended" ? p.category : "",
+                              p.rating != null ? `★ ${p.rating.toFixed(1)}` : "",
+                              p.hours ?? "",
+                            ].filter(Boolean).join(" · ");
+                            return (
+                              <div key={p.id} className="group flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] border border-line bg-bg">
+                                <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.04em] text-accent w-[54px]">{SLOT_LABELS[it.slot]}</span>
+                                {p.photoUrl && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={p.photoUrl} alt="" loading="lazy" className="w-9 h-9 rounded-[7px] object-cover shrink-0" />
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[13px] font-semibold text-ink truncate">{p.name}</div>
+                                  {meta && <div className="text-[11px] text-muted truncate">{meta}</div>}
+                                </div>
+                                <span className="shrink-0 text-[11px] text-muted">{fmtHrs(it.durationMin ?? p.estDurationMin)}</span>
+                                <button onClick={() => onRemoveStop(p.id)} title="Remove" className="shrink-0 w-6 h-6 rounded-md border border-line text-muted grid place-items-center cursor-pointer hover:text-[#b3402f] hover:border-[#b3402f] opacity-0 group-hover:opacity-100 transition"><X size={12} strokeWidth={2} /></button>
                               </div>
-                              <span className="shrink-0 text-[11px] text-muted">{fmtHrs(it.durationMin ?? it.place.estDurationMin)}</span>
-                              <button onClick={() => onRemoveStop(it.place.id)} title="Remove" className="shrink-0 w-6 h-6 rounded-md border border-line text-muted grid place-items-center cursor-pointer hover:text-[#b3402f] hover:border-[#b3402f] opacity-0 group-hover:opacity-100 transition"><X size={12} strokeWidth={2} /></button>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="text-[11.5px] text-muted px-2.5 py-2 rounded-[10px] border border-dashed border-line">Free day — ask to add something or keep it open.</div>
