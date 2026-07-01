@@ -2,9 +2,9 @@
 
 import type { Destination } from "@/lib/types";
 import type { ItineraryItem, ExplorePlace } from "@/lib/places";
-import { haversineKm } from "@/lib/places";
 import { recommend, MODE_TEMPLATES } from "@/lib/data";
 import { dayStructure, venueEnv } from "./schedulePlan";
+import { backtrackKm } from "./optimize";
 import type { DaySignal } from "@/lib/weather/signal";
 import type { BudgetDaySignal } from "@/lib/budget/signal";
 
@@ -23,6 +23,8 @@ export interface Insight {
   message: string;
   /** Short lower-case clause for the arrival briefing, e.g. "day 2 zig-zags across town". */
   brief?: string;
+  /** Present when the fix can be applied instantly + deterministically (no AI round-trip). */
+  apply?: { type: "optimizeRoute"; destId: string; day: number; globalDay: number };
 }
 
 /** Does this stop count as food (restaurant / café / bar)? */
@@ -66,30 +68,6 @@ const fmtHour = (h: number) => {
   const ampm = h < 12 || h >= 24 ? "am" : "pm";
   return `${hr}${ampm}`;
 };
-
-/** Total path length in visiting order. */
-function pathKm(pts: { lat: number; lng: number }[]): number {
-  let s = 0;
-  for (let i = 1; i < pts.length; i++) s += haversineKm(pts[i - 1], pts[i]);
-  return s;
-}
-
-/** Greedy nearest-neighbour path length from the first stop — a cheap "efficient order" baseline. */
-function greedyKm(pts: { lat: number; lng: number }[]): number {
-  const rem = pts.slice(1);
-  let cur = pts[0];
-  let s = 0;
-  while (rem.length) {
-    let bi = 0, bd = Infinity;
-    for (let i = 0; i < rem.length; i++) {
-      const d = haversineKm(cur, rem[i]);
-      if (d < bd) { bd = d; bi = i; }
-    }
-    s += bd;
-    cur = rem.splice(bi, 1)[0];
-  }
-  return s;
-}
 
 /** Up to `max` ranked observations for the current plan (busy → weather → budget → transport). */
 export function deriveInsights(
@@ -141,13 +119,11 @@ export function deriveInsights(
         out.push({ id: `hours-${g}`, kind: "hours", text: `Day ${g}: ${clash.place.name} is set for the evening but closes around ${fmtHour(c)}. Move it earlier?`, actionLabel: "Fix timing", message: `On day ${g}, ${clash.place.name} closes before evening — move it to the morning or afternoon`, brief: `${clash.place.name} on day ${g} closes before its evening slot` });
       }
 
-      // Route backtracking: current visiting order zigzags vs an efficient order.
-      const pts = ordered.map((it) => it.place.position).filter((p): p is { lat: number; lng: number } => !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng));
-      if (pts.length >= 3) {
-        const cur = pathKm(pts), opt = greedyKm(pts);
-        if (cur > opt * 1.4 && cur - opt >= 3) {
-          out.push({ id: `route-${g}`, kind: "route", text: `Day ${g} crosses town more than it needs to — I can reorder it to cut about ${Math.round(cur - opt)} km of backtracking.`, actionLabel: "Optimise route", message: `Reorder day ${g}'s stops into an efficient geographic order to cut backtracking`, brief: `day ${g} zig-zags across town (~${Math.round(cur - opt)} km of extra walking)` });
-        }
+      // Route backtracking: how much walking the day wastes vs an efficient order.
+      // The fix is applied instantly + deterministically (no AI round-trip).
+      const bt = backtrackKm(dayItems);
+      if (bt >= 3) {
+        out.push({ id: `route-${g}`, kind: "route", text: `Day ${g} zig-zags across town — I can reorder it to cut about ${Math.round(bt)} km of walking, same stops.`, actionLabel: "Apply reorder", message: `Reorder day ${g}'s stops into an efficient geographic order`, brief: `day ${g} zig-zags across town (~${Math.round(bt)} km of extra walking)`, apply: { type: "optimizeRoute", destId: ds.city, day: d, globalDay: g } });
       }
 
       // Meal gap: a full day with nowhere to eat.

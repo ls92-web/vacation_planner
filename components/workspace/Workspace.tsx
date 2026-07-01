@@ -8,6 +8,7 @@ import { geocodeCity } from "@/lib/geo";
 import { SLOT_LABELS, SLOTS, type ExplorePlace, type ItineraryItem } from "@/lib/places";
 import { planTrip, type PlaceSuggestion } from "@/lib/ai-client";
 import { applyScheduleOps, dayStructure, serializeSchedule } from "@/lib/planner/schedulePlan";
+import { optimizeDay } from "@/lib/planner/optimize";
 import { lookupPlace } from "@/lib/places/lookup";
 import { buildWeatherContext, type DaySignal } from "@/lib/weather/signal";
 import { describeWeather } from "@/lib/weather/codes";
@@ -131,7 +132,7 @@ export function Workspace() {
   // One-time trip-context prompt (who's travelling / pace / budget / interests).
   const [ctxDismissed, setCtxDismissed] = useState<Set<string>>(new Set());
   const insights = useMemo(
-    () => deriveInsights(saved, itinerary, weatherByDay, budget.byDay, state.budgetLevel, state.transports),
+    () => deriveInsights(saved, itinerary, weatherByDay, budget.byDay, state.budgetLevel, state.transports, 3),
     [saved, itinerary, weatherByDay, budget.byDay, state.budgetLevel, state.transports]
   );
   const activeInsights = insights.filter((i) => !dismissed.has(i.id));
@@ -148,8 +149,14 @@ export function Workspace() {
   // Load this trip's conversation memory + which suggested places are already saved.
   const greeted = useRef(false);
   const [itinLoaded, setItinLoaded] = useState(false);
+  // Proactive conflict nudges: remember which issues already existed so the
+  // companion only speaks up about NEW ones an edit introduces.
+  const nudgeSeen = useRef<Set<string>>(new Set());
+  const nudgeBaseline = useRef(false);
   useEffect(() => {
     greeted.current = false;
+    nudgeBaseline.current = false;
+    nudgeSeen.current = new Set();
     setSavedIds(new Set());
     setItinerary([]);
     setItinLoaded(false);
@@ -335,6 +342,44 @@ export function Workspace() {
     withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", items));
   };
 
+  // The companion posts an unprompted message (nudge / confirmation), streamed in.
+  const sayProactively = (content: string) => {
+    if (!activeTrip) return;
+    const full = [...messages, { role: "assistant" as const, content }];
+    setMessages(full);
+    setAnimateIdx(full.length - 1);
+    saveChat(activeTrip.id, full);
+  };
+
+  // Inline "Apply" — a real, instant, deterministic route reorder (no AI round-trip).
+  const optimizeDayNow = (apply: NonNullable<Insight["apply"]>) => {
+    if (!activeTrip) return;
+    const res = optimizeDay(itineraryRef.current, apply.destId, apply.day);
+    if (!res) { actions.flash("That day's route is already efficient."); return; }
+    setItinerary(res.items);
+    withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", res.items));
+    sayProactively(`Done — I reordered Day ${apply.globalDay} into an efficient loop: same stops, about ${Math.round(res.savedKm)} km less walking.`);
+  };
+
+  // Baseline: record the issues already present when the plan loads, so nudges
+  // only fire for problems a later edit actually introduces (not pre-existing ones).
+  useEffect(() => {
+    if (!itinLoaded || nudgeBaseline.current) return;
+    nudgeSeen.current = new Set(deriveInsights(saved, itineraryRef.current, weatherByDay, budget.byDay, state.budgetLevel, state.transports, 8).map((i) => i.id));
+    nudgeBaseline.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itinLoaded]);
+
+  // Speak up when an edit introduces a NEW structural conflict (timing / meal / overload).
+  useEffect(() => {
+    if (!itinLoaded || !nudgeBaseline.current || sending || !activeTrip) return;
+    const all = deriveInsights(saved, itinerary, weatherByDay, budget.byDay, state.budgetLevel, state.transports, 8);
+    const fresh = all.filter((i) => !nudgeSeen.current.has(i.id) && (i.kind === "hours" || i.kind === "meal" || i.kind === "busy"));
+    nudgeSeen.current = new Set([...nudgeSeen.current, ...all.map((i) => i.id)]);
+    if (fresh.length) sayProactively(`Heads up — ${fresh[0].text}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itinerary]);
+
   return (
     <MapsApiProvider>
     <div className="imm-bg h-screen w-full flex flex-col lg:flex-row overflow-hidden font-body text-white screen-stage">
@@ -475,7 +520,7 @@ export function Workspace() {
             <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
           </div>
         )}
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} coreState={sending ? "routing" : "idle"} onInsightAction={(m, id) => { setDismissed((prev) => new Set(prev).add(id)); send(m); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} coreState={sending ? "routing" : "idle"} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) optimizeDayNow(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
 
       {/* particle bursts flowing toward the companion */}
@@ -503,7 +548,7 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
   transports: Record<string, string>;
   insights: Insight[];
   coreState: "idle" | "thinking" | "routing";
-  onInsightAction: (message: string, id: string) => void;
+  onInsightAction: (insight: Insight) => void;
   onInsightDismiss: (id: string) => void;
 }) {
   const geo = saved.filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0));
@@ -623,7 +668,7 @@ const totalMinutes = (items: ItineraryItem[]) => items.reduce((s, it) => s + (it
 const fmtHrs = (min: number) => { const h = Math.floor(min / 60); const m = min % 60; return h ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`; };
 
 /** Proactive, dismissible AI observations — acting on one sends its pre-written prompt. */
-function InsightBar({ insights, onAction, onDismiss }: { insights: Insight[]; onAction: (message: string, id: string) => void; onDismiss: (id: string) => void }) {
+function InsightBar({ insights, onAction, onDismiss }: { insights: Insight[]; onAction: (insight: Insight) => void; onDismiss: (id: string) => void }) {
   if (!insights.length) return null;
   return (
     <div className="mb-4 flex flex-col gap-2">
@@ -637,7 +682,7 @@ function InsightBar({ insights, onAction, onDismiss }: { insights: Insight[]; on
           <div className="min-w-0 flex-1">
             <div className="text-[13px] text-white/85 leading-snug">{it.text}</div>
             <div className="mt-2 flex items-center gap-3">
-              <button onClick={() => onAction(it.message, it.id)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-bold text-white cursor-pointer transition hover:brightness-[1.06]" style={{ background: "var(--accent)" }}>{it.actionLabel}<ArrowRight size={12} strokeWidth={2.2} /></button>
+              <button onClick={() => onAction(it)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-bold text-white cursor-pointer transition hover:brightness-[1.06]" style={{ background: "var(--accent)" }}>{it.actionLabel}<ArrowRight size={12} strokeWidth={2.2} /></button>
               <button onClick={() => onDismiss(it.id)} className="text-[12px] font-semibold text-white/45 hover:text-white/70 cursor-pointer transition">Dismiss</button>
             </div>
           </div>
