@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, Clock, Compass, Lightbulb, MapPin, Moon, Plus, Send, Sparkles, Star, Wallet, X } from "lucide-react";
+import { ArrowRight, Calendar, Check, Clock, Compass, Lightbulb, MapPin, Minus, Moon, Plus, Send, Sparkles, Star, Wallet, X } from "lucide-react";
 import { queryLink } from "@/lib/maps";
 import { getRepository } from "@/lib/itinerary/repository";
 import { geocodeCity } from "@/lib/geo";
@@ -342,6 +342,32 @@ export function Workspace() {
     withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", items));
   };
 
+  // ===== Editable trip dates (start date + nights per destination) =====
+  // The AI seeds sensible dates; the user can change them any time while planning.
+  // We keep the chain consistent: each destination arrives when the previous departs.
+  const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+  const nightsOf = (d: { arrive?: string | null; depart?: string | null }) => { const n = nightsBetween(d.arrive ?? undefined, d.depart ?? undefined); return n && n > 0 ? n : 2; };
+  const defaultStart = () => isoDate(new Date(Date.now() + 30 * 864e5));
+  const rechainDates = (startISO: string, nightsFor: (d: (typeof state.destinations)[number]) => number) => {
+    let cur = new Date((startISO || defaultStart()) + "T00:00:00Z");
+    return state.destinations.map((d) => {
+      const nights = Math.max(1, Math.round(nightsFor(d)));
+      const arrive = isoDate(cur);
+      cur = new Date(cur.getTime() + nights * 864e5);
+      return { ...d, arrive, depart: isoDate(cur) };
+    });
+  };
+  const persistDates = (newDests: typeof state.destinations) => {
+    if (!activeTrip) return;
+    actions.patchDestinationDates(newDests.map((d) => ({ id: d.id, arrive: d.arrive ?? "", depart: d.depart ?? "" })));
+    withSave(saveTrip(activeTrip.id, newDests, state.budgetLevel, state.transports, state.preferences));
+  };
+  const setTripStart = (iso: string) => { if (iso) persistDates(rechainDates(iso, nightsOf)); };
+  const setDestNights = (id: number, nights: number) => {
+    const start = state.destinations[0]?.arrive || defaultStart();
+    persistDates(rechainDates(start, (d) => (d.id === id ? Math.max(1, nights) : nightsOf(d))));
+  };
+
   // The companion posts an unprompted message (nudge / confirmation), streamed in.
   const sayProactively = (content: string) => {
     if (!activeTrip) return;
@@ -542,7 +568,7 @@ export function Workspace() {
             <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
           </div>
         )}
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} transports={state.transports} insights={activeInsights} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) applyFix(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} transports={state.transports} insights={activeInsights} onStartDate={setTripStart} onNights={setDestNights} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) applyFix(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
 
       {/* particle bursts flowing toward the companion */}
@@ -560,12 +586,14 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, transports, insights, onInsightAction, onInsightDismiss }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, transports, insights, onStartDate, onNights, onInsightAction, onInsightDismiss }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   itinerary: ItineraryItem[];
   transports: Record<string, string>;
   insights: Insight[];
+  onStartDate: (iso: string) => void;
+  onNights: (id: number, nights: number) => void;
   onInsightAction: (insight: Insight) => void;
   onInsightDismiss: (id: string) => void;
 }) {
@@ -580,8 +608,6 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
     agg = addBreakdowns(agg, b);
     budgetTotal += typeof d.budgetOverride === "number" ? d.budgetOverride : b.total;
   }
-  const span = saved.length && saved[0].arrive ? `${fmtMonthDay(saved[0].arrive)} – ${fmtMonthDay(saved[saved.length - 1].depart)}` : "Dates flexible";
-
   if (!saved.length) {
     return (
       <div className="h-full grid place-items-center p-8 text-center text-white">
@@ -615,7 +641,17 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-white/85">
         <span className="inline-flex items-center gap-1.5"><MapPin size={14} style={{ color: "var(--accent)" }} />{saved.length} {saved.length === 1 ? "city" : "cities"}</span>
         <span className="inline-flex items-center gap-1.5"><Moon size={14} style={{ color: "var(--accent)" }} />{totalNights} night{totalNights !== 1 ? "s" : ""}</span>
-        <span className="inline-flex items-center gap-1.5 text-white/55">{span}</span>
+        <label className="inline-flex items-center gap-1.5 text-white/70 cursor-pointer" title="Trip start date">
+          <Calendar size={14} style={{ color: "var(--accent)" }} />
+          <input
+            type="date"
+            value={saved[0]?.arrive || ""}
+            onChange={(e) => onStartDate(e.target.value)}
+            className="bg-transparent outline-none text-white/85 text-[12.5px] cursor-pointer"
+            style={{ colorScheme: "dark" }}
+          />
+          {saved.length > 0 && saved[saved.length - 1].depart ? <span className="text-white/45">– {fmtMonthDay(saved[saved.length - 1].depart)}</span> : null}
+        </label>
         <span className="inline-flex items-center gap-1.5 ml-auto font-bold text-white"><Wallet size={14} style={{ color: "var(--accent)" }} />{formatMoney(budgetTotal, currency)}</span>
       </div>
       {preferences && <div className="mt-2 text-[12px] text-white/55">{preferences}</div>}
@@ -635,9 +671,13 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
                 <div className="flex-1 min-w-0 py-3 pr-3">
                   <div className="font-display font-bold text-[16px] truncate">{d.name}</div>
                   <div className="text-[12px] text-white/50 truncate">{d.country}</div>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11.5px]">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11.5px]">
                     {d.arrive && <span className="px-2 py-0.5 rounded-md text-white/80" style={{ background: "rgba(255,255,255,.08)" }}>{fmtMonthDay(d.arrive)} – {fmtMonthDay(d.depart)}</span>}
-                    <span className="px-2 py-0.5 rounded-md text-white/80" style={{ background: "rgba(255,255,255,.08)" }}>{n ?? "—"} night{n !== 1 ? "s" : ""}</span>
+                    <span className="inline-flex items-center rounded-md overflow-hidden" style={{ background: "rgba(255,255,255,.08)" }}>
+                      <button onClick={() => onNights(d.id, (n || 1) - 1)} disabled={(n || 1) <= 1} title="Fewer nights" className="px-1.5 py-1 text-white/70 hover:text-white disabled:opacity-30 disabled:cursor-default cursor-pointer transition"><Minus size={11} strokeWidth={2.4} /></button>
+                      <span className="px-1 text-white/85 tabular-nums select-none">{n ?? "—"} night{n !== 1 ? "s" : ""}</span>
+                      <button onClick={() => onNights(d.id, (n || 1) + 1)} title="More nights" className="px-1.5 py-1 text-white/70 hover:text-white cursor-pointer transition"><Plus size={11} strokeWidth={2.4} /></button>
+                    </span>
                   </div>
                 </div>
               </div>

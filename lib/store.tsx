@@ -324,6 +324,12 @@ export function useTripStore() {
       // destinations
       updateDest: (id: number, field: keyof Destination, val: string) =>
         setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.id === id ? { ...d, [field]: val } : d)) })),
+      /** Batch-apply arrive/depart for destinations (used by the editable trip dates). */
+      patchDestinationDates: (patches: { id: number; arrive: string; depart: string }[]) =>
+        setState((s) => {
+          const m = new Map(patches.map((p) => [p.id, p] as const));
+          return { ...s, destinations: s.destinations.map((d) => { const p = m.get(d.id); return p ? { ...d, arrive: p.arrive, depart: p.depart } : d; }) };
+        }),
       toggleDest: (id: number) =>
         setState((s) => ({ ...s, destinations: s.destinations.map((d) => (d.id === id ? { ...d, expanded: !d.expanded } : d)) })),
       /** Collapse a saved destination card (after the user saves it). */
