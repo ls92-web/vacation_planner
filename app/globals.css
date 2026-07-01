@@ -119,6 +119,44 @@ body {
 .logo-anim .logo-node { transform-box: fill-box; transform-origin: center; animation: logo_node 2.6s var(--ease-soft) infinite; }
 @media (prefers-reduced-motion: reduce) { .logo-anim * { animation: none !important; } }
 
+/* ===== Journey Core — the living intelligence sphere ===== */
+.jc { position: relative; display: grid; place-items: center; }
+.jc svg { display: block; }
+.jc-atmo, .jc-meridian, .jc-node-halo, .jc-particle { transform-box: fill-box; transform-origin: center; }
+
+@keyframes jc_meridian { from { transform: scaleX(1); } to { transform: scaleX(-1); } }
+@keyframes jc_atmo { 0%, 100% { opacity: .8; transform: scale(1); } 50% { opacity: 1; transform: scale(1.05); } }
+@keyframes jc_halo { 0%, 100% { opacity: .18; transform: scale(1); } 50% { opacity: .42; transform: scale(1.28); } }
+@keyframes jc_particle { 0% { opacity: 0; transform: translateY(5px); } 45% { opacity: .7; } 100% { opacity: 0; transform: translateY(-7px); } }
+@keyframes jc_draw { to { stroke-dashoffset: 0; } }
+@keyframes jc_flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+
+.jc-meridian { animation: jc_meridian 20s linear infinite; }
+.jc-atmo { animation: jc_atmo 6s var(--ease-soft) infinite; }
+.jc-node-halo { animation: jc_halo 3.4s var(--ease-soft) infinite; }
+.jc-particle { animation: jc_particle 8s ease-in-out infinite; }
+.jc-route { stroke-dasharray: 100; stroke-dashoffset: 100; animation: jc_draw 2.4s var(--ease-soft) forwards; }
+
+/* thinking — the AI is actively working (replaces spinners) */
+.jc-thinking .jc-meridian { animation-duration: 7s; }
+.jc-thinking .jc-atmo { animation-duration: 2.6s; }
+.jc-thinking .jc-node-halo { animation-duration: 1.8s; }
+
+/* routing — travel arcs flow between destinations */
+.jc-routing .jc-route { stroke-dasharray: 16 84; stroke-dashoffset: 0; animation: jc_flow 2s linear infinite; }
+.jc-routing .jc-meridian { animation-duration: 12s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .jc * { animation: none !important; }
+  .jc-route { stroke-dashoffset: 0 !important; }
+}
+
+/* ===== Welcome ambient lights ===== */
+.wl-light { position: absolute; pointer-events: none; border-radius: 50%; z-index: 0; will-change: transform; }
+@keyframes wl_float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -22px; } }
+.wl-float { animation: wl_float 14s var(--ease-soft) infinite; }
+@media (prefers-reduced-motion: reduce) { .wl-float { animation: none !important; } }
+
 /* ===== Prototype keyframes ===== */
 @keyframes vpFade { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
 @keyframes vpPop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
