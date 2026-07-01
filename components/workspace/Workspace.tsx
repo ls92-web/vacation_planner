@@ -26,7 +26,7 @@ import { applyTrip } from "@/lib/trips/applyTrip";
 import { loadChat, saveChat, saveTrip, type ChatTurn } from "@/lib/destinations/repository";
 import { TripContextCard } from "./TripContextCard";
 import { fmtMonthDay, MODE_TEMPLATES, nightsBetween, recommend } from "@/lib/data";
-import { addBreakdowns, computeBudget, convertCostText, EMPTY_BREAKDOWN, formatMoney } from "@/lib/budget/estimate";
+import { computeBudget, convertCostText, formatMoney } from "@/lib/budget/estimate";
 import { useCurrency } from "@/lib/budget/useCurrency";
 import { summarizePreferences } from "@/lib/trips/preferences";
 import { GoogleMap, MapsApiProvider, DestinationMarkers, FitBounds } from "@/components/maps";
@@ -575,24 +575,20 @@ export function Workspace() {
         </div>
       </section>
 
-      {/* schedule — immediately under the chat */}
+      {/* trip details — under the chat, exclusively */}
       <div className="flex-[2] min-h-0 overflow-y-auto imm-scroll" style={{ background: "rgba(255,255,255,.02)" }}>
-        {saved.length > 0 && (
-          <div className="px-4 pb-6">
-            <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={removeStop} onMoveStop={moveStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} budgetLevel={state.budgetLevel} />
-          </div>
-        )}
+        <div className="px-4 py-4 flex flex-col gap-5">
+          {needsContext && (
+            <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
+          )}
+          <TripDetails saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} transports={state.transports} onStartDate={setTripStart} onNights={setDestNights} onRemoveStop={removeStop} onMoveStop={moveStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} />
+        </div>
       </div>
       </div>
 
-      {/* ============ Right: companion analysis + map + overview ============ */}
+      {/* ============ Right: companion analysis + night map only ============ */}
       <section className="flex-1 overflow-y-auto imm-scroll">
-        {needsContext && (
-          <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] pt-6">
-            <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
-          </div>
-        )}
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} transports={state.transports} insights={activeInsights} onStartDate={setTripStart} onNights={setDestNights} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) applyFix(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
+        <AnalysisMap saved={saved} insights={activeInsights} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) applyFix(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
 
       {/* particle bursts flowing toward the companion */}
@@ -610,28 +606,16 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, transports, insights, onStartDate, onNights, onInsightAction, onInsightDismiss }: {
+// Right side — companion analysis + the night map, nothing else.
+function AnalysisMap({ saved, insights, onInsightAction, onInsightDismiss }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
-  travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
-  itinerary: ItineraryItem[];
-  transports: Record<string, string>;
   insights: Insight[];
-  onStartDate: (iso: string) => void;
-  onNights: (id: number, nights: number) => void;
   onInsightAction: (insight: Insight) => void;
   onInsightDismiss: (id: string) => void;
 }) {
   const geo = saved.filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0));
   const center: LatLng = geo[0] ? { lat: geo[0].lat as number, lng: geo[0].lng as number } : { lat: 41.39, lng: 2.16 };
-  // The chosen destinations, plotted on the night map.
   const markers: MapMarker[] = geo.map((d, i) => ({ id: String(d.id), name: d.name, kind: "destination" as const, position: { lat: d.lat as number, lng: d.lng as number }, subtitle: `Stop ${i + 1}`, category: d.country }));
-  const totalNights = saved.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
-  let agg = EMPTY_BREAKDOWN; let budgetTotal = 0;
-  for (const d of saved) {
-    const b = computeBudget({ travelers, nights: nightsBetween(d.arrive, d.depart) || 0, hotels: d.accoms.length, level: budgetLevel });
-    agg = addBreakdowns(agg, b);
-    budgetTotal += typeof d.budgetOverride === "number" ? d.budgetOverride : b.total;
-  }
   if (!saved.length) {
     return (
       <div className="h-full grid place-items-center p-8 text-center text-white">
@@ -645,12 +629,12 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
   }
 
   return (
-    <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] py-6">
+    <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] py-6 flex flex-col gap-4">
       {/* proactive intelligence */}
       <InsightBar insights={insights} onAction={onInsightAction} onDismiss={onInsightDismiss} />
 
       {/* Your route — the chosen destinations on a night map */}
-      <div className="relative rounded-[24px] overflow-hidden border border-white/10 h-[clamp(240px,34vh,320px)]">
+      <div className="relative rounded-[24px] overflow-hidden border border-white/10 h-[clamp(300px,52vh,600px)]">
         <ErrorBoundary fallback={() => <div className="absolute inset-0 grid place-items-center text-white/40 text-[13px]" style={{ background: "radial-gradient(120% 120% at 50% 30%, #16233c, #060c16)" }}>Map unavailable</div>}>
           <GoogleMap dark gesture="cooperative" center={center} zoom={5} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0 grid place-items-center text-white/40 text-[13px]" style={{ background: "radial-gradient(120% 120% at 50% 30%, #16233c, #060c16)" }}>Map preview</div>}>
             <DestinationMarkers markers={markers} />
@@ -660,28 +644,50 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
         {/* subtle edge for depth (never blocks the map) */}
         <div aria-hidden className="pointer-events-none absolute inset-0 rounded-[24px]" style={{ boxShadow: "inset 0 0 0 1px rgba(255,255,255,.06), inset 0 -44px 60px -44px rgba(6,12,22,.85)" }} />
       </div>
+    </div>
+  );
+}
 
+// Left side, beneath the chat — all trip details (summary, cities, itinerary, export).
+function TripDetails({ saved, travelers, currency, budgetLevel, preferences, itinerary, transports, onStartDate, onNights, onRemoveStop, onMoveStop, weatherByDay, budgetByDay }: {
+  saved: ReturnType<typeof useTrip>["state"]["destinations"];
+  travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
+  itinerary: ItineraryItem[];
+  transports: Record<string, string>;
+  onStartDate: (iso: string) => void;
+  onNights: (id: number, nights: number) => void;
+  onRemoveStop: (placeId: string) => void;
+  onMoveStop: (item: ItineraryItem, dir: -1 | 1) => void;
+  weatherByDay: Map<number, DaySignal>;
+  budgetByDay: Map<number, BudgetDaySignal>;
+}) {
+  if (!saved.length) return null;
+  const geo = saved.filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0));
+  const center: LatLng = geo[0] ? { lat: geo[0].lat as number, lng: geo[0].lng as number } : { lat: 41.39, lng: 2.16 };
+  const totalNights = saved.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
+  let budgetTotal = 0;
+  for (const d of saved) {
+    const b = computeBudget({ travelers, nights: nightsBetween(d.arrive, d.depart) || 0, hotels: d.accoms.length, level: budgetLevel });
+    budgetTotal += typeof d.budgetOverride === "number" ? d.budgetOverride : b.total;
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
       {/* summary strip */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-white/85">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-white/85">
         <span className="inline-flex items-center gap-1.5"><MapPin size={14} style={{ color: "var(--accent)" }} />{saved.length} {saved.length === 1 ? "city" : "cities"}</span>
         <span className="inline-flex items-center gap-1.5"><Moon size={14} style={{ color: "var(--accent)" }} />{totalNights} night{totalNights !== 1 ? "s" : ""}</span>
         <label className="inline-flex items-center gap-1.5 text-white/70 cursor-pointer" title="Trip start date">
           <Calendar size={14} style={{ color: "var(--accent)" }} />
-          <input
-            type="date"
-            value={saved[0]?.arrive || ""}
-            onChange={(e) => onStartDate(e.target.value)}
-            className="bg-transparent outline-none text-white/85 text-[12.5px] cursor-pointer"
-            style={{ colorScheme: "dark" }}
-          />
+          <input type="date" value={saved[0]?.arrive || ""} onChange={(e) => onStartDate(e.target.value)} className="bg-transparent outline-none text-white/85 text-[12.5px] cursor-pointer" style={{ colorScheme: "dark" }} />
           {saved.length > 0 && saved[saved.length - 1].depart ? <span className="text-white/45">– {fmtMonthDay(saved[saved.length - 1].depart)}</span> : null}
         </label>
         <span className="inline-flex items-center gap-1.5 ml-auto font-bold text-white"><Wallet size={14} style={{ color: "var(--accent)" }} />{formatMoney(budgetTotal, currency)}</span>
       </div>
-      {preferences && <div className="mt-2 text-[12px] text-white/55">{preferences}</div>}
+      {preferences && <div className="text-[12px] text-white/55 -mt-3">{preferences}</div>}
 
       {/* the journey */}
-      <div className="mt-5 flex flex-col">
+      <div className="flex flex-col">
         {saved.map((d, i) => {
           const next = saved[i + 1];
           const n = nightsBetween(d.arrive, d.depart);
@@ -722,8 +728,11 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
         })}
       </div>
 
-      {/* actions */}
-      <div className="mt-6 flex flex-wrap gap-2.5">
+      {/* living itinerary */}
+      <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={onRemoveStop} onMoveStop={onMoveStop} weatherByDay={weatherByDay} budgetByDay={budgetByDay} budgetLevel={budgetLevel} />
+
+      {/* export */}
+      <div className="flex flex-wrap gap-2.5">
         <ExportControl
           itinerary={itinerary}
           destination={saved[0]?.name ?? ""}
