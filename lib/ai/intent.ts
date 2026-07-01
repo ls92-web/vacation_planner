@@ -50,6 +50,12 @@ function isGibberish(raw: string): boolean {
   // No token looks like a real word → treat the whole thing as mashing.
   const tokens = t.split(/\s+/).filter(Boolean);
   if (tokens.length && !tokens.some(wordLike)) return true;
+  // A single long run of letters with awkward consonant clustering is mashing
+  // (e.g. "okkesdijdsuheujd") — even when it happens to contain enough vowels.
+  if (tokens.length === 1) {
+    const w = low.replace(/[^a-zà-ÿ]/g, "");
+    if (w.length >= 12 && /[bcdfghjklmnpqrstvwxz]{3,}/.test(w)) return true;
+  }
   return false;
 }
 

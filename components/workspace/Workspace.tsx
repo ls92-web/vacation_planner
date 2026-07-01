@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Calendar, Check, ChevronDown, ChevronUp, Clock, Compass, Lightbulb, MapPin, Minus, Moon, Plus, Send, Sparkles, Star, Wallet, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ChevronUp, Clock, Compass, Lightbulb, MapPin, Minus, Moon, Plus, Send, Sparkles, Star, Wallet, X } from "lucide-react";
 import { queryLink } from "@/lib/maps";
 import { getRepository } from "@/lib/itinerary/repository";
 import { geocodeCity } from "@/lib/geo";
@@ -35,6 +35,7 @@ import type { LatLng, MapMarker } from "@/lib/maps";
 import { CityImage } from "@/components/destinations/CityImage";
 import { ExportControl } from "@/components/export/ExportButton";
 import { ImmersiveMenu } from "@/components/immersive/ImmersiveMenu";
+import { DateRangePicker } from "./DateRangePicker";
 import { Logo } from "@/components/Logo";
 
 const sigOf = (t: ComposedTrip) =>
@@ -386,10 +387,27 @@ export function Workspace() {
     actions.patchDestinationDates(newDests.map((d) => ({ id: d.id, arrive: d.arrive ?? "", depart: d.depart ?? "" })));
     withSave(saveTrip(activeTrip.id, newDests, state.budgetLevel, state.transports, state.preferences));
   };
-  const setTripStart = (iso: string) => { if (iso) persistDates(rechainDates(iso, nightsOf)); };
   const setDestNights = (id: number, nights: number) => {
     const start = state.destinations[0]?.arrive || defaultStart();
     persistDates(rechainDates(start, (d) => (d.id === id ? Math.max(1, nights) : nightsOf(d))));
+  };
+  // Departure + return (flight-style range): total nights spread across the cities
+  // by their current proportions, so the last day lands exactly on the return date.
+  const setTripRange = (depISO: string, retISO: string) => {
+    const n = state.destinations.length;
+    if (!n) return;
+    const total = Math.max(n, Math.round((Date.parse(retISO + "T00:00:00Z") - Date.parse(depISO + "T00:00:00Z")) / 864e5));
+    const weights = state.destinations.map((d) => Math.max(1, nightsOf(d)));
+    const sum = weights.reduce((a, b) => a + b, 0) || n;
+    const alloc = weights.map((w) => Math.max(1, Math.round((w / sum) * total)));
+    let diff = total - alloc.reduce((a, b) => a + b, 0);
+    let guard = 500;
+    while (diff !== 0 && guard-- > 0) {
+      if (diff > 0) { alloc[alloc.indexOf(Math.max(...alloc))]++; diff--; }
+      else { const i = alloc.reduce((best, v, idx) => (v > 1 && v > alloc[best] ? idx : best), alloc.findIndex((v) => v > 1)); if (i < 0) break; alloc[i]--; diff++; }
+    }
+    const byId = new Map(state.destinations.map((d, i) => [d.id, alloc[i]] as const));
+    persistDates(rechainDates(depISO, (d) => byId.get(d.id) ?? 1));
   };
 
   // The companion posts an unprompted message (nudge / confirmation), streamed in.
@@ -444,8 +462,8 @@ export function Workspace() {
   return (
     <MapsApiProvider>
     <div className="imm-bg h-screen w-full flex flex-col lg:flex-row overflow-hidden font-body text-white screen-stage">
-      {/* ============ Left: chat, with the schedule beneath it ============ */}
-      <div className="flex flex-col lg:w-[42%] lg:max-w-[540px] h-[66vh] lg:h-full min-h-0 lg:border-r border-white/10">
+      {/* ============ Left: chat, with the trip details beneath it (wider than the map side) ============ */}
+      <div className="flex flex-col lg:w-[57%] lg:max-w-[900px] h-[66vh] lg:h-full min-h-0 lg:border-r border-white/10">
       <section className="flex flex-col min-h-0 flex-[3] border-b border-white/10" style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(10px)" }}>
         <header className="flex items-center gap-2.5 px-4 h-[58px] border-b border-white/10 shrink-0">
           <button ref={headerLogoRef} onClick={actions.goWelcome} title="New journey" className="flex items-center gap-2 cursor-pointer">
@@ -581,7 +599,7 @@ export function Workspace() {
           {needsContext && (
             <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
           )}
-          <TripDetails saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} transports={state.transports} onStartDate={setTripStart} onNights={setDestNights} onRemoveStop={removeStop} onMoveStop={moveStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} />
+          <TripDetails saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} transports={state.transports} onRange={setTripRange} onNights={setDestNights} onRemoveStop={removeStop} onMoveStop={moveStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} />
         </div>
       </div>
       </div>
@@ -649,12 +667,12 @@ function AnalysisMap({ saved, insights, onInsightAction, onInsightDismiss }: {
 }
 
 // Left side, beneath the chat — all trip details (summary, cities, itinerary, export).
-function TripDetails({ saved, travelers, currency, budgetLevel, preferences, itinerary, transports, onStartDate, onNights, onRemoveStop, onMoveStop, weatherByDay, budgetByDay }: {
+function TripDetails({ saved, travelers, currency, budgetLevel, preferences, itinerary, transports, onRange, onNights, onRemoveStop, onMoveStop, weatherByDay, budgetByDay }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   itinerary: ItineraryItem[];
   transports: Record<string, string>;
-  onStartDate: (iso: string) => void;
+  onRange: (departISO: string, returnISO: string) => void;
   onNights: (id: number, nights: number) => void;
   onRemoveStop: (placeId: string) => void;
   onMoveStop: (item: ItineraryItem, dir: -1 | 1) => void;
@@ -677,11 +695,7 @@ function TripDetails({ saved, travelers, currency, budgetLevel, preferences, iti
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-white/85">
         <span className="inline-flex items-center gap-1.5"><MapPin size={14} style={{ color: "var(--accent)" }} />{saved.length} {saved.length === 1 ? "city" : "cities"}</span>
         <span className="inline-flex items-center gap-1.5"><Moon size={14} style={{ color: "var(--accent)" }} />{totalNights} night{totalNights !== 1 ? "s" : ""}</span>
-        <label className="inline-flex items-center gap-1.5 text-white/70 cursor-pointer" title="Trip start date">
-          <Calendar size={14} style={{ color: "var(--accent)" }} />
-          <input type="date" value={saved[0]?.arrive || ""} onChange={(e) => onStartDate(e.target.value)} className="bg-transparent outline-none text-white/85 text-[12.5px] cursor-pointer" style={{ colorScheme: "dark" }} />
-          {saved.length > 0 && saved[saved.length - 1].depart ? <span className="text-white/45">– {fmtMonthDay(saved[saved.length - 1].depart)}</span> : null}
-        </label>
+        <DateRangePicker startISO={saved[0]?.arrive || null} endISO={saved[saved.length - 1]?.depart || null} onChange={onRange} />
         <span className="inline-flex items-center gap-1.5 ml-auto font-bold text-white"><Wallet size={14} style={{ color: "var(--accent)" }} />{formatMoney(budgetTotal, currency)}</span>
       </div>
       {preferences && <div className="text-[12px] text-white/55 -mt-3">{preferences}</div>}
