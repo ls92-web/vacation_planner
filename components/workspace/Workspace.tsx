@@ -381,7 +381,7 @@ export function Workspace() {
           {sending && (
             <div className="self-start rounded-[16px] px-3.5 py-3 imm-glass" style={{ borderBottomLeftRadius: 4 }}>
               <span className="inline-flex gap-1">
-                {[0, 1, 2].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-accent" style={{ animation: `vpw_pulse 1s ease-in-out ${d * 0.18}s infinite` }} />)}
+                {[0, 1, 2].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-accent" style={{ animation: `imm_pulse 1s ease-in-out ${d * 0.18}s infinite` }} />)}
               </span>
             </div>
           )}
@@ -418,8 +418,6 @@ export function Workspace() {
         )}
         <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} onInsightAction={(m, id) => { setDismissed((prev) => new Set(prev).add(id)); send(m); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
-
-      <style dangerouslySetInnerHTML={{ __html: `@keyframes vpw_pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.3)}}` }} />
     </div>
     </MapsApiProvider>
   );

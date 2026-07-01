@@ -100,7 +100,7 @@ body {
 }
 
 /* ===== Prototype keyframes ===== */
-@keyframes vpFade { from { opacity: 1; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+@keyframes vpFade { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
 @keyframes vpPop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
 @keyframes vpPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 @keyframes vpSpin { to { transform: rotate(360deg); } }
@@ -206,4 +206,15 @@ body {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent);
   outline: none;
+}
+
+/* Accessibility: honour reduced-motion — entrance/looping animations resolve
+   instantly to their final state, so nothing slides, pulses or floats. */
+@media (prefers-reduced-motion: reduce) {
+  .vp-fade, .vp-fade-fast, .vp-pop, .vp-slide-down, .vp-slide-up, .vp-drop,
+  .imm-rise, .imm-rise-2, .imm-rise-3 {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
