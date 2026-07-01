@@ -99,6 +99,26 @@ body {
   }
 }
 
+/* ===== Premium motion vocabulary =====
+   Shared easing curves so every transition in the app feels like one hand
+   designed it — calm, weighted, a touch of life. */
+:root {
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+/* ===== Brandmark (Journey Core) motion — splash / loading / avatar ===== */
+@keyframes logo_sweep { to { transform: rotate(360deg); } }
+@keyframes logo_breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes logo_halo { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
+@keyframes logo_node { 0%, 100% { opacity: .85; } 50% { opacity: 1; } }
+.logo-anim .logo-orbits { transform-box: view-box; transform-origin: 50px 50px; animation: logo_sweep 16s linear infinite; }
+.logo-anim .logo-core { transform-box: fill-box; transform-origin: center; animation: logo_breathe 4.5s var(--ease-soft) infinite; }
+.logo-anim .logo-halo { animation: logo_halo 4.5s var(--ease-soft) infinite; }
+.logo-anim .logo-node { transform-box: fill-box; transform-origin: center; animation: logo_node 2.6s var(--ease-soft) infinite; }
+@media (prefers-reduced-motion: reduce) { .logo-anim * { animation: none !important; } }
+
 /* ===== Prototype keyframes ===== */
 @keyframes vpFade { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
 @keyframes vpPop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }

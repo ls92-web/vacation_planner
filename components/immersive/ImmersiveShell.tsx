@@ -49,7 +49,7 @@ export function ImmersiveShell({ children }: { children: ReactNode }) {
       />
       <header className="sticky top-0 z-40 flex items-center justify-between px-4 sm:px-6 h-[60px]">
         <button onClick={() => actions.goWelcome()} className="flex items-center gap-2.5 cursor-pointer text-white" title="New journey">
-          <Logo size={26} />
+          <Logo size={26} variant="plain" />
           <span className="font-brand font-semibold text-[19px] tracking-[-.01em]">Itinera</span>
         </button>
         <ImmersiveMenu />

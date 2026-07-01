@@ -9,11 +9,12 @@ import { Onboarding } from "./Onboarding";
 
 function Splash() {
   return (
-    <div className="imm-bg min-h-screen grid place-items-center text-white">
-      <div className="flex flex-col items-center gap-4">
-        <Logo size={52} />
+    <div className="imm-bg min-h-screen grid place-items-center text-white overflow-hidden">
+      <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ width: 520, height: 520, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in oklab, var(--accent) 20%, transparent), transparent 62%)" }} />
+      <div className="relative flex flex-col items-center gap-5">
+        <Logo size={76} variant="plain" animated />
         <div className="font-brand font-semibold text-[22px] tracking-[-.01em]">Itinera</div>
-        <div className="w-5 h-5 border-2 border-white/20 rounded-full vp-spin" style={{ borderTopColor: "var(--accent)" }} />
+        <div className="text-[12.5px] tracking-[.16em] uppercase text-white/45" style={{ animation: "logo_halo 2.4s var(--ease-soft) infinite" }}>Preparing your universe</div>
       </div>
     </div>
   );
@@ -23,7 +24,7 @@ function ConfigNotice() {
   return (
     <div className="imm-bg min-h-screen grid place-items-center p-6 text-white">
       <div className="max-w-[440px] text-center flex flex-col items-center gap-4">
-        <Logo size={48} />
+        <Logo size={48} variant="plain" />
         <div className="font-brand font-semibold text-[22px] tracking-[-.01em]">Itinera</div>
         <h1 className="font-display font-bold text-[18px]">Sign-in isn&apos;t available</h1>
         <p className="text-[14px] text-white/60 leading-relaxed">

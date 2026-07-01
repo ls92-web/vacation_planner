@@ -149,7 +149,7 @@ export function AuthScreen() {
       <div aria-hidden className="pointer-events-none absolute left-1/2 -translate-x-1/2" style={{ top: "-14%", width: 720, height: 720, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in oklab, var(--accent) 22%, transparent), transparent 62%)" }} />
       <div className="relative w-full max-w-[440px] imm-glass rounded-[24px] p-[clamp(24px,4vw,38px)] imm-scroll imm-rise" style={{ boxShadow: "0 40px 90px -30px rgba(0,0,0,.8)", maxHeight: "94vh", overflowY: "auto" }}>
         <div className="flex items-center gap-2.5 mb-6">
-          <Logo size={30} tile="rgba(255,255,255,.16)" />
+          <Logo size={30} variant="plain" />
           <span className="font-brand font-semibold text-[21px] tracking-[-.01em]">Itinera</span>
         </div>
         <form onSubmit={submit} className="w-full">

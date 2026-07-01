@@ -292,7 +292,7 @@ export function Workspace() {
       <section className="flex flex-col lg:w-[40%] lg:max-w-[520px] h-[52vh] lg:h-full border-b lg:border-b-0 lg:border-r border-white/10" style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(10px)" }}>
         <header className="flex items-center gap-2.5 px-4 h-[58px] border-b border-white/10 shrink-0">
           <button onClick={actions.goWelcome} title="New journey" className="flex items-center gap-2 cursor-pointer">
-            <Logo size={26} />
+            <Logo size={26} variant="plain" />
           </button>
           <div className="min-w-0 flex-1">
             <div className="font-display font-bold text-[15px] leading-tight truncate">{activeTrip?.name || "Your trip"}</div>

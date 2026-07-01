@@ -1,34 +1,86 @@
+"use client";
+
+import { useId } from "react";
+
 /**
- * Itinera brandmark — a journey path connecting two stops, forming a subtle "I",
- * with an AI sparkle. Minimal, flat, scalable.
+ * Itinera brandmark — the "Journey Core".
  *
- *  variant="tile"  → mark on the rounded brand tile (use on light surfaces / app icon)
- *  variant="plain" → mark only, tinted with the current theme accent (use on dark tiles)
+ * An orbital glyph: a luminous intelligence at the centre with destination
+ * nodes travelling tilted orbits around it. It says *intelligent journeys,
+ * connected destinations, discovery, motion* — no planes, pins or luggage.
+ * Retints per theme via `var(--accent)`; scales cleanly from favicon to splash.
+ *
+ *   variant="tile"  → mark on a deep glass tile (app icon / light surfaces)
+ *   variant="plain" → mark only, on whatever sits behind it (dark surfaces)
+ *   animated        → orbits sweep + core breathes (splash / loading / avatar)
  */
 export function Logo({
   size = 32,
   variant = "tile",
-  tile = "#002B36",
+  animated = false,
   className = "",
 }: {
   size?: number;
   variant?: "tile" | "plain";
-  tile?: string;
+  animated?: boolean;
   className?: string;
 }) {
+  const uid = useId().replace(/[:]/g, "");
   const onTile = variant === "tile";
-  const line = onTile ? "#FFFFFF" : "var(--accent)";
-  const ring = onTile ? tile : "var(--surface)";
+  const core = `core-${uid}`;
+  const glow = `glow-${uid}`;
+  const ring = `ring-${uid}`;
+  const tileGrad = `tile-${uid}`;
+
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" className={className} role="img" aria-label="Itinera">
-      {onTile && <rect width="100" height="100" rx="27" fill={tile} />}
-      {/* journey path */}
-      <path d="M40 32 V50 C40 61 49 65 60 68" fill="none" stroke={line} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-      {/* stops */}
-      <circle cx="40" cy="32" r="7.5" fill="#F5A623" stroke={ring} strokeWidth="2.5" />
-      <circle cx="60" cy="68" r="7.5" fill="#0EA5A0" stroke={ring} strokeWidth="2.5" />
-      {/* AI sparkle */}
-      <path d="M71 21 Q71 31 81 31 Q71 31 71 41 Q71 31 61 31 Q71 31 71 21 Z" fill="#F5A623" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      className={`${animated ? "logo-anim" : ""} ${className}`}
+      role="img"
+      aria-label="Itinera"
+    >
+      <defs>
+        <radialGradient id={core} cx="42%" cy="38%" r="70%">
+          <stop offset="0%" stopColor="#fff" />
+          <stop offset="45%" stopColor="#FFE7C4" />
+          <stop offset="100%" stopColor="var(--accent)" />
+        </radialGradient>
+        <radialGradient id={glow} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.55" />
+          <stop offset="60%" stopColor="var(--accent)" stopOpacity="0.12" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={ring} x1="0" y1="0" x2="1" y2="0.35">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.15" />
+          <stop offset="50%" stopColor="var(--accent)" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.15" />
+        </linearGradient>
+        <linearGradient id={tileGrad} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#16233c" />
+          <stop offset="100%" stopColor="#0a1424" />
+        </linearGradient>
+      </defs>
+
+      {onTile && <rect width="100" height="100" rx="26" fill={`url(#${tileGrad})`} />}
+
+      {/* atmospheric halo */}
+      <circle cx="50" cy="50" r="42" fill={`url(#${glow})`} className="logo-halo" />
+
+      {/* orbital system — sweeps as one when animated */}
+      <g className="logo-orbits">
+        <ellipse cx="50" cy="50" rx="38" ry="14" fill="none" stroke={`url(#${ring})`} strokeWidth="2.4" transform="rotate(-27 50 50)" opacity="0.9" />
+        <ellipse cx="50" cy="50" rx="33" ry="12" fill="none" stroke={`url(#${ring})`} strokeWidth="1.8" transform="rotate(38 50 50)" opacity="0.5" />
+        {/* destination nodes riding the orbits */}
+        <circle cx="83.9" cy="34.8" r="4" fill="var(--accent)" className="logo-node" />
+        <circle cx="16.1" cy="65.2" r="2.6" fill="var(--accent)" opacity="0.75" />
+        <circle cx="24.4" cy="34" r="2.4" fill="#FFE7C4" opacity="0.85" />
+      </g>
+
+      {/* luminous intelligence at the centre */}
+      <circle cx="50" cy="50" r="9.2" fill={`url(#${core})`} className="logo-core" />
+      <circle cx="46.6" cy="46.4" r="2.6" fill="#fff" opacity="0.9" />
     </svg>
   );
 }

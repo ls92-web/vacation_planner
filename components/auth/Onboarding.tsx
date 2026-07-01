@@ -55,7 +55,7 @@ export function Onboarding() {
       <div aria-hidden className="pointer-events-none absolute left-1/2 -translate-x-1/2" style={{ top: "-14%", width: 720, height: 720, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in oklab, var(--accent) 20%, transparent), transparent 62%)" }} />
       <div className="relative w-full max-w-[640px] imm-rise">
         <div className="flex items-center gap-2.5 mb-5">
-          <Logo size={30} />
+          <Logo size={30} variant="plain" />
           <span className="font-brand font-semibold text-[20px] tracking-[-.01em]">Itinera</span>
         </div>
         <div className="imm-glass rounded-[22px] p-6 sm:p-8" style={{ boxShadow: "0 40px 90px -30px rgba(0,0,0,.8)" }}>

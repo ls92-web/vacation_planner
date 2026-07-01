@@ -148,7 +148,7 @@ export function Welcome() {
 
       {/* brand */}
       <div className="absolute top-6 left-6 flex items-center gap-2.5" style={{ animation: "vpw_rise .8s ease both" }}>
-        <Logo size={30} />
+        <Logo size={30} variant="plain" />
         <span className="font-brand font-semibold text-[20px] tracking-[-.01em]">Itinera</span>
       </div>
       {/* floating menu */}
