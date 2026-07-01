@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 
 /**
  * The Journey Core — the visual heart of Itinera.
@@ -83,6 +83,10 @@ export function JourneyCore({
 }) {
   const uid = useId().replace(/[:]/g, "");
   const id = (s: string) => `${s}-${uid}`;
+  // SMIL <animateMotion> can't be stopped by CSS, so honour reduced-motion here:
+  // render the orbit nodes at rest instead of travelling.
+  const [still, setStill] = useState(false);
+  useEffect(() => { setStill(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false); }, []);
 
   const pts = (nodes ?? [
     { x: -0.15, y: -0.42, active: true },
@@ -160,17 +164,25 @@ export function JourneyCore({
         <g className="jc-orbit jc-orbit-a">
           <g transform={`rotate(-24 ${C} ${C})`}>
             <ellipse cx={C} cy={C} rx={94} ry={31} fill="none" stroke="var(--accent)" strokeOpacity="0.26" strokeWidth="0.9" />
-            <circle r="2.4" fill="var(--accent)" filter={`url(#${id("soft")})`}>
-              <animateMotion dur="17s" repeatCount="indefinite" path="M6,100 a94,31 0 1,0 188,0 a94,31 0 1,0 -188,0" />
-            </circle>
+            {still ? (
+              <circle cx={194} cy={100} r="2.4" fill="var(--accent)" filter={`url(#${id("soft")})`} />
+            ) : (
+              <circle r="2.4" fill="var(--accent)" filter={`url(#${id("soft")})`}>
+                <animateMotion dur="17s" repeatCount="indefinite" path="M6,100 a94,31 0 1,0 188,0 a94,31 0 1,0 -188,0" />
+              </circle>
+            )}
           </g>
         </g>
         <g className="jc-orbit jc-orbit-b">
           <g transform={`rotate(33 ${C} ${C})`}>
             <ellipse cx={C} cy={C} rx={88} ry={25} fill="none" stroke="var(--accent)" strokeOpacity="0.15" strokeWidth="0.9" />
-            <circle r="1.8" fill="#FFE7C4" filter={`url(#${id("soft")})`}>
-              <animateMotion dur="24s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" path="M12,100 a88,25 0 1,0 176,0 a88,25 0 1,0 -176,0" />
-            </circle>
+            {still ? (
+              <circle cx={12} cy={100} r="1.8" fill="#FFE7C4" filter={`url(#${id("soft")})`} />
+            ) : (
+              <circle r="1.8" fill="#FFE7C4" filter={`url(#${id("soft")})`}>
+                <animateMotion dur="24s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" path="M12,100 a88,25 0 1,0 176,0 a88,25 0 1,0 -176,0" />
+              </circle>
+            )}
           </g>
         </g>
 
