@@ -18,6 +18,8 @@ interface GoogleMapProps {
   className?: string;
   /** Rendered instead of the live map when no API key is configured. */
   fallback?: ReactNode;
+  /** Background-atmosphere mode: no controls, no gestures, non-interactive. */
+  atmospheric?: boolean;
 }
 
 /** Smoothly re-centers the map whenever `center` changes. */
@@ -50,7 +52,7 @@ function LoadingOverlay() {
  * Falls back to `fallback` when no key is configured. Children (markers, overlays)
  * use the vis.gl map context.
  */
-export function GoogleMap({ center, zoom = mapsConfig.defaultZoom, children, className, fallback }: GoogleMapProps) {
+export function GoogleMap({ center, zoom = mapsConfig.defaultZoom, children, className, fallback, atmospheric = false }: GoogleMapProps) {
   if (!isMapsConfigured()) return <>{fallback ?? null}</>;
 
   return (
@@ -59,11 +61,14 @@ export function GoogleMap({ center, zoom = mapsConfig.defaultZoom, children, cla
         mapId={mapsConfig.mapId}
         defaultCenter={center}
         defaultZoom={zoom}
-        gestureHandling="greedy"
-        zoomControl
+        gestureHandling={atmospheric ? "none" : "greedy"}
+        disableDefaultUI={atmospheric}
+        zoomControl={!atmospheric}
         mapTypeControl={false}
         streetViewControl={false}
         fullscreenControl={false}
+        keyboardShortcuts={atmospheric ? false : undefined}
+        clickableIcons={atmospheric ? false : undefined}
         className="absolute inset-0 h-full w-full"
         style={{ width: "100%", height: "100%" }}
       >

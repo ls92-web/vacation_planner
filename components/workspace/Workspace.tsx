@@ -26,12 +26,13 @@ import { fmtMonthDay, MODE_TEMPLATES, nightsBetween, recommend } from "@/lib/dat
 import { addBreakdowns, computeBudget, convertCostText, EMPTY_BREAKDOWN, formatMoney } from "@/lib/budget/estimate";
 import { useCurrency } from "@/lib/budget/useCurrency";
 import { summarizePreferences } from "@/lib/trips/preferences";
-import { GoogleMap, MapsApiProvider, DestinationMarkers } from "@/components/maps";
+import { GoogleMap, MapsApiProvider } from "@/components/maps";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import type { LatLng, MapMarker } from "@/lib/maps";
+import type { LatLng } from "@/lib/maps";
 import { CityImage } from "@/components/destinations/CityImage";
 import { ExportControl } from "@/components/export/ExportButton";
 import { ImmersiveMenu } from "@/components/immersive/ImmersiveMenu";
+import { JourneyCore, type CoreNode } from "@/components/immersive/JourneyCore";
 import { Logo } from "@/components/Logo";
 
 const sigOf = (t: ComposedTrip) =>
@@ -61,6 +62,22 @@ export function Workspace() {
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  // Particle bursts that flow from a tapped action toward the AI brandmark.
+  const headerLogoRef = useRef<HTMLButtonElement>(null);
+  const burstId = useRef(0);
+  const [bursts, setBursts] = useState<{ id: number; x: number; y: number; dots: { dx: number; dy: number }[] }[]>([]);
+  const fireBurst = (from: HTMLElement) => {
+    const target = headerLogoRef.current;
+    if (!target) return;
+    const a = from.getBoundingClientRect();
+    const b = target.getBoundingClientRect();
+    const ox = a.left + a.width / 2, oy = a.top + a.height / 2;
+    const tx = b.left + b.width / 2, ty = b.top + b.height / 2;
+    const dots = Array.from({ length: 7 }, (_, i) => ({ dx: tx - ox + (i - 3) * 9, dy: ty - oy + (i % 2 ? -6 : 6) }));
+    const id = ++burstId.current;
+    setBursts((p) => [...p, { id, x: ox, y: oy, dots }]);
+    setTimeout(() => setBursts((p) => p.filter((x) => x.id !== id)), 1000);
+  };
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
   const itineraryRef = useRef<ItineraryItem[]>([]);
@@ -291,8 +308,8 @@ export function Workspace() {
       {/* ============ Chat (primary) ============ */}
       <section className="flex flex-col lg:w-[40%] lg:max-w-[520px] h-[52vh] lg:h-full border-b lg:border-b-0 lg:border-r border-white/10" style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(10px)" }}>
         <header className="flex items-center gap-2.5 px-4 h-[58px] border-b border-white/10 shrink-0">
-          <button onClick={actions.goWelcome} title="New journey" className="flex items-center gap-2 cursor-pointer">
-            <Logo size={26} variant="plain" />
+          <button ref={headerLogoRef} onClick={actions.goWelcome} title="New journey" className="flex items-center gap-2 cursor-pointer">
+            <Logo size={26} variant="plain" animated={sending} />
           </button>
           <div className="min-w-0 flex-1">
             <div className="font-display font-bold text-[15px] leading-tight truncate">{activeTrip?.name || "Your trip"}</div>
@@ -389,7 +406,15 @@ export function Workspace() {
         <div className="shrink-0 px-3 pb-3 pt-1">
           <div className="flex flex-wrap gap-1.5 mb-2">
             {nextActions(saved, itinerary).map((q) => (
-              <button key={q} onClick={() => send(q)} disabled={sending} className="imm-glass imm-glass-hover px-2.5 py-1.5 rounded-full text-[12px] font-semibold text-white/70 cursor-pointer hover:text-white disabled:opacity-50 transition">{q}</button>
+              <button
+                key={q}
+                onClick={(e) => { fireBurst(e.currentTarget); send(q); }}
+                disabled={sending}
+                className="constellation-chip disabled:opacity-40 disabled:cursor-default"
+              >
+                <span className="constellation-star" aria-hidden />
+                {q}
+              </button>
             ))}
           </div>
           <div className="imm-glass flex items-end gap-2 rounded-[16px] p-2" style={{ boxShadow: "0 8px 24px -16px rgba(0,0,0,.5)" }}>
@@ -415,14 +440,25 @@ export function Workspace() {
             <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
           </div>
         )}
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} onInsightAction={(m, id) => { setDismissed((prev) => new Set(prev).add(id)); send(m); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} coreState={sending ? "routing" : "idle"} onInsightAction={(m, id) => { setDismissed((prev) => new Set(prev).add(id)); send(m); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
+
+      {/* particle bursts flowing toward the companion */}
+      <div className="fixed inset-0 pointer-events-none z-[60]">
+        {bursts.map((b) => (
+          <span key={b.id} className="fixed" style={{ left: b.x, top: b.y }}>
+            {b.dots.map((dt, i) => (
+              <span key={i} className="burst-dot" style={{ ["--dx" as string]: `${dt.dx}px`, ["--dy" as string]: `${dt.dy}px`, animationDelay: `${i * 0.02}s` }} />
+            ))}
+          </span>
+        ))}
+      </div>
     </div>
     </MapsApiProvider>
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports, insights, onInsightAction, onInsightDismiss }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports, insights, coreState, onInsightAction, onInsightDismiss }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   itinerary: ItineraryItem[];
@@ -431,13 +467,16 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
   budgetByDay: Map<number, BudgetDaySignal>;
   transports: Record<string, string>;
   insights: Insight[];
+  coreState: "idle" | "thinking" | "routing";
   onInsightAction: (message: string, id: string) => void;
   onInsightDismiss: (id: string) => void;
 }) {
-  const markers: MapMarker[] = saved
-    .filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0))
-    .map((d, i) => ({ id: String(d.id), name: d.name, kind: "destination", position: { lat: d.lat as number, lng: d.lng as number }, subtitle: `Stop ${i + 1}`, category: d.country }));
-  const center: LatLng = markers[0]?.position ?? { lat: 41.39, lng: 2.16 };
+  const geo = saved.filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0));
+  const center: LatLng = geo[0] ? { lat: geo[0].lat as number, lng: geo[0].lng as number } : { lat: 41.39, lng: 2.16 };
+  // The trip's cities become the Core's destination nodes; consecutive nodes draw the route.
+  const coreNodes: CoreNode[] = saved.length <= 1
+    ? [{ x: 0, y: 0, active: true }]
+    : saved.map((_, i) => { const ang = -Math.PI / 2 + (i / saved.length) * 2 * Math.PI; return { x: Math.cos(ang) * 0.6, y: Math.sin(ang) * 0.6, active: i === 0 }; });
   const totalNights = saved.reduce((s, d) => s + (nightsBetween(d.arrive, d.depart) || 0), 0);
   let agg = EMPTY_BREAKDOWN; let budgetTotal = 0;
   for (const d of saved) {
@@ -464,13 +503,17 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
       {/* proactive intelligence */}
       <InsightBar insights={insights} onAction={onInsightAction} onDismiss={onInsightDismiss} />
 
-      {/* map */}
-      <div className="relative rounded-[18px] overflow-hidden border border-white/12 h-[260px]">
-        <ErrorBoundary fallback={() => <div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px]">Map unavailable</div>}>
-          <GoogleMap center={center} zoom={5} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0 grid place-items-center bg-[#eef3ec] text-muted text-[13px]">Map preview</div>}>
-            <DestinationMarkers markers={markers} />
-          </GoogleMap>
-        </ErrorBoundary>
+      {/* Living Journey Canvas — atmospheric map behind the intelligence Core */}
+      <div className="relative rounded-[24px] overflow-hidden border border-white/[0.06] h-[clamp(240px,34vh,320px)]">
+        <div className="jc-atmomap absolute inset-0">
+          <ErrorBoundary fallback={() => null}>
+            <GoogleMap atmospheric center={center} zoom={4} className="absolute inset-0 h-full w-full" fallback={<div className="absolute inset-0" style={{ background: "radial-gradient(120% 120% at 50% 30%, #16233c, #060c16)" }} />} />
+          </ErrorBoundary>
+        </div>
+        <div aria-hidden className="absolute inset-0" style={{ background: "radial-gradient(115% 85% at 50% 8%, rgba(6,12,22,0) 30%, rgba(6,12,22,.78) 82%), linear-gradient(180deg, rgba(6,12,22,.4), rgba(6,12,22,.15))" }} />
+        <div className="absolute inset-0 grid place-items-center">
+          <JourneyCore size="clamp(200px,26vh,280px)" state={coreState} nodes={coreNodes} />
+        </div>
       </div>
 
       {/* summary strip */}

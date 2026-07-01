@@ -151,6 +151,50 @@ body {
   .jc-route { stroke-dashoffset: 0 !important; }
 }
 
+/* ===== Atmospheric map (background only, never reads as a map component) ===== */
+.jc-atmomap { filter: blur(7px) saturate(.42) brightness(.36) contrast(1.05); transform: scale(1.16); pointer-events: none; }
+.jc-atmomap :is(a, button, .gmnoprint, .gm-style-cc) { display: none !important; }
+
+/* ===== Constellation chips — glowing star actions ===== */
+.constellation-chip {
+  position: relative; display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 13px 6px 11px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, .72);
+  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .1);
+  cursor: pointer;
+  transition: transform .28s var(--ease-spring), color .2s ease, background-color .2s ease, border-color .25s ease, box-shadow .3s ease;
+}
+.constellation-chip:hover:not(:disabled) {
+  color: #fff; background: rgba(255, 255, 255, .08);
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 18%, transparent), 0 8px 22px -8px color-mix(in oklab, var(--accent) 60%, transparent);
+  transform: translateY(-1px);
+}
+.constellation-chip:active:not(:disabled) { transform: translateY(0) scale(.96); }
+.constellation-star {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 6px 1px color-mix(in oklab, var(--accent) 75%, transparent);
+  transition: box-shadow .3s ease, transform .3s var(--ease-spring), background-color .2s ease;
+}
+.constellation-chip:hover:not(:disabled) .constellation-star {
+  background: #FFE7C4; transform: scale(1.35);
+  box-shadow: 0 0 10px 2px color-mix(in oklab, var(--accent) 90%, transparent);
+}
+
+/* particle burst — a tapped action streams toward the companion */
+@keyframes burst_fly {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.5); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.32); }
+}
+.burst-dot {
+  position: absolute; left: 0; top: 0; width: 6px; height: 6px; border-radius: 50%;
+  background: radial-gradient(circle, #FFF4E2, var(--accent) 70%);
+  box-shadow: 0 0 8px 1px color-mix(in oklab, var(--accent) 80%, transparent);
+  animation: burst_fly .9s var(--ease-out-expo) forwards;
+}
+@media (prefers-reduced-motion: reduce) { .burst-dot { display: none; } }
+
 /* ===== Welcome ambient lights ===== */
 .wl-light { position: absolute; pointer-events: none; border-radius: 50%; z-index: 0; will-change: transform; }
 @keyframes wl_float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -22px; } }
