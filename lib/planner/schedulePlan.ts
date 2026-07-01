@@ -99,8 +99,10 @@ export function serializeSchedule(destinations: Destination[], itinerary: Itiner
           refMap[r] = it;
           const dur = it.durationMin ?? it.place.estDurationMin;
           const env = venueEnv(it.place);
+          const pl = it.place.priceLevel;
+          const price = pl == null ? "" : pl <= 0 ? ", free" : `, ${"$".repeat(Math.min(4, Math.max(1, pl)))}`;
           const hrs = it.place.hours ? `, ${it.place.hours}` : "";
-          return `[${r}] ${it.place.name} (${dur}m${env ? `, ${env}` : ""}${hrs})`;
+          return `[${r}] ${it.place.name} (${dur}m${env ? `, ${env}` : ""}${price}${hrs})`;
         });
         slotStrs.push(`    ${slot}: ${refs.join(", ")}`);
       }

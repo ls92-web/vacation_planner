@@ -49,7 +49,7 @@ export function refineMessages(tripJson: string, history: AIMessage[], message: 
     { role: "user", content: `CURRENT TRIP:\n${tripJson}\n\nTraveller says: "${message}"\n\nReturn the JSON now.` },
   ];
 }
-export function planMessages(tripJson: string, scheduleText: string, weatherText: string, history: AIMessage[], message: string): AIMessage[] {
+export function planMessages(tripJson: string, scheduleText: string, weatherText: string, budgetText: string, history: AIMessage[], message: string): AIMessage[] {
   return [
     {
       role: "system",
@@ -64,10 +64,11 @@ export function planMessages(tripJson: string, scheduleText: string, weatherText
         "Use the [ref] ids exactly as shown in the current schedule. To REPLACE a stop, remove it and add the alternative. To make a day less busy, move a couple of its stops to lighter days or add a Break. If there is NO schedule yet and the traveller asks to plan the days, emit \"add\" ops to build one from well-known REAL places that fit their preferences (spread ~2-3 stops per day across morning/afternoon/evening).\n\n" +
         "Understand natural language: move a stop to another day, reorder within a day, remove, replace with a better alternative, make a day less busy, balance travel time / reduce backtracking, or insert rest. ALWAYS prefer minimal edits over rebuilding.\n\n" +
         "WEATHER: a per-day forecast may be provided, and each schedule stop is tagged indoor/outdoor with its opening hours. Use this to be genuinely helpful: on a hot day move heat-exposed OUTDOOR stops (markets, parks, viewpoints, gardens) to cooler morning or evening slots; on a rainy day favour INDOOR stops (museums, galleries, cafés) and suggest keeping an indoor option as a rainy-day backup; recommend an indoor café or lunch between two outdoor stops; and flag when a stop's opening hours don't fit its slot. Weather is ADVISORY — put weather reasoning in \"reply\" by default and only emit ops when the traveller asks you to optimise/fix for the weather (or the clash is obvious), briefly saying what you changed and why.\n\n" +
+        "BUDGET: the trip's budget level and estimate may be provided, and each stop is marked $–$$$$ by price. If the plan skews pricier than the level — e.g. several $$$–$$$$ stops on a 'budget' trip, or a day that stacks premium stops — gently flag it and, when it helps, offer cheaper swaps (replace a pricey restaurant with a well-rated mid-range/local option via a remove + add). On a 'luxury' level do not nag about cost. Budget is ADVISORY — comment by default, ops only when the traveller asks to cut costs / fit a budget (or clearly wants it), briefly saying what you changed.\n\n" +
         "\"suggestions\": curated real place ideas (name, city, why) when the traveller asks what to do/see/eat; otherwise []. Use ONLY the listed enum values. Never invent place names you are not confident are real. JSON only, no prose.",
     },
     ...history,
-    { role: "user", content: `CURRENT TRIP:\n${tripJson}\n\n${scheduleText}${weatherText ? `\n\n${weatherText}` : ""}\n\nTraveller says: "${message}"\n\nReturn the JSON now.` },
+    { role: "user", content: `CURRENT TRIP:\n${tripJson}\n\n${scheduleText}${weatherText ? `\n\n${weatherText}` : ""}${budgetText ? `\n\n${budgetText}` : ""}\n\nTraveller says: "${message}"\n\nReturn the JSON now.` },
   ];
 }
 export function insightsMessages(ctx: TripContext): AIMessage[] {

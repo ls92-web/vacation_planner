@@ -64,8 +64,9 @@ Deno.serve(async (req: Request) => {
       const scheduleText = String(body.scheduleText ?? "");
       if (scheduleText.length > 12_000) return json({ error: "Schedule too long" }, 413);
       const weatherText = String(body.weatherText ?? "").slice(0, 4_000);
+      const budgetText = String(body.budgetText ?? "").slice(0, 3_000);
       const refKeys = Array.isArray(body.refKeys) ? body.refKeys.slice(0, 200).map(String) : [];
-      return json(await planTrip(body.trip, scheduleText, weatherText, refKeys, messages, message));
+      return json(await planTrip(body.trip, scheduleText, weatherText, budgetText, refKeys, messages, message));
     }
     if (!context) return json({ error: "Missing 'context'" }, 400);
     if (action === "assistant") {

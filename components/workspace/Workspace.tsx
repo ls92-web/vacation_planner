@@ -11,6 +11,7 @@ import { applyScheduleOps, dayStructure, serializeSchedule } from "@/lib/planner
 import { lookupPlace } from "@/lib/places/lookup";
 import { buildWeatherContext, type DaySignal } from "@/lib/weather/signal";
 import { describeWeather } from "@/lib/weather/codes";
+import { buildBudgetContext, type BudgetDaySignal } from "@/lib/budget/signal";
 import { withSave } from "@/lib/ui/saveStatus";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
@@ -53,6 +54,13 @@ export function Workspace() {
   const [weatherByDay, setWeatherByDay] = useState<Map<number, DaySignal>>(new Map());
   const weatherTextRef = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Budget signal: derived synchronously from the plan + trip level (no fetch).
+  const budget = useMemo(
+    () => buildBudgetContext(state.destinations, itinerary, state.adults + state.kids, state.budgetLevel, currency),
+    [state.destinations, itinerary, state.adults, state.kids, state.budgetLevel, currency]
+  );
+  const budgetTextRef = useRef("");
+  budgetTextRef.current = budget.text;
 
   const saved = useMemo(() => state.destinations.filter((d) => d.saved && d.name.trim()), [state.destinations]);
   const travelers = state.adults + state.kids;
@@ -162,7 +170,7 @@ export function Workspace() {
     try {
       // Serialize the live schedule so the companion can edit existing stops by ref.
       const { text: scheduleText, refMap } = serializeSchedule(state.destinations, itineraryRef.current);
-      const res = await planTrip(struct, scheduleText, weatherTextRef.current, Object.keys(refMap), history, text);
+      const res = await planTrip(struct, scheduleText, weatherTextRef.current, budgetTextRef.current, Object.keys(refMap), history, text);
       if (res) {
         // (1) Structural change → rebuild destinations + rehydrate the store.
         if (res.trip && sigOf(res.trip) !== sigOf(struct)) {
@@ -308,7 +316,7 @@ export function Workspace() {
 
       {/* ============ Live journey ============ */}
       <section className="flex-1 overflow-y-auto vp-scroll">
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} actions={actions} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} actions={actions} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} />
       </section>
 
       <style dangerouslySetInnerHTML={{ __html: `@keyframes vpw_pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.3)}}` }} />
@@ -317,13 +325,14 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, actions, itinerary, onRemoveStop, weatherByDay }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, actions, itinerary, onRemoveStop, weatherByDay, budgetByDay }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   actions: ReturnType<typeof useTrip>["actions"];
   itinerary: ItineraryItem[];
   onRemoveStop: (placeId: string) => void;
   weatherByDay: Map<number, DaySignal>;
+  budgetByDay: Map<number, BudgetDaySignal>;
 }) {
   const markers: MapMarker[] = saved
     .filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0))
@@ -408,7 +417,7 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
       </div>
 
       {/* living itinerary */}
-      <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={onRemoveStop} weatherByDay={weatherByDay} />
+      <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={onRemoveStop} weatherByDay={weatherByDay} budgetByDay={budgetByDay} budgetLevel={budgetLevel} />
 
       {/* actions */}
       <div className="mt-6 flex flex-wrap gap-2.5">
@@ -445,11 +454,28 @@ function WeatherChip({ w }: { w: DaySignal }) {
   );
 }
 
-function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay }: {
+function BudgetChip({ premium, level }: { premium: number; level: "budget" | "standard" | "luxury" }) {
+  // Flag a day that stacks premium ($$$+) stops — louder on a budget trip.
+  const alert = level === "budget" ? premium >= 1 : premium >= 2;
+  if (!alert) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+      title={`${premium} premium ($$$+) stop${premium !== 1 ? "s" : ""} — ${level === "budget" ? "over your budget level" : "a pricey day"}`}
+      style={{ background: "#FCEFD6", color: "#9A6512" }}
+    >
+      <Wallet size={12} strokeWidth={2} />$$$·{premium}
+    </span>
+  );
+}
+
+function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay, budgetByDay, budgetLevel }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   itinerary: ItineraryItem[];
   onRemoveStop: (placeId: string) => void;
   weatherByDay: Map<number, DaySignal>;
+  budgetByDay: Map<number, BudgetDaySignal>;
+  budgetLevel: "budget" | "standard" | "luxury";
 }) {
   if (!itinerary.length) {
     return (
@@ -486,6 +512,7 @@ function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay }: {
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="font-display font-bold text-[13.5px]">Day {globalDay}</span>
                         {weatherByDay.get(globalDay) && <WeatherChip w={weatherByDay.get(globalDay) as DaySignal} />}
+                        {budgetByDay.get(globalDay) && <BudgetChip premium={(budgetByDay.get(globalDay) as BudgetDaySignal).premium} level={budgetLevel} />}
                         {dayItems.length > 0 && <span className="text-[11px] text-muted inline-flex items-center gap-1"><Clock size={11} />{fmtHrs(mins)} planned</span>}
                       </div>
                       {dayItems.length ? (
