@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Calendar, Check, Clock, Compass, Lightbulb, MapPin, Minus, Moon, Plus, Send, Sparkles, Star, Wallet, X } from "lucide-react";
+import { ArrowRight, Calendar, Check, ChevronDown, ChevronUp, Clock, Compass, Lightbulb, MapPin, Minus, Moon, Plus, Send, Sparkles, Star, Wallet, X } from "lucide-react";
 import { queryLink } from "@/lib/maps";
 import { getRepository } from "@/lib/itinerary/repository";
 import { geocodeCity } from "@/lib/geo";
 import { SLOT_LABELS, SLOTS, type ExplorePlace, type ItineraryItem } from "@/lib/places";
 import { planTrip, type PlaceSuggestion } from "@/lib/ai-client";
 import { applyScheduleOps, dayStructure, serializeSchedule } from "@/lib/planner/schedulePlan";
-import { optimizeDay, lightenDay, fixTiming } from "@/lib/planner/optimize";
+import { optimizeDay, lightenDay, fixTiming, moveStopInDay } from "@/lib/planner/optimize";
 import { lookupPlace } from "@/lib/places/lookup";
 import { buildWeatherContext, type DaySignal } from "@/lib/weather/signal";
 import { describeWeather } from "@/lib/weather/codes";
@@ -342,6 +342,15 @@ export function Workspace() {
     withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", items));
   };
 
+  // Reorder a stop up/down within its day (one click).
+  const moveStop = (item: ItineraryItem, dir: -1 | 1) => {
+    if (!activeTrip) return;
+    const items = moveStopInDay(itineraryRef.current, item.destId, item.day, item.place.id, dir);
+    if (!items) return;
+    setItinerary(items);
+    withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", items));
+  };
+
   // ===== Editable trip dates (start date + nights per destination) =====
   // The AI seeds sensible dates; the user can change them any time while planning.
   // We keep the chain consistent: each destination arrives when the previous departs.
@@ -555,7 +564,7 @@ export function Workspace() {
       <div className="flex-[2] min-h-0 overflow-y-auto imm-scroll" style={{ background: "rgba(255,255,255,.02)" }}>
         {saved.length > 0 && (
           <div className="px-4 pb-6">
-            <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} budgetLevel={state.budgetLevel} />
+            <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={removeStop} onMoveStop={moveStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} budgetLevel={state.budgetLevel} />
           </div>
         )}
       </div>
@@ -776,10 +785,11 @@ function BudgetChip({ premium, level }: { premium: number; level: "budget" | "st
   );
 }
 
-function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay, budgetByDay, budgetLevel }: {
+function ScheduleView({ saved, itinerary, onRemoveStop, onMoveStop, weatherByDay, budgetByDay, budgetLevel }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   itinerary: ItineraryItem[];
   onRemoveStop: (placeId: string) => void;
+  onMoveStop: (item: ItineraryItem, dir: -1 | 1) => void;
   weatherByDay: Map<number, DaySignal>;
   budgetByDay: Map<number, BudgetDaySignal>;
   budgetLevel: "budget" | "standard" | "luxury";
@@ -827,13 +837,14 @@ function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay, budgetByDa
                       </div>
                       {dayItems.length ? (
                         <div className="flex flex-col gap-1.5">
-                          {dayItems.map((it) => {
+                          {dayItems.map((it, idx) => {
                             const p = it.place;
                             const meta = [
                               p.category && p.category !== "Recommended" ? p.category : "",
                               p.rating != null ? `★ ${p.rating.toFixed(1)}` : "",
                               p.hours ?? "",
                             ].filter(Boolean).join(" · ");
+                            const btn = "shrink-0 w-6 h-6 rounded-md border border-white/15 text-white/50 grid place-items-center cursor-pointer transition disabled:opacity-25 disabled:cursor-default";
                             return (
                               <div key={p.id} className="group flex items-center gap-2.5 px-2.5 py-2 rounded-[10px]" style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)" }}>
                                 <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.04em] w-[54px]" style={{ color: "var(--accent)" }}>{SLOT_LABELS[it.slot]}</span>
@@ -846,7 +857,11 @@ function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay, budgetByDa
                                   {meta && <div className="text-[11px] text-white/50 truncate">{meta}</div>}
                                 </div>
                                 <span className="shrink-0 text-[11px] text-white/50">{fmtHrs(it.durationMin ?? p.estDurationMin)}</span>
-                                <button onClick={() => onRemoveStop(p.id)} title="Remove" className="shrink-0 w-6 h-6 rounded-md border border-white/15 text-white/50 grid place-items-center cursor-pointer hover:text-[#F1A88C] hover:border-[#F1A88C] opacity-0 group-hover:opacity-100 transition"><X size={12} strokeWidth={2} /></button>
+                                <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition">
+                                  <button onClick={() => onMoveStop(it, -1)} disabled={idx === 0} title="Move earlier" className={`${btn} hover:text-white hover:border-white/30`}><ChevronUp size={13} strokeWidth={2.2} /></button>
+                                  <button onClick={() => onMoveStop(it, 1)} disabled={idx === dayItems.length - 1} title="Move later" className={`${btn} hover:text-white hover:border-white/30`}><ChevronDown size={13} strokeWidth={2.2} /></button>
+                                  <button onClick={() => onRemoveStop(p.id)} title="Remove" className={`${btn} hover:text-[#F1A88C] hover:border-[#F1A88C]`}><X size={12} strokeWidth={2} /></button>
+                                </div>
                               </div>
                             );
                           })}

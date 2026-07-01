@@ -95,6 +95,22 @@ export function lightenDay(itinerary: ItineraryItem[], destId: string, fromDay: 
   return { items, movedName: moved.place.name };
 }
 
+/** Move one stop up (dir -1) or down (dir +1) within its day, one step. */
+export function moveStopInDay(itinerary: ItineraryItem[], destId: string, day: number, placeId: string, dir: -1 | 1): ItineraryItem[] | null {
+  const key = cityKey(destId);
+  const dayItems = visitingOrder(itinerary.filter((it) => inDay(it, key, day)));
+  const idx = dayItems.findIndex((it) => it.place.id === placeId);
+  const target = idx + dir;
+  if (idx < 0 || target < 0 || target >= dayItems.length) return null;
+  const order = [...dayItems];
+  [order[idx], order[target]] = [order[target], order[idx]];
+  // Keep the day's slot rhythm at each position; only which stop sits there changes.
+  const slotSeq = dayItems.map((it) => it.slot);
+  const reordered = order.map((it, i) => ({ ...it, slot: slotSeq[i], position: i }));
+  const rest = itinerary.filter((it) => !inDay(it, key, day));
+  return [...rest, ...reordered];
+}
+
 /** Move an early-closing evening stop into the day's lighter earlier slot — instantly. */
 export function fixTiming(itinerary: ItineraryItem[], destId: string, day: number): { items: ItineraryItem[]; movedName: string; slot: "morning" | "afternoon" } | null {
   const key = cityKey(destId);
