@@ -17,10 +17,18 @@ import type { BudgetDaySignal } from "@/lib/budget/signal";
 
 export interface Insight {
   id: string;
-  kind: "empty" | "busy" | "hours" | "weather" | "route" | "cluster" | "budget" | "transport";
+  kind: "empty" | "busy" | "hours" | "weather" | "route" | "meal" | "cluster" | "thin" | "budget" | "transport";
   text: string;
   actionLabel: string;
   message: string;
+  /** Short lower-case clause for the arrival briefing, e.g. "day 2 zig-zags across town". */
+  brief?: string;
+}
+
+/** Does this stop count as food (restaurant / café / bar)? */
+function isFood(p: ExplorePlace): boolean {
+  const k = placeKind(p);
+  return k?.key === "restaurant" || k?.key === "cafe" || k?.key === "bar";
 }
 
 const cityKey = (n: string) => n.split(",")[0].trim().toLowerCase();
@@ -105,6 +113,11 @@ export function deriveInsights(
   const firstKey = struct[0] ? cityKey(struct[0].city) : "";
   const out: Insight[] = [];
 
+  // How full is a typical day? — so we can tell a deliberate light day from a thin one.
+  const lenByDay = new Map<string, number>();
+  for (const it of itinerary) { const k = `${it.destId ? cityKey(it.destId) : firstKey}#${it.day}`; lenByDay.set(k, (lenByDay.get(k) ?? 0) + 1); }
+  const maxDayLen = Math.max(0, ...lenByDay.values());
+
   // Per-day: busy days, heat/rain clashes, pricey stacks.
   for (const ds of struct) {
     const cityItems = itinerary.filter((it) => (it.destId ? cityKey(it.destId) : firstKey) === cityKey(ds.city));
@@ -117,7 +130,7 @@ export function deriveInsights(
       const b = budgetByDay.get(g);
 
       if (dayItems.length >= 5) {
-        out.push({ id: `busy-${g}`, kind: "busy", text: `Day ${g} has ${dayItems.length} stops — a little packed for a good day.`, actionLabel: "Ease it up", message: `Make day ${g} less busy` });
+        out.push({ id: `busy-${g}`, kind: "busy", text: `Day ${g} has ${dayItems.length} stops — a little packed for a good day.`, actionLabel: "Ease it up", message: `Make day ${g} less busy`, brief: `day ${g} is pretty packed (${dayItems.length} stops)` });
       }
 
       // Opening-hours conflict: an evening stop that closes before evening.
@@ -125,7 +138,7 @@ export function deriveInsights(
       const clash = ordered.find((it) => it.slot === "evening" && (() => { const c = closingHour(it.place.hours); return c != null && c <= 17.5; })());
       if (clash) {
         const c = closingHour(clash.place.hours)!;
-        out.push({ id: `hours-${g}`, kind: "hours", text: `Day ${g}: ${clash.place.name} is set for the evening but closes around ${fmtHour(c)}. Move it earlier?`, actionLabel: "Fix timing", message: `On day ${g}, ${clash.place.name} closes before evening — move it to the morning or afternoon` });
+        out.push({ id: `hours-${g}`, kind: "hours", text: `Day ${g}: ${clash.place.name} is set for the evening but closes around ${fmtHour(c)}. Move it earlier?`, actionLabel: "Fix timing", message: `On day ${g}, ${clash.place.name} closes before evening — move it to the morning or afternoon`, brief: `${clash.place.name} on day ${g} closes before its evening slot` });
       }
 
       // Route backtracking: current visiting order zigzags vs an efficient order.
@@ -133,8 +146,18 @@ export function deriveInsights(
       if (pts.length >= 3) {
         const cur = pathKm(pts), opt = greedyKm(pts);
         if (cur > opt * 1.4 && cur - opt >= 3) {
-          out.push({ id: `route-${g}`, kind: "route", text: `Day ${g} crosses town more than it needs to — I can reorder it to cut about ${Math.round(cur - opt)} km of backtracking.`, actionLabel: "Optimise route", message: `Reorder day ${g}'s stops into an efficient geographic order to cut backtracking` });
+          out.push({ id: `route-${g}`, kind: "route", text: `Day ${g} crosses town more than it needs to — I can reorder it to cut about ${Math.round(cur - opt)} km of backtracking.`, actionLabel: "Optimise route", message: `Reorder day ${g}'s stops into an efficient geographic order to cut backtracking`, brief: `day ${g} zig-zags across town (~${Math.round(cur - opt)} km of extra walking)` });
         }
+      }
+
+      // Meal gap: a full day with nowhere to eat.
+      if (dayItems.length >= 3 && !dayItems.some((it) => isFood(it.place))) {
+        out.push({ id: `meal-${g}`, kind: "meal", text: `Day ${g} is full but has no food stop — a well-placed lunch or dinner would round it out.`, actionLabel: "Add a meal", message: `Add a well-rated, well-located lunch or dinner spot to day ${g}`, brief: `day ${g} has no food stop planned` });
+      }
+
+      // Under-planned day (a lone stop while the rest of the trip is full).
+      if (dayItems.length === 1 && maxDayLen >= 4) {
+        out.push({ id: `thin-${g}`, kind: "thin", text: `Day ${g} only has one stop while your other days are full — want me to flesh it out?`, actionLabel: "Flesh it out", message: `Add a couple more well-chosen stops to day ${g} so it feels complete`, brief: `day ${g} is nearly empty` });
       }
 
       // Same-category clustering: a day leaning heavily on one kind of place.
@@ -148,16 +171,16 @@ export function deriveInsights(
       }
       const heavy = [...kinds.values()].filter((e) => e.n >= 3 && e.n >= dayItems.length - 1).sort((a, b) => b.n - a.n)[0];
       if (heavy) {
-        out.push({ id: `cluster-${g}`, kind: "cluster", text: `Day ${g} is heavy on ${heavy.label} (${heavy.n} of them) — mixing in something different keeps it fresh.`, actionLabel: "Add variety", message: `Day ${g} leans heavily on ${heavy.label} — add more variety with a different kind of stop` });
+        out.push({ id: `cluster-${g}`, kind: "cluster", text: `Day ${g} is heavy on ${heavy.label} (${heavy.n} of them) — mixing in something different keeps it fresh.`, actionLabel: "Add variety", message: `Day ${g} leans heavily on ${heavy.label} — add more variety with a different kind of stop`, brief: `day ${g} leans hard on ${heavy.label}` });
       }
       if (w?.hot && outdoor > 0) {
-        out.push({ id: `hot-${g}`, kind: "weather", text: `Day ${g} looks hot (${Math.round(w.tMax)}°) with ${outdoor} outdoor stop${outdoor > 1 ? "s" : ""}. I can move them to cooler hours.`, actionLabel: "Optimise for heat", message: `It's hot on day ${g} — move the outdoor stops to cooler morning or evening times` });
+        out.push({ id: `hot-${g}`, kind: "weather", text: `Day ${g} looks hot (${Math.round(w.tMax)}°) with ${outdoor} outdoor stop${outdoor > 1 ? "s" : ""}. I can move them to cooler hours.`, actionLabel: "Optimise for heat", message: `It's hot on day ${g} — move the outdoor stops to cooler morning or evening times`, brief: `day ${g} is hot (${Math.round(w.tMax)}°) with outdoor stops` });
       } else if (w?.rain && outdoor > 0) {
-        out.push({ id: `rain-${g}`, kind: "weather", text: `Rain is likely on day ${g}. Want me to favour indoor stops and keep a backup?`, actionLabel: "Plan for rain", message: `Rain is likely on day ${g} — favour indoor stops and suggest an indoor backup` });
+        out.push({ id: `rain-${g}`, kind: "weather", text: `Rain is likely on day ${g}. Want me to favour indoor stops and keep a backup?`, actionLabel: "Plan for rain", message: `Rain is likely on day ${g} — favour indoor stops and suggest an indoor backup`, brief: `rain's likely on day ${g} with outdoor stops` });
       }
       const premium = b?.premium ?? 0;
       if (budgetLevel === "budget" ? premium >= 1 : premium >= 2) {
-        out.push({ id: `budget-${g}`, kind: "budget", text: `Day ${g} stacks ${premium} pricey stop${premium > 1 ? "s" : ""} for a ${budgetLevel} trip.`, actionLabel: "Trim the cost", message: `Trim day ${g}'s budget — swap the pricey spots for well-rated cheaper local ones` });
+        out.push({ id: `budget-${g}`, kind: "budget", text: `Day ${g} stacks ${premium} pricey stop${premium > 1 ? "s" : ""} for a ${budgetLevel} trip.`, actionLabel: "Trim the cost", message: `Trim day ${g}'s budget — swap the pricey spots for well-rated cheaper local ones`, brief: `day ${g} stacks pricey stops for a ${budgetLevel} trip` });
       }
     }
   }
@@ -175,9 +198,46 @@ export function deriveInsights(
     }
   }
 
-  const rank: Insight["kind"][] = ["busy", "hours", "weather", "route", "budget", "cluster", "transport"];
+  const rank: Insight["kind"][] = ["hours", "busy", "weather", "route", "meal", "budget", "cluster", "thin", "transport"];
   out.sort((a, b) => rank.indexOf(a.kind) - rank.indexOf(b.kind));
   return out.slice(0, max);
+}
+
+/**
+ * The Companion's proactive read on the whole itinerary — the assessment it
+ * "speaks" the moment you step into a trip. It reasons over the real plan and
+ * either flags what stood out (with the one-tap fixes waiting in the insight bar)
+ * or, when the plan is genuinely solid, says so and offers to go further. Honest:
+ * it never invents problems.
+ */
+export function deriveBriefing(
+  saved: Destination[],
+  itinerary: ItineraryItem[],
+  weatherByDay: Map<number, DaySignal>,
+  budgetByDay: Map<number, BudgetDaySignal>,
+  budgetLevel: "budget" | "standard" | "luxury",
+  transports: Record<string, string>,
+  tripName: string
+): string {
+  const dests = saved.filter((d) => d.saved && d.name.trim());
+  const cities = dests.map((d) => d.name.split(",")[0]).join(", ");
+
+  if (!itinerary.length) {
+    return `Your ${tripName} is taking shape — ${cities}. Say the word and I'll turn it into a day-by-day plan with sensible pacing, or tell me what you're in the mood for.`;
+  }
+
+  const all = deriveInsights(saved, itinerary, weatherByDay, budgetByDay, budgetLevel, transports, 8).filter((i) => i.kind !== "empty" && i.brief);
+  if (!all.length) {
+    return `I looked over your ${tripName} and it's in good shape — the pace and the mix of places feel right. Want me to find a hidden gem or two to make it special, or shall we fine-tune anything?`;
+  }
+
+  // One clause per kind → a briefing that spans distinct concerns, not the same one twice.
+  const seen = new Set<Insight["kind"]>();
+  const issues = all.filter((i) => (seen.has(i.kind) ? false : (seen.add(i.kind), true)));
+  const clauses = issues.slice(0, 3).map((i) => i.brief!) as string[];
+  const joined = clauses.length === 1 ? clauses[0] : `${clauses.slice(0, -1).join(", ")} and ${clauses[clauses.length - 1]}`;
+  const lead = issues.length === 1 ? "one thing stood out" : "a few things stood out";
+  return `I looked over your ${tripName} — ${lead}: ${joined}. I've lined up a one-tap fix for each, or just tell me how you'd like to handle them.`;
 }
 
 /** Context-aware quick actions for the composer — the "next logical step" chips. */

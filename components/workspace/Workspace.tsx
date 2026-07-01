@@ -13,7 +13,7 @@ import { buildWeatherContext, type DaySignal } from "@/lib/weather/signal";
 import { describeWeather } from "@/lib/weather/codes";
 import { buildBudgetContext, type BudgetDaySignal } from "@/lib/budget/signal";
 import { buildTransportContext } from "@/lib/planner/transportSignal";
-import { deriveInsights, nextActions, type Insight } from "@/lib/planner/insights";
+import { deriveBriefing, deriveInsights, nextActions, type Insight } from "@/lib/planner/insights";
 import { withSave } from "@/lib/ui/saveStatus";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
@@ -147,10 +147,12 @@ export function Workspace() {
 
   // Load this trip's conversation memory + which suggested places are already saved.
   const greeted = useRef(false);
+  const [itinLoaded, setItinLoaded] = useState(false);
   useEffect(() => {
     greeted.current = false;
     setSavedIds(new Set());
     setItinerary([]);
+    setItinLoaded(false);
     if (!activeTrip) return;
     let cancelled = false;
     loadChat(activeTrip.id).then((chat) => {
@@ -161,9 +163,10 @@ export function Workspace() {
     getRepository().listFavorites(activeTrip.id).then((favs) => {
       if (!cancelled) setSavedIds(new Set(favs.map((p) => p.id)));
     }).catch(() => {});
-    getRepository().listItinerary(activeTrip.id).then((items) => {
-      if (!cancelled) setItinerary(items);
-    }).catch(() => {});
+    getRepository().listItinerary(activeTrip.id)
+      .then((items) => { if (!cancelled) setItinerary(items); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setItinLoaded(true); }); // greet only once the plan is known
     return () => { cancelled = true; };
   }, [activeTrip?.id]);
 
@@ -230,15 +233,16 @@ export function Workspace() {
   const needsContext = !!activeTrip && saved.length > 0 && !ctxDismissed.has(activeTrip.id) &&
     (!state.preferences.travellerType || !(state.preferences.interests && state.preferences.interests.length));
 
-  // Greet once the trip's cities are loaded (so the greeting is personal).
+  // Greet once the trip's cities AND its plan are loaded — so the companion can
+  // open with a real, proactive read on the itinerary rather than a generic hello.
   useEffect(() => {
-    if (greeted.current || !activeTrip || messages.length || !saved.length) return;
+    if (greeted.current || !activeTrip || messages.length || !saved.length || !itinLoaded) return;
     greeted.current = true;
-    const cities = saved.map((d) => d.name).join(", ");
-    setMessages([{ role: "assistant", content: `Your ${struct.name} is taking shape — ${cities}. Tell me how you'd like to shape it: add a city, change how long you stay, adjust the pace or who's coming, or ask me anything.` }]);
-    setAnimateIdx(0); // the companion "arrives" — its first words stream in
+    const briefing = deriveBriefing(saved, itineraryRef.current, weatherByDay, budget.byDay, state.budgetLevel, state.transports, struct.name);
+    setMessages([{ role: "assistant", content: briefing }]);
+    setAnimateIdx(0); // the companion "arrives" — its assessment streams in
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saved.length, messages.length, activeTrip?.id]);
+  }, [saved.length, messages.length, activeTrip?.id, itinLoaded]);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, sending]);
 
@@ -623,6 +627,10 @@ function InsightBar({ insights, onAction, onDismiss }: { insights: Insight[]; on
   if (!insights.length) return null;
   return (
     <div className="mb-4 flex flex-col gap-2">
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[.14em] text-white/45 mb-0.5">
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--accent)", boxShadow: "0 0 8px 1px color-mix(in oklab, var(--accent) 80%, transparent)", animation: "jc_halo 2.4s var(--ease-soft) infinite" }} />
+        Companion analysis
+      </div>
       {insights.map((it) => (
         <div key={it.id} className="imm-glass rounded-[14px] px-3.5 py-3 flex items-start gap-3 vp-fade-fast">
           <span className="w-8 h-8 rounded-full grid place-items-center shrink-0 mt-0.5" style={{ background: "rgba(255,255,255,.08)", color: "var(--accent)" }}><Lightbulb size={15} strokeWidth={2} /></span>
