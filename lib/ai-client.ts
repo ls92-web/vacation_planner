@@ -11,10 +11,53 @@ export interface ComposedTrip {
   preferences: TripPreferences;
 }
 
-/** Turn a free-text trip description into a structured trip (destinations + preferences). */
-export async function composeTrip(text: string): Promise<ComposedTrip | null> {
-  const data = await callFn<{ trip: ComposedTrip }>("ai", { action: "compose", text });
-  return data?.trip && data.trip.destinations?.length ? data.trip : null;
+/**
+ * Result of composing a trip from free text. Distinguishes a *confident* trip
+ * from the two failure modes that must NOT create a trip:
+ *  - `busy`  — a transient failure (rate-limited, timed out, network / upstream
+ *              error). Retrying shortly will likely succeed.
+ *  - `empty` — the AI responded but produced nothing we can confidently turn into
+ *              a trip (no valid destinations). Retrying won't help; ask the user.
+ */
+export type ComposeOutcome =
+  | { status: "ok"; trip: ComposedTrip }
+  | { status: "busy" }
+  | { status: "empty" };
+
+/** A trip is only usable if it has at least one destination with a real city name. */
+function isConfidentTrip(t: ComposedTrip | undefined | null): t is ComposedTrip {
+  return !!t && Array.isArray(t.destinations) && t.destinations.length > 0 &&
+    t.destinations.every((d) => typeof d?.city === "string" && d.city.trim().length > 0);
+}
+
+/**
+ * Turn a free-text trip description into a structured trip (destinations +
+ * preferences). Never throws — classifies every outcome so the caller can degrade
+ * gracefully (retry on `busy`, ask again on `empty`) and never build a broken trip.
+ */
+export async function composeTrip(text: string, timeoutMs = 20000): Promise<ComposeOutcome> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(fnUrl("ai"), {
+      method: "POST",
+      headers: await fnHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ action: "compose", text }),
+      signal: controller.signal,
+    });
+    // Any non-2xx (429 rate-limit, 5xx, 401…) is treated as a transient "busy".
+    if (!res.ok) return { status: "busy" };
+    const data = (await res.json().catch(() => null)) as { trip?: ComposedTrip } | null;
+    const trip = data?.trip;
+    if (isConfidentTrip(trip)) return { status: "ok", trip };
+    // 200 but nothing we can trust → don't fabricate a trip.
+    return { status: "empty" };
+  } catch {
+    // Aborted (timeout) or network error → transient.
+    return { status: "busy" };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** A curated place idea the companion surfaces in conversation. */
