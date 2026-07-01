@@ -16,6 +16,21 @@ const cityName = (n: string) => n.split(",")[0].trim();
 const destDays = (d: Destination) => Math.max(1, nightsBetween(d.arrive, d.depart) || 1);
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+const INDOOR_TYPES = ["museum", "art_gallery", "restaurant", "cafe", "bar", "shopping_mall", "store", "aquarium", "movie_theater", "spa", "library", "church", "book_store", "night_club"];
+const OUTDOOR_TYPES = ["park", "tourist_attraction", "natural_feature", "beach", "zoo", "amusement_park", "stadium", "campground", "hiking_area", "garden", "plaza"];
+
+/** Best-effort indoor/outdoor classification, so weather reasoning knows a stop's exposure. */
+function venueEnv(place: ExplorePlace): "indoor" | "outdoor" | "" {
+  if (place.indoor === true) return "indoor";
+  const types = place.googleTypes ?? [];
+  if (types.some((t) => INDOOR_TYPES.includes(t))) return "indoor";
+  if (types.some((t) => OUTDOOR_TYPES.includes(t))) return "outdoor";
+  const cat = `${place.category} ${place.name}`.toLowerCase();
+  if (/museum|gallery|restaurant|caf|bar|mall|shop|aquarium|indoor|break|theat|spa|church/.test(cat)) return "indoor";
+  if (/park|beach|garden|market|outdoor|hike|view|monument|square|tower|bridge|walk/.test(cat)) return "outdoor";
+  return "";
+}
+
 /** One destination's slice of the continuous day timeline (globalStart is 0-based). */
 export interface DayStructure {
   destId: string;
@@ -83,7 +98,9 @@ export function serializeSchedule(destinations: Destination[], itinerary: Itiner
           const r = nextRef();
           refMap[r] = it;
           const dur = it.durationMin ?? it.place.estDurationMin;
-          return `[${r}] ${it.place.name} (${dur}m)`;
+          const env = venueEnv(it.place);
+          const hrs = it.place.hours ? `, ${it.place.hours}` : "";
+          return `[${r}] ${it.place.name} (${dur}m${env ? `, ${env}` : ""}${hrs})`;
         });
         slotStrs.push(`    ${slot}: ${refs.join(", ")}`);
       }

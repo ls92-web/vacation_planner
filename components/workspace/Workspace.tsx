@@ -9,6 +9,8 @@ import { SLOT_LABELS, SLOTS, type ExplorePlace, type ItineraryItem } from "@/lib
 import { planTrip, type PlaceSuggestion } from "@/lib/ai-client";
 import { applyScheduleOps, dayStructure, serializeSchedule } from "@/lib/planner/schedulePlan";
 import { lookupPlace } from "@/lib/places/lookup";
+import { buildWeatherContext, type DaySignal } from "@/lib/weather/signal";
+import { describeWeather } from "@/lib/weather/codes";
 import { withSave } from "@/lib/ui/saveStatus";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
@@ -30,7 +32,7 @@ import { Logo } from "@/components/Logo";
 const sigOf = (t: ComposedTrip) =>
   JSON.stringify({ n: t.name, d: t.destinations.map((x) => `${x.city.toLowerCase()}#${x.nights}`), p: t.preferences });
 
-const QUICK = ["Plan my days", "What should we do there?", "Make day 1 less busy", "Add another city"];
+const QUICK = ["Plan my days", "What should we do there?", "Optimize for the weather", "Make day 1 less busy"];
 
 /** Stable id for a suggested place, so saving is idempotent and "saved" survives reload. */
 const suggestionId = (s: PlaceSuggestion) => `sugg:${s.city.toLowerCase()}:${s.name.toLowerCase()}`.replace(/\s+/g, "-");
@@ -48,6 +50,8 @@ export function Workspace() {
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
   const itineraryRef = useRef<ItineraryItem[]>([]);
   itineraryRef.current = itinerary;
+  const [weatherByDay, setWeatherByDay] = useState<Map<number, DaySignal>>(new Map());
+  const weatherTextRef = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const saved = useMemo(() => state.destinations.filter((d) => d.saved && d.name.trim()), [state.destinations]);
@@ -132,6 +136,21 @@ export function Workspace() {
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, sending]);
 
+  // Weather signal: refresh the per-day forecast whenever the route/dates change.
+  // Feeds both the AI (weatherTextRef, sent with each message) and the itinerary UI.
+  const weatherKey = saved.map((d) => `${d.name}:${d.lat},${d.lng}:${d.arrive}:${d.depart}`).join("|");
+  useEffect(() => {
+    if (!saved.length) { setWeatherByDay(new Map()); weatherTextRef.current = ""; return; }
+    let cancelled = false;
+    buildWeatherContext(state.destinations).then((ctx) => {
+      if (cancelled) return;
+      weatherTextRef.current = ctx.text;
+      setWeatherByDay(ctx.byDay);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weatherKey]);
+
   const send = async (raw?: string) => {
     const text = (raw ?? input).trim();
     if (!text || sending || !activeTrip) return;
@@ -143,7 +162,7 @@ export function Workspace() {
     try {
       // Serialize the live schedule so the companion can edit existing stops by ref.
       const { text: scheduleText, refMap } = serializeSchedule(state.destinations, itineraryRef.current);
-      const res = await planTrip(struct, scheduleText, Object.keys(refMap), history, text);
+      const res = await planTrip(struct, scheduleText, weatherTextRef.current, Object.keys(refMap), history, text);
       if (res) {
         // (1) Structural change → rebuild destinations + rehydrate the store.
         if (res.trip && sigOf(res.trip) !== sigOf(struct)) {
@@ -289,7 +308,7 @@ export function Workspace() {
 
       {/* ============ Live journey ============ */}
       <section className="flex-1 overflow-y-auto vp-scroll">
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} actions={actions} itinerary={itinerary} onRemoveStop={removeStop} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} actions={actions} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} />
       </section>
 
       <style dangerouslySetInnerHTML={{ __html: `@keyframes vpw_pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.3)}}` }} />
@@ -298,12 +317,13 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, actions, itinerary, onRemoveStop }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, actions, itinerary, onRemoveStop, weatherByDay }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   actions: ReturnType<typeof useTrip>["actions"];
   itinerary: ItineraryItem[];
   onRemoveStop: (placeId: string) => void;
+  weatherByDay: Map<number, DaySignal>;
 }) {
   const markers: MapMarker[] = saved
     .filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0))
@@ -388,7 +408,7 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
       </div>
 
       {/* living itinerary */}
-      <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={onRemoveStop} />
+      <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={onRemoveStop} weatherByDay={weatherByDay} />
 
       {/* actions */}
       <div className="mt-6 flex flex-wrap gap-2.5">
@@ -411,10 +431,25 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
 const totalMinutes = (items: ItineraryItem[]) => items.reduce((s, it) => s + (it.durationMin ?? it.place.estDurationMin), 0);
 const fmtHrs = (min: number) => { const h = Math.floor(min / 60); const m = min % 60; return h ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`; };
 
-function ScheduleView({ saved, itinerary, onRemoveStop }: {
+function WeatherChip({ w }: { w: DaySignal }) {
+  const Icon = describeWeather(w.code).icon;
+  const alert = w.hot || w.rain;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+      title={`${w.label}${w.seasonal ? " (seasonal average)" : ""}${w.hot ? " · hot" : ""}${w.rain ? " · rain likely" : ""}`}
+      style={alert ? { background: "#FCEFD6", color: "#9A6512" } : { background: "var(--tint)", color: "var(--accent)" }}
+    >
+      <Icon size={12} strokeWidth={2} />{Math.round(w.tMax)}°{w.rain ? " · rain" : w.hot ? " · hot" : ""}
+    </span>
+  );
+}
+
+function ScheduleView({ saved, itinerary, onRemoveStop, weatherByDay }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   itinerary: ItineraryItem[];
   onRemoveStop: (placeId: string) => void;
+  weatherByDay: Map<number, DaySignal>;
 }) {
   if (!itinerary.length) {
     return (
@@ -448,8 +483,9 @@ function ScheduleView({ saved, itinerary, onRemoveStop }: {
                   const mins = totalMinutes(dayItems);
                   return (
                     <div key={d}>
-                      <div className="flex items-baseline gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 mb-1.5">
                         <span className="font-display font-bold text-[13.5px]">Day {globalDay}</span>
+                        {weatherByDay.get(globalDay) && <WeatherChip w={weatherByDay.get(globalDay) as DaySignal} />}
                         {dayItems.length > 0 && <span className="text-[11px] text-muted inline-flex items-center gap-1"><Clock size={11} />{fmtHrs(mins)} planned</span>}
                       </div>
                       {dayItems.length ? (

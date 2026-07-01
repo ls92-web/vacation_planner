@@ -49,11 +49,12 @@ export interface PlanResult {
 export async function planTrip(
   trip: ComposedTrip,
   scheduleText: string,
+  weatherText: string,
   refKeys: string[],
   history: AIMessage[],
   message: string
 ): Promise<PlanResult | null> {
-  const data = await callFn<PlanResult>("ai", { action: "plan", trip, scheduleText, refKeys, messages: history, message });
+  const data = await callFn<PlanResult>("ai", { action: "plan", trip, scheduleText, weatherText, refKeys, messages: history, message });
   return data && typeof data.reply === "string" ? data : null;
 }
 

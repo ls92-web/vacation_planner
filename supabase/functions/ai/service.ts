@@ -137,11 +137,12 @@ function normalizeScheduleOp(o: Record<string, unknown>, refSet: Set<string>) {
  * and/or the day-by-day schedule and/or suggest places, returning only what
  * changed. `refKeys` are the stable stop ids from the serialized schedule.
  */
-export async function planTrip(trip: unknown, scheduleText: string, refKeys: string[], history: AIMessage[], message: string) {
+export async function planTrip(trip: unknown, scheduleText: string, weatherText: string, refKeys: string[], history: AIMessage[], message: string) {
   const tripJson = JSON.stringify(trip ?? {});
   const safeHistory = (Array.isArray(history) ? history : []).slice(-12).filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string");
   const scheduleBlock = typeof scheduleText === "string" && scheduleText.trim() ? scheduleText : "SCHEDULE: empty (no day-by-day plan yet).";
-  const raw = await chat({ messages: planMessages(tripJson, scheduleBlock, safeHistory, message), temperature: 0.4, maxTokens: 2000, json: true });
+  const weatherBlock = typeof weatherText === "string" ? weatherText.trim() : "";
+  const raw = await chat({ messages: planMessages(tripJson, scheduleBlock, weatherBlock, safeHistory, message), temperature: 0.4, maxTokens: 2000, json: true });
   const p = extractJson<Record<string, unknown>>(raw);
 
   const reply = String(p.reply ?? "").trim() || "Done.";
