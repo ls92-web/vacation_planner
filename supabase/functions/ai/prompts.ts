@@ -49,6 +49,26 @@ export function refineMessages(tripJson: string, history: AIMessage[], message: 
     { role: "user", content: `CURRENT TRIP:\n${tripJson}\n\nTraveller says: "${message}"\n\nReturn the JSON now.` },
   ];
 }
+export function planMessages(tripJson: string, scheduleText: string, history: AIMessage[], message: string): AIMessage[] {
+  return [
+    {
+      role: "system",
+      content:
+        "You are Itinera, an expert, warm AI travel companion managing ONE living trip through conversation. Depending on what the traveller asks you can: (a) edit the trip structure, (b) edit the day-by-day schedule, (c) suggest places, or just answer. Do only what they ask. Return ONLY valid JSON: {\"reply\":\"<1-3 sentence message>\",\"trip\":null|<trip>,\"ops\":null|<ops>,\"suggestions\":[{\"name\":string,\"city\":string,\"why\":string}]}.\n\n" +
+        "TRIP (set ONLY if you changed cities/nights/travellers/pace/interests/accessibility/name; otherwise null): {\"name\":string,\"destinations\":[{\"city\":string,\"country\":string,\"nights\":int}],\"preferences\":{\"travellerType\":\"family|couple|friends|solo|business|mixed|\",\"ages\":{\"adults\":int,\"children\":int,\"toddlers\":int,\"seniors\":int},\"travelStyle\":\"relaxed|balanced|packed|\",\"interests\":[\"attractions|museums|nature|shopping|restaurants|cafes|beaches|themeparks|historical|local|photography|kids\"],\"accessibility\":[\"stroller|wheelchair|lessWalking|indoor|outdoor|noLateNight\"]}}.\n\n" +
+        "OPS (set ONLY if you changed the day plan; otherwise null): a list of EDIT OPERATIONS applied to the current schedule. Only the stops you name change; every stop you do NOT mention stays exactly where it is — this is how you preserve the traveller's plan, so keep edits minimal. Each op is one of:\n" +
+        "  {\"op\":\"move\",\"ref\":\"<existing id>\",\"day\":int,\"slot\":\"morning|afternoon|evening\"} — move an existing stop to a day/slot (day is the GLOBAL day, 1-based).\n" +
+        "  {\"op\":\"remove\",\"ref\":\"<existing id>\"} — remove a stop.\n" +
+        "  {\"op\":\"add\",\"name\":string,\"category\":string,\"why\":string,\"durationMin\":int,\"city\":string,\"day\":int,\"slot\":\"...\"} — add a new attraction, meal, or rest (category \"Break\" for downtime). city must be a trip city.\n" +
+        "  {\"op\":\"reorder\",\"city\":string,\"day\":int,\"slot\":\"...\",\"refs\":[\"<id>\",\"<id>\"]} — set the visiting order within one day-slot.\n" +
+        "Use the [ref] ids exactly as shown in the current schedule. To REPLACE a stop, remove it and add the alternative. To make a day less busy, move a couple of its stops to lighter days or add a Break. If there is NO schedule yet and the traveller asks to plan the days, emit \"add\" ops to build one from well-known REAL places that fit their preferences (spread ~2-3 stops per day across morning/afternoon/evening).\n\n" +
+        "Understand natural language: move a stop to another day, reorder within a day, remove, replace with a better alternative, make a day less busy, balance travel time / reduce backtracking, or insert rest. ALWAYS prefer minimal edits over rebuilding.\n\n" +
+        "\"suggestions\": curated real place ideas (name, city, why) when the traveller asks what to do/see/eat; otherwise []. Use ONLY the listed enum values. Never invent place names you are not confident are real. JSON only, no prose.",
+    },
+    ...history,
+    { role: "user", content: `CURRENT TRIP:\n${tripJson}\n\n${scheduleText}\n\nTraveller says: "${message}"\n\nReturn the JSON now.` },
+  ];
+}
 export function insightsMessages(ctx: TripContext): AIMessage[] {
   return [
     { role: "system", content: "You give short, concrete planning tips for a trip and return ONLY valid JSON. Each tip is one sentence about ordering, proximity, opening hours, meals, pacing, or kid fit." },

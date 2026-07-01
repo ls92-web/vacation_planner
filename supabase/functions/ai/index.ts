@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isConfigured } from "./openrouter.ts";
-import { composeTrip, generateItinerary, planningInsights, recommendPlaces, refineTrip, streamAssistant } from "./service.ts";
+import { composeTrip, generateItinerary, planningInsights, planTrip, recommendPlaces, refineTrip, streamAssistant } from "./service.ts";
 
 // Single action-routed AI function: itinerary | insights | recommendations | assistant (stream).
 // Requires a real signed-in user (the anon key is rejected). OpenRouter key/model come
@@ -55,6 +55,16 @@ Deno.serve(async (req: Request) => {
       if (message.length > 1200) return json({ error: "Message too long" }, 413);
       const messages = Array.isArray(body.messages) ? body.messages : [];
       return json(await refineTrip(body.trip, messages, message));
+    }
+    if (action === "plan") {
+      const message = String(body.message ?? "").trim();
+      if (!message) return json({ error: "Missing 'message'" }, 400);
+      if (message.length > 1200) return json({ error: "Message too long" }, 413);
+      const messages = Array.isArray(body.messages) ? body.messages : [];
+      const scheduleText = String(body.scheduleText ?? "");
+      if (scheduleText.length > 12_000) return json({ error: "Schedule too long" }, 413);
+      const refKeys = Array.isArray(body.refKeys) ? body.refKeys.slice(0, 200).map(String) : [];
+      return json(await planTrip(body.trip, scheduleText, refKeys, messages, message));
     }
     if (!context) return json({ error: "Missing 'context'" }, 400);
     if (action === "assistant") {

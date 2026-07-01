@@ -1,5 +1,5 @@
 import { chat, streamDeltas } from "./openrouter.ts";
-import { assistantMessages, composeMessages, insightsMessages, itineraryMessages, recommendationMessages, refineMessages, type TripContext } from "./prompts.ts";
+import { assistantMessages, composeMessages, insightsMessages, itineraryMessages, planMessages, recommendationMessages, refineMessages, type TripContext } from "./prompts.ts";
 import type { AIMessage } from "./openrouter.ts";
 
 function extractJson<T>(raw: string): T {
@@ -94,6 +94,81 @@ export async function refineTrip(trip: unknown, history: AIMessage[], message: s
     .filter((s) => s.name && cities.has(s.city.toLowerCase()))
     .slice(0, 4);
   return { reply, trip: updated, suggestions };
+}
+
+const SLOT_SET = new Set(["morning", "afternoon", "evening"]);
+const slotOf = (v: unknown) => (SLOT_SET.has(String(v)) ? String(v) : "morning");
+const dayOf = (v: unknown) => Math.max(1, Math.round(Number(v)) || 1);
+
+/** Validate one AI schedule edit op against the set of known stop refs. */
+function normalizeScheduleOp(o: Record<string, unknown>, refSet: Set<string>) {
+  const op = String(o.op ?? "");
+  if (op === "remove") {
+    return typeof o.ref === "string" && refSet.has(o.ref) ? { op, ref: o.ref } : null;
+  }
+  if (op === "move") {
+    if (!(typeof o.ref === "string" && refSet.has(o.ref))) return null;
+    return { op, ref: o.ref, day: dayOf(o.day), slot: slotOf(o.slot) };
+  }
+  if (op === "add") {
+    const name = String(o.name ?? "").trim();
+    if (!name) return null;
+    return {
+      op,
+      name,
+      category: String(o.category ?? "").trim() || undefined,
+      why: String(o.why ?? "").trim() || undefined,
+      durationMin: Number.isFinite(Number(o.durationMin)) ? Math.max(15, Math.min(600, Math.round(Number(o.durationMin)))) : undefined,
+      city: String(o.city ?? "").trim(),
+      day: dayOf(o.day),
+      slot: slotOf(o.slot),
+    };
+  }
+  if (op === "reorder") {
+    const refs = Array.isArray(o.refs) ? (o.refs as unknown[]).map(String).filter((r) => refSet.has(r)) : [];
+    if (!refs.length) return null;
+    return { op, city: String(o.city ?? "").trim(), day: dayOf(o.day), slot: slotOf(o.slot), refs };
+  }
+  return null;
+}
+
+/**
+ * The living-itinerary companion: one call that can edit the trip structure
+ * and/or the day-by-day schedule and/or suggest places, returning only what
+ * changed. `refKeys` are the stable stop ids from the serialized schedule.
+ */
+export async function planTrip(trip: unknown, scheduleText: string, refKeys: string[], history: AIMessage[], message: string) {
+  const tripJson = JSON.stringify(trip ?? {});
+  const safeHistory = (Array.isArray(history) ? history : []).slice(-12).filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string");
+  const scheduleBlock = typeof scheduleText === "string" && scheduleText.trim() ? scheduleText : "SCHEDULE: empty (no day-by-day plan yet).";
+  const raw = await chat({ messages: planMessages(tripJson, scheduleBlock, safeHistory, message), temperature: 0.4, maxTokens: 2000, json: true });
+  const p = extractJson<Record<string, unknown>>(raw);
+
+  const reply = String(p.reply ?? "").trim() || "Done.";
+
+  let updated: ReturnType<typeof normalizeTrip> | null = null;
+  const tripIn = p.trip;
+  if (tripIn && typeof tripIn === "object" && Array.isArray((tripIn as Record<string, unknown>).destinations) && (tripIn as { destinations: unknown[] }).destinations.length) {
+    try { updated = normalizeTrip(tripIn as Record<string, unknown>); } catch { updated = null; }
+  }
+
+  const refSet = new Set(Array.isArray(refKeys) ? refKeys.map(String) : []);
+  let ops: ReturnType<typeof normalizeScheduleOp>[] | null = null;
+  if (Array.isArray(p.ops)) {
+    const list = (p.ops as Record<string, unknown>[]).map((o) => normalizeScheduleOp(o, refSet)).filter((o): o is NonNullable<typeof o> => !!o).slice(0, 60);
+    ops = list.length ? list : null;
+  }
+
+  const cityList = (updated ?? (trip as { destinations?: { city: string }[] } | null))?.destinations ?? [];
+  const cities = new Set(cityList.map((d) => String(d.city).toLowerCase()));
+  const suggestions = Array.isArray(p.suggestions)
+    ? (p.suggestions as Record<string, unknown>[])
+        .map((s) => ({ name: String(s.name ?? "").trim(), city: String(s.city ?? "").trim(), why: String(s.why ?? "").trim() }))
+        .filter((s) => s.name && cities.has(s.city.toLowerCase()))
+        .slice(0, 4)
+    : [];
+
+  return { reply, trip: updated, ops, suggestions };
 }
 
 export async function planningInsights(ctx: TripContext) {

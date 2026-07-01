@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, Compass, Download, MapPin, Moon, Plus, Send, Sparkles, Wallet } from "lucide-react";
+import { ArrowRight, Check, Clock, Compass, Download, MapPin, Moon, Plus, Send, Sparkles, Wallet, X } from "lucide-react";
 import { queryLink } from "@/lib/maps";
 import { getRepository } from "@/lib/itinerary/repository";
 import { geocodeCity } from "@/lib/geo";
-import type { ExplorePlace } from "@/lib/places";
-import type { PlaceSuggestion } from "@/lib/ai-client";
+import { SLOT_LABELS, SLOTS, type ExplorePlace, type ItineraryItem } from "@/lib/places";
+import { planTrip, type PlaceSuggestion } from "@/lib/ai-client";
+import { applyScheduleOps, dayStructure, serializeSchedule } from "@/lib/planner/schedulePlan";
+import { withSave } from "@/lib/ui/saveStatus";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { useTripLoader } from "@/lib/trips/useTripLoader";
-import { refineTrip, type ComposedTrip } from "@/lib/ai-client";
+import type { ComposedTrip } from "@/lib/ai-client";
 import { applyTrip } from "@/lib/trips/applyTrip";
 import { loadChat, saveChat, type ChatTurn } from "@/lib/destinations/repository";
 import { fmtMonthDay, MODE_TEMPLATES, nightsBetween, recommend } from "@/lib/data";
@@ -26,7 +28,7 @@ import { Logo } from "@/components/Logo";
 const sigOf = (t: ComposedTrip) =>
   JSON.stringify({ n: t.name, d: t.destinations.map((x) => `${x.city.toLowerCase()}#${x.nights}`), p: t.preferences });
 
-const QUICK = ["What should we do there?", "Add another city", "Make it more relaxed", "We're travelling with kids"];
+const QUICK = ["Plan my days", "What should we do there?", "Make day 1 less busy", "Add another city"];
 
 /** Stable id for a suggested place, so saving is idempotent and "saved" survives reload. */
 const suggestionId = (s: PlaceSuggestion) => `sugg:${s.city.toLowerCase()}:${s.name.toLowerCase()}`.replace(/\s+/g, "-");
@@ -41,6 +43,9 @@ export function Workspace() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
+  const itineraryRef = useRef<ItineraryItem[]>([]);
+  itineraryRef.current = itinerary;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const saved = useMemo(() => state.destinations.filter((d) => d.saved && d.name.trim()), [state.destinations]);
@@ -59,6 +64,7 @@ export function Workspace() {
   useEffect(() => {
     greeted.current = false;
     setSavedIds(new Set());
+    setItinerary([]);
     if (!activeTrip) return;
     let cancelled = false;
     loadChat(activeTrip.id).then((chat) => {
@@ -68,6 +74,9 @@ export function Workspace() {
     });
     getRepository().listFavorites(activeTrip.id).then((favs) => {
       if (!cancelled) setSavedIds(new Set(favs.map((p) => p.id)));
+    }).catch(() => {});
+    getRepository().listItinerary(activeTrip.id).then((items) => {
+      if (!cancelled) setItinerary(items);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [activeTrip?.id]);
@@ -118,12 +127,21 @@ export function Workspace() {
     setInput("");
     setSending(true);
     try {
-      const res = await refineTrip(struct, history, text);
+      // Serialize the live schedule so the companion can edit existing stops by ref.
+      const { text: scheduleText, refMap } = serializeSchedule(state.destinations, itineraryRef.current);
+      const res = await planTrip(struct, scheduleText, Object.keys(refMap), history, text);
       if (res) {
-        if (sigOf(res.trip) !== sigOf(struct)) {
+        // (1) Structural change → rebuild destinations + rehydrate the store.
+        if (res.trip && sigOf(res.trip) !== sigOf(struct)) {
           await applyTrip(activeTrip.id, res.trip, state.destinations, state.budgetLevel);
           if (res.trip.name && res.trip.name !== activeTrip.name) await tripActions.rename(activeTrip.id, res.trip.name);
           await loadPlan(activeTrip.id, res.trip.destinations[0].city);
+        }
+        // (2) Schedule change → apply minimal edit ops onto the live stops (preserving the rest) + persist.
+        if (res.ops) {
+          const items = applyScheduleOps(itineraryRef.current, res.ops, refMap, state.destinations);
+          setItinerary(items);
+          withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", items));
         }
         const full = [...afterUser, { role: "assistant" as const, content: res.reply, suggestions: res.suggestions?.length ? res.suggestions : undefined }];
         setMessages(full);
@@ -136,6 +154,14 @@ export function Workspace() {
     } finally {
       setSending(false);
     }
+  };
+
+  // Remove one stop from the living schedule (quick action; chat can do more).
+  const removeStop = (placeId: string) => {
+    if (!activeTrip) return;
+    const items = itineraryRef.current.filter((it) => it.place.id !== placeId);
+    setItinerary(items);
+    withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", items));
   };
 
   return (
@@ -234,7 +260,7 @@ export function Workspace() {
 
       {/* ============ Live journey ============ */}
       <section className="flex-1 overflow-y-auto vp-scroll">
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} actions={actions} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} actions={actions} itinerary={itinerary} onRemoveStop={removeStop} />
       </section>
 
       <style dangerouslySetInnerHTML={{ __html: `@keyframes vpw_pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.3)}}` }} />
@@ -242,10 +268,12 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, actions }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, actions, itinerary, onRemoveStop }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   actions: ReturnType<typeof useTrip>["actions"];
+  itinerary: ItineraryItem[];
+  onRemoveStop: (placeId: string) => void;
 }) {
   const markers: MapMarker[] = saved
     .filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0))
@@ -331,11 +359,88 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
         })}
       </div>
 
+      {/* living itinerary */}
+      <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={onRemoveStop} />
+
       {/* actions */}
       <div className="mt-6 flex flex-wrap gap-2.5">
         <button onClick={actions.goExplore} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06]"><Compass size={15} />Browse places to add</button>
         <button onClick={actions.goForm} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent"><MapPin size={15} />Detailed planner</button>
         <button onClick={actions.goExplore} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent"><Download size={15} />Export<ArrowRight size={14} /></button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- the living day-by-day schedule ---------------- */
+const totalMinutes = (items: ItineraryItem[]) => items.reduce((s, it) => s + (it.durationMin ?? it.place.estDurationMin), 0);
+const fmtHrs = (min: number) => { const h = Math.floor(min / 60); const m = min % 60; return h ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`; };
+
+function ScheduleView({ saved, itinerary, onRemoveStop }: {
+  saved: ReturnType<typeof useTrip>["state"]["destinations"];
+  itinerary: ItineraryItem[];
+  onRemoveStop: (placeId: string) => void;
+}) {
+  if (!itinerary.length) {
+    return (
+      <div className="mt-6 rounded-[16px] border border-dashed border-line px-4 py-5 text-center">
+        <div className="font-display font-bold text-[14.5px]">No day-by-day plan yet</div>
+        <p className="text-muted text-[12.5px] mt-1 max-w-[420px] mx-auto">Ask the companion to <span className="text-ink font-semibold">“plan my days”</span> — then refine it by chat: move stops between days, reorder, make a day less busy, or swap in alternatives.</p>
+      </div>
+    );
+  }
+
+  const struct = dayStructure(saved);
+  const firstKey = struct[0] ? struct[0].city.split(",")[0].trim().toLowerCase() : "";
+  const cityKey = (n: string) => n.split(",")[0].trim().toLowerCase();
+
+  return (
+    <div className="mt-6">
+      <div className="font-display font-bold text-[16px] mb-3 flex items-center gap-2"><Sparkles size={15} className="text-accent" />Your itinerary</div>
+      <div className="flex flex-col gap-4">
+        {struct.map((ds) => {
+          const cityItems = itinerary.filter((it) => (it.destId ? cityKey(it.destId) : firstKey) === cityKey(ds.city));
+          return (
+            <div key={ds.destId} className="rounded-[16px] border border-line bg-surface overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-line flex items-center justify-between">
+                <div className="font-display font-bold text-[14.5px]">{ds.city}</div>
+                <div className="text-[11.5px] text-muted">{cityItems.length} stop{cityItems.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div className="p-3 flex flex-col gap-3">
+                {Array.from({ length: ds.nights }).map((_, d) => {
+                  const dayItems = cityItems.filter((it) => it.day === d).sort((a, b) => SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || a.position - b.position);
+                  const globalDay = ds.globalStart + d + 1;
+                  const mins = totalMinutes(dayItems);
+                  return (
+                    <div key={d}>
+                      <div className="flex items-baseline gap-2 mb-1.5">
+                        <span className="font-display font-bold text-[13.5px]">Day {globalDay}</span>
+                        {dayItems.length > 0 && <span className="text-[11px] text-muted inline-flex items-center gap-1"><Clock size={11} />{fmtHrs(mins)} planned</span>}
+                      </div>
+                      {dayItems.length ? (
+                        <div className="flex flex-col gap-1.5">
+                          {dayItems.map((it) => (
+                            <div key={it.place.id} className="group flex items-center gap-2.5 px-2.5 py-2 rounded-[10px] border border-line bg-bg">
+                              <span className="shrink-0 text-[10px] font-bold uppercase tracking-[.04em] text-accent w-[54px]">{SLOT_LABELS[it.slot]}</span>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-[13px] font-semibold text-ink truncate">{it.place.name}</div>
+                                {it.place.category && it.place.category !== "Recommended" && <div className="text-[11px] text-muted truncate">{it.place.category}</div>}
+                              </div>
+                              <span className="shrink-0 text-[11px] text-muted">{fmtHrs(it.durationMin ?? it.place.estDurationMin)}</span>
+                              <button onClick={() => onRemoveStop(it.place.id)} title="Remove" className="shrink-0 w-6 h-6 rounded-md border border-line text-muted grid place-items-center cursor-pointer hover:text-[#b3402f] hover:border-[#b3402f] opacity-0 group-hover:opacity-100 transition"><X size={12} strokeWidth={2} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-[11.5px] text-muted px-2.5 py-2 rounded-[10px] border border-dashed border-line">Free day — ask to add something or keep it open.</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import type { DayPlan, TripPreferences } from "./types";
 import type { Recommendation, TripContext, AIMessage } from "./ai";
+import type { ScheduleOp } from "./planner/schedulePlan";
 import { callFn, fnHeaders, fnUrl } from "./edge";
 
 export interface ComposedTrip {
@@ -33,6 +34,27 @@ export interface RefineResult {
 export async function refineTrip(trip: ComposedTrip, history: AIMessage[], message: string): Promise<RefineResult | null> {
   const data = await callFn<RefineResult>("ai", { action: "refine", trip, messages: history, message });
   return data?.trip?.destinations?.length ? data : null;
+}
+
+/** The living-itinerary companion: one call may edit the trip, the day plan, and/or suggest. */
+export interface PlanResult {
+  reply: string;
+  /** Present only if the trip structure changed. */
+  trip: ComposedTrip | null;
+  /** Present only if the day-by-day schedule changed (minimal edit ops). */
+  ops: ScheduleOp[] | null;
+  suggestions?: PlaceSuggestion[];
+}
+
+export async function planTrip(
+  trip: ComposedTrip,
+  scheduleText: string,
+  refKeys: string[],
+  history: AIMessage[],
+  message: string
+): Promise<PlanResult | null> {
+  const data = await callFn<PlanResult>("ai", { action: "plan", trip, scheduleText, refKeys, messages: history, message });
+  return data && typeof data.reply === "string" ? data : null;
 }
 
 // ===== Browser helpers that call the `ai` Supabase Edge Function. =====
