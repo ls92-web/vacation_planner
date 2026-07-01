@@ -23,6 +23,7 @@ import { GoogleMap, MapsApiProvider, DestinationMarkers } from "@/components/map
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import type { LatLng, MapMarker } from "@/lib/maps";
 import { CityImage } from "@/components/destinations/CityImage";
+import { ExportControl } from "@/components/export/ExportButton";
 import { Logo } from "@/components/Logo";
 
 const sigOf = (t: ComposedTrip) =>
@@ -366,7 +367,16 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
       <div className="mt-6 flex flex-wrap gap-2.5">
         <button onClick={actions.goExplore} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] bg-accent text-white text-[13.5px] font-bold cursor-pointer hover:brightness-[1.06]"><Compass size={15} />Browse places to add</button>
         <button onClick={actions.goForm} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent"><MapPin size={15} />Detailed planner</button>
-        <button onClick={actions.goExplore} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent"><Download size={15} />Export<ArrowRight size={14} /></button>
+        <ExportControl
+          itinerary={itinerary}
+          destination={saved[0]?.name ?? ""}
+          center={center}
+          transportMode="walk"
+          units="km"
+          label="Export"
+          disabled={!itinerary.length}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[12px] border border-line bg-surface text-ink text-[13.5px] font-bold cursor-pointer hover:border-accent disabled:opacity-50"
+        />
       </div>
     </div>
   );

@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Download, X } from "lucide-react";
 import { usePlanner } from "@/lib/planner/store";
+import type { ItineraryItem } from "@/lib/places";
+import type { LatLng } from "@/lib/maps";
+import type { TransportMode } from "@/lib/planner/travel";
 import { TEMPLATES, type BookTemplate } from "./templates";
-import { ItineraryBook } from "./ItineraryBook";
+import { ItineraryBookView } from "./ItineraryBook";
 
 function TemplateCard({ t, city, days, onPick }: { t: BookTemplate; city: string; days: number; onPick: () => void }) {
   const labelCls = t.uppercaseLabels ? "uppercase tracking-[.12em]" : "";
@@ -29,14 +32,53 @@ function TemplateCard({ t, city, days, onPick }: { t: BookTemplate; city: string
   );
 }
 
+/** Thin wrapper for the Explore/planner flow: pulls schedule data from the PlannerProvider. */
 export function ExportButton({ label = "Export", className, disabled = false }: { label?: string; className?: string; disabled?: boolean } = {}) {
   const { state } = usePlanner();
+  return (
+    <ExportControl
+      label={label}
+      className={className}
+      disabled={disabled}
+      itinerary={state.itinerary}
+      destination={state.destination}
+      center={state.center}
+      transportMode={state.transportMode}
+      units={state.units}
+    />
+  );
+}
+
+/**
+ * Presentational export control (button → template gallery → rendered book).
+ * Takes schedule data as props so it works both in the planner and in the
+ * conversational workspace (which passes its own live itinerary).
+ */
+export function ExportControl({
+  itinerary,
+  destination,
+  center,
+  transportMode,
+  units,
+  label = "Export",
+  className,
+  disabled = false,
+}: {
+  itinerary: ItineraryItem[];
+  destination: string;
+  center: LatLng;
+  transportMode: TransportMode;
+  units: "km" | "mi";
+  label?: string;
+  className?: string;
+  disabled?: boolean;
+}) {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [book, setBook] = useState<BookTemplate | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const city = state.destination.split(",")[0];
-  const days = new Set(state.itinerary.map((it) => `${it.destId}|${it.day}`)).size;
+  const city = destination.split(",")[0];
+  const days = new Set(itinerary.map((it) => `${it.destId}|${it.day}`)).size;
 
   // Overlays are portaled to <body> so the header's backdrop-filter can't trap position:fixed.
   const overlays = (
@@ -60,7 +102,16 @@ export function ExportButton({ label = "Export", className, disabled = false }: 
         </div>
       )}
 
-      {book && <ItineraryBook template={book} onClose={() => setBook(null)} />}
+      {book && (
+        <ItineraryBookView
+          template={book}
+          onClose={() => setBook(null)}
+          itinerary={itinerary}
+          center={center}
+          transportMode={transportMode}
+          units={units}
+        />
+      )}
     </>
   );
 

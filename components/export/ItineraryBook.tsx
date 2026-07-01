@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 import { Printer, X } from "lucide-react";
 import { EX_THUMBS, fmtMonthDay, MODE_TEMPLATES, nightsBetween, recommend } from "@/lib/data";
 import { formatDurationMin, formatKm, type ItineraryItem } from "@/lib/places";
-import { computeTimeline, fmtClock, orderedItems as orderItems } from "@/lib/planner/travel";
+import { computeTimeline, fmtClock, orderedItems as orderItems, type TransportMode } from "@/lib/planner/travel";
 import { analyzeDay } from "@/lib/planner/dayAnalysis";
 import { usePlanner } from "@/lib/planner/store";
 import { useTrip } from "@/lib/store";
@@ -36,8 +36,41 @@ function fmtTime(t?: string): string {
   return `${hr}:${(mRaw ?? "00").padStart(2, "0")} ${ap}`;
 }
 
-export function ItineraryBook({ template: t, onClose }: { template: BookTemplate; onClose: () => void }) {
+/** Thin wrapper for the Explore/planner flow: pulls schedule data from the PlannerProvider. */
+export function ItineraryBook({ template, onClose }: { template: BookTemplate; onClose: () => void }) {
   const { state } = usePlanner();
+  return (
+    <ItineraryBookView
+      template={template}
+      onClose={onClose}
+      itinerary={state.itinerary}
+      center={state.center}
+      transportMode={state.transportMode}
+      units={state.units}
+    />
+  );
+}
+
+/**
+ * The rendered guide. Takes schedule data as props so it works both inside the
+ * PlannerProvider (Explore) and in the conversational workspace (which holds its
+ * own live itinerary). Trip/account/currency come from their always-present providers.
+ */
+export function ItineraryBookView({
+  template: t,
+  onClose,
+  itinerary,
+  center,
+  transportMode,
+  units,
+}: {
+  template: BookTemplate;
+  onClose: () => void;
+  itinerary: ItineraryItem[];
+  center: LatLng;
+  transportMode: TransportMode;
+  units: "km" | "mi";
+}) {
   const trip = useTrip();
   const auth = useAuth();
   const currency = useCurrency();
@@ -61,8 +94,8 @@ export function ItineraryBook({ template: t, onClose }: { template: BookTemplate
     let budget = 0;
     const tot = { attractions: 0, restaurants: 0, sightseeing: 0, stops: 0 };
     const secs = dests.map((d) => {
-      const dcenter: LatLng = typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0) ? { lat: d.lat, lng: d.lng } : state.center;
-      const items = state.itinerary.filter((it) => (it.destId ? cityKey(it.destId) : firstKey) === cityKey(d.name));
+      const dcenter: LatLng = typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0) ? { lat: d.lat, lng: d.lng } : center;
+      const items = itinerary.filter((it) => (it.destId ? cityKey(it.destId) : firstKey) === cityKey(d.name));
       // Day count is the destination's nights, but never fewer than the days that
       // actually hold stops — otherwise a stop placed on a day later trimmed off by a
       // shortened date range would be silently dropped from the book (and its counts),
@@ -72,12 +105,12 @@ export function ItineraryBook({ template: t, onClose }: { template: BookTemplate
       const dayList = Array.from({ length: dayCount }, (_, di) => {
         const dayItems: ItineraryItem[] = items.filter((it) => it.day === di);
         const seq = orderItems(dayItems);
-        const analysis = analyzeDay(dayItems, dcenter, state.transportMode);
+        const analysis = analyzeDay(dayItems, dcenter, transportMode);
         tot.attractions += analysis.attractions;
         tot.restaurants += analysis.restaurants;
         tot.sightseeing += analysis.visitMin;
         tot.stops += seq.length;
-        return { globalDay: offset + di + 1, seq, timeline: computeTimeline(seq, dcenter, state.transportMode), analysis, date: dayDate(d.arrive, di) };
+        return { globalDay: offset + di + 1, seq, timeline: computeTimeline(seq, dcenter, transportMode), analysis, date: dayDate(d.arrive, di) };
       });
       const b = computeBudget({ travelers, nights: nightsBetween(d.arrive, d.depart) || 0, hotels: d.accoms.length, level: trip.state.budgetLevel });
       const destBudget = typeof d.budgetOverride === "number" ? d.budgetOverride : b.total;
@@ -87,7 +120,7 @@ export function ItineraryBook({ template: t, onClose }: { template: BookTemplate
       return sec;
     });
     return { sections: secs, totals: tot, totalDays: offset, totalBudget: budget };
-  }, [dests, state.itinerary, state.center, state.transportMode, travelers, trip.state.budgetLevel]);
+  }, [dests, itinerary, center, transportMode, travelers, trip.state.budgetLevel]);
 
   const labelCls = t.uppercaseLabels ? "uppercase tracking-[.12em]" : "tracking-[.02em]";
   const routeLabel = dests.map((d) => d.name.split(",")[0]).join("  →  ");
@@ -243,7 +276,7 @@ export function ItineraryBook({ template: t, onClose }: { template: BookTemplate
                         return (
                           <div key={p.id} style={{ breakInside: "avoid" }}>
                             {i > 0 && (
-                              <div className="text-[10.5px] my-1.5 pl-[58px]" style={{ color: t.muted }}>↓ {e.travelFromPrev.min} min · {formatKm(e.travelFromPrev.km, state.units)}</div>
+                              <div className="text-[10.5px] my-1.5 pl-[58px]" style={{ color: t.muted }}>↓ {e.travelFromPrev.min} min · {formatKm(e.travelFromPrev.km, units)}</div>
                             )}
                             <div className="flex gap-3 items-start">
                               <div className="w-[50px] shrink-0 text-[12px] font-bold pt-1" style={{ color: t.accent }}>{fmtClock(e.arrivalMin)}</div>
