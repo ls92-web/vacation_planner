@@ -5,6 +5,7 @@ import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { useTripLoader } from "@/lib/trips/useTripLoader";
 import { composeTrip } from "@/lib/ai-client";
+import { classifyIntent } from "@/lib/ai/intent";
 import { geocodeCity } from "@/lib/geo";
 import { saveTrip } from "@/lib/destinations/repository";
 import type { Destination } from "@/lib/types";
@@ -30,6 +31,12 @@ export function useComposeJourney(onBeforeEnter?: () => Promise<void> | void) {
   const compose = async (text: string) => {
     const t = text.trim();
     if (!t || busy) return;
+    // Don't spend a model call on a greeting or keyboard-mashing — nudge instead.
+    const intent = classifyIntent(t);
+    if (intent === "gibberish" || intent === "greeting" || intent === "farewell" || intent === "thanks" || intent === "confirmation") {
+      setError("Tell me where you’d like to go — a city, a country, or a vibe like “a relaxed week of food in Italy”.");
+      return;
+    }
     setError(null);
     setBusy(true);
     try {
@@ -38,7 +45,7 @@ export function useComposeJourney(onBeforeEnter?: () => Promise<void> | void) {
         setBusy(false);
         setError(
           outcome.status === "busy"
-            ? "The AI is currently busy. Please try again in a few seconds."
+            ? "I’m gathering my thoughts — give it another moment and try again."
             : "I couldn’t turn that into a trip yet — try naming a destination or two."
         );
         return;

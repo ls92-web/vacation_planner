@@ -15,6 +15,7 @@ import { describeWeather } from "@/lib/weather/codes";
 import { buildBudgetContext, type BudgetDaySignal } from "@/lib/budget/signal";
 import { buildTransportContext } from "@/lib/planner/transportSignal";
 import { deriveBriefing, deriveInsights, nextActions, type Insight } from "@/lib/planner/insights";
+import { classifyIntent, isInstantIntent, instantReply } from "@/lib/ai/intent";
 import { withSave } from "@/lib/ui/saveStatus";
 import { seenFirstRun, markFirstRun } from "@/lib/ui/firstRun";
 import { useTrip } from "@/lib/store";
@@ -273,6 +274,20 @@ export function Workspace() {
     if (!text || sending || !activeTrip) return;
     const history = messages;
     const afterUser = [...messages, { role: "user" as const, content: text }];
+
+    // Intent layer: answer greetings / thanks / farewells / gibberish instantly,
+    // with no LLM call (and no wasted tokens). Everything else goes to the model.
+    const intent = classifyIntent(text);
+    if (isInstantIntent(intent)) {
+      const reply = instantReply(intent, { tripName: struct.name, hasPlan: itinerary.length > 0 }, text.toLowerCase());
+      const full = [...afterUser, { role: "assistant" as const, content: reply }];
+      setMessages(full);
+      setInput("");
+      setAnimateIdx(full.length - 1);
+      saveChat(activeTrip.id, full);
+      return;
+    }
+
     setMessages(afterUser);
     setInput("");
     setSending(true);
@@ -324,7 +339,7 @@ export function Workspace() {
         setAnimateIdx(full.length - 1);
         saveChat(activeTrip.id, full);
       } else {
-        const full = [...afterUser, { role: "assistant" as const, content: "I couldn't update that just now — mind rephrasing?" }];
+        const full = [...afterUser, { role: "assistant" as const, content: "Hmm, I lost my train of thought for a second there. Give it another go, or rephrase it and I'll pick it right up." }];
         setMessages(full);
         setAnimateIdx(full.length - 1);
         saveChat(activeTrip.id, full);
