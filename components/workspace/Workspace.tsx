@@ -8,7 +8,7 @@ import { geocodeCity } from "@/lib/geo";
 import { SLOT_LABELS, SLOTS, type ExplorePlace, type ItineraryItem } from "@/lib/places";
 import { planTrip, type PlaceSuggestion } from "@/lib/ai-client";
 import { applyScheduleOps, dayStructure, serializeSchedule } from "@/lib/planner/schedulePlan";
-import { optimizeDay } from "@/lib/planner/optimize";
+import { optimizeDay, lightenDay, fixTiming } from "@/lib/planner/optimize";
 import { lookupPlace } from "@/lib/places/lookup";
 import { buildWeatherContext, type DaySignal } from "@/lib/weather/signal";
 import { describeWeather } from "@/lib/weather/codes";
@@ -16,6 +16,7 @@ import { buildBudgetContext, type BudgetDaySignal } from "@/lib/budget/signal";
 import { buildTransportContext } from "@/lib/planner/transportSignal";
 import { deriveBriefing, deriveInsights, nextActions, type Insight } from "@/lib/planner/insights";
 import { withSave } from "@/lib/ui/saveStatus";
+import { seenFirstRun, markFirstRun } from "@/lib/ui/firstRun";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
 import { useTripLoader } from "@/lib/trips/useTripLoader";
@@ -351,14 +352,25 @@ export function Workspace() {
     saveChat(activeTrip.id, full);
   };
 
-  // Inline "Apply" — a real, instant, deterministic route reorder (no AI round-trip).
-  const optimizeDayNow = (apply: NonNullable<Insight["apply"]>) => {
+  // Inline "Apply" — real, instant, deterministic edits (no AI round-trip).
+  const applyFix = (apply: NonNullable<Insight["apply"]>) => {
     if (!activeTrip) return;
-    const res = optimizeDay(itineraryRef.current, apply.destId, apply.day);
-    if (!res) { actions.flash("That day's route is already efficient."); return; }
-    setItinerary(res.items);
-    withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", res.items));
-    sayProactively(`Done — I reordered Day ${apply.globalDay} into an efficient loop: same stops, about ${Math.round(res.savedKm)} km less walking.`);
+    let items: ItineraryItem[] | null = null;
+    let msg = "";
+    if (apply.type === "optimizeRoute") {
+      const r = optimizeDay(itineraryRef.current, apply.destId, apply.day);
+      if (r) { items = r.items; msg = `Done — I reordered Day ${apply.globalDay} into an efficient loop: same stops, about ${Math.round(r.savedKm)} km less walking.`; }
+    } else if (apply.type === "lightenDay") {
+      const r = lightenDay(itineraryRef.current, apply.destId, apply.day, apply.toDay);
+      if (r) { items = r.items; msg = `Done — I moved ${r.movedName} to Day ${apply.toGlobalDay} so Day ${apply.globalDay} has room to breathe.`; }
+    } else if (apply.type === "fixTiming") {
+      const r = fixTiming(itineraryRef.current, apply.destId, apply.day);
+      if (r) { items = r.items; msg = `Done — I moved ${r.movedName} to the ${r.slot} on Day ${apply.globalDay}, before it closes.`; }
+    }
+    if (!items) { actions.flash("That one needs a closer look — ask me and I'll sort it."); return; }
+    setItinerary(items);
+    withSave(getRepository().saveItinerary(activeTrip.id, state.destinations[0]?.name ?? "", items));
+    sayProactively(msg);
   };
 
   // Baseline: record the issues already present when the plan loads, so nudges
@@ -520,7 +532,7 @@ export function Workspace() {
             <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
           </div>
         )}
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} coreState={sending ? "routing" : "idle"} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) optimizeDayNow(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} coreState={sending ? "routing" : "idle"} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) applyFix(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
 
       {/* particle bursts flowing toward the companion */}
@@ -669,6 +681,8 @@ const fmtHrs = (min: number) => { const h = Math.floor(min / 60); const m = min 
 
 /** Proactive, dismissible AI observations — acting on one sends its pre-written prompt. */
 function InsightBar({ insights, onAction, onDismiss }: { insights: Insight[]; onAction: (insight: Insight) => void; onDismiss: (id: string) => void }) {
+  const [hint] = useState(() => !seenFirstRun("workspace-fixes"));
+  useEffect(() => { if (insights.length && hint) markFirstRun("workspace-fixes"); }, [insights.length, hint]);
   if (!insights.length) return null;
   return (
     <div className="mb-4 flex flex-col gap-2">
@@ -676,6 +690,7 @@ function InsightBar({ insights, onAction, onDismiss }: { insights: Insight[]; on
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--accent)", boxShadow: "0 0 8px 1px color-mix(in oklab, var(--accent) 80%, transparent)", animation: "jc_halo 2.4s var(--ease-soft) infinite" }} />
         Companion analysis
       </div>
+      {hint && <div className="text-[12px] text-white/55 leading-snug -mt-1 mb-0.5 vp-fade-fast">I watch your plan as it grows — tap a fix and I&apos;ll apply it instantly.</div>}
       {insights.map((it) => (
         <div key={it.id} className="imm-glass rounded-[14px] px-3.5 py-3 flex items-start gap-3 vp-fade-fast">
           <span className="w-8 h-8 rounded-full grid place-items-center shrink-0 mt-0.5" style={{ background: "rgba(255,255,255,.08)", color: "var(--accent)" }}><Lightbulb size={15} strokeWidth={2} /></span>

@@ -7,6 +7,7 @@ import { useComposeJourney } from "@/lib/trips/useComposeJourney";
 import { Logo } from "@/components/Logo";
 import { ImmersiveMenu } from "@/components/immersive/ImmersiveMenu";
 import { JourneyCore, type CoreNode } from "@/components/immersive/JourneyCore";
+import { seenFirstRun, markFirstRun } from "@/lib/ui/firstRun";
 
 const PROMPTS = [
   "10 days exploring Italy with my family.",
@@ -39,6 +40,7 @@ export function Welcome() {
   const { compose, busy, error, setError } = useComposeJourney();
   const [value, setValue] = useState("");
   const [promptIdx, setPromptIdx] = useState(0);
+  const [coach, setCoach] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -46,6 +48,14 @@ export function Welcome() {
     const t = setInterval(() => setPromptIdx((i) => (i + 1) % PROMPTS.length), 3400);
     return () => clearInterval(t);
   }, []);
+
+  // Gentle, one-time first-run nudge — the core magic, shown once, dismissible.
+  useEffect(() => {
+    if (seenFirstRun("welcome")) return;
+    const t = setTimeout(() => setCoach(true), 1100);
+    return () => clearTimeout(t);
+  }, []);
+  const dismissCoach = () => { setCoach(false); markFirstRun("welcome"); };
 
   // Subtle pointer parallax — the whole scene breathes with the cursor.
   const onPointer = (e: React.PointerEvent) => {
@@ -61,7 +71,7 @@ export function Welcome() {
   const coreState: "idle" | "thinking" | "routing" = busy ? "routing" : value.trim() ? "thinking" : "idle";
   const coreNodes = nodesFromText(value);
 
-  const start = () => compose(value);
+  const start = () => { markFirstRun("welcome"); setCoach(false); compose(value); };
 
   return (
     <div
@@ -98,6 +108,15 @@ export function Welcome() {
         <p className="mt-3 text-[15px] sm:text-[16px] imm-rise-2" style={{ color: "rgba(255,255,255,.62)" }}>
           Describe your journey. The intelligence maps the rest.
         </p>
+
+        {/* one-time first-run coach — the core magic, gently */}
+        {coach && (
+          <div className="mt-6 -mb-1 mx-auto max-w-[520px] imm-glass rounded-[14px] px-4 py-3 flex items-center gap-3 text-left vp-fade-fast" role="note">
+            <Sparkles size={16} strokeWidth={2} className="shrink-0" style={{ color: "var(--accent)" }} />
+            <span className="flex-1 text-[12.5px] leading-snug text-white/80">New here? Just describe a trip in your own words — I&apos;ll build the whole plan, then refine and optimise it with you.</span>
+            <button onClick={dismissCoach} className="shrink-0 text-[12px] font-bold text-white/60 hover:text-white cursor-pointer transition">Got it</button>
+          </div>
+        )}
 
         {/* compose */}
         <div

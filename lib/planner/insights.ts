@@ -4,7 +4,7 @@ import type { Destination } from "@/lib/types";
 import type { ItineraryItem, ExplorePlace } from "@/lib/places";
 import { recommend, MODE_TEMPLATES } from "@/lib/data";
 import { dayStructure, venueEnv } from "./schedulePlan";
-import { backtrackKm } from "./optimize";
+import { backtrackKm, closingHour } from "./optimize";
 import type { DaySignal } from "@/lib/weather/signal";
 import type { BudgetDaySignal } from "@/lib/budget/signal";
 
@@ -24,7 +24,10 @@ export interface Insight {
   /** Short lower-case clause for the arrival briefing, e.g. "day 2 zig-zags across town". */
   brief?: string;
   /** Present when the fix can be applied instantly + deterministically (no AI round-trip). */
-  apply?: { type: "optimizeRoute"; destId: string; day: number; globalDay: number };
+  apply?:
+    | { type: "optimizeRoute"; destId: string; day: number; globalDay: number }
+    | { type: "lightenDay"; destId: string; day: number; toDay: number; globalDay: number; toGlobalDay: number }
+    | { type: "fixTiming"; destId: string; day: number; globalDay: number };
 }
 
 /** Does this stop count as food (restaurant / café / bar)? */
@@ -49,18 +52,6 @@ function placeKind(p: ExplorePlace): { key: string; label: string } | null {
   if (has("bar", "night_club", "nightlife", "pub")) return { key: "bar", label: "bars" };
   if (has("shopping", "store", "mall", "market", "boutique")) return { key: "shopping", label: "shopping stops" };
   return null;
-}
-
-/** Parse the closing hour (0–24) from a "9:00 AM – 6:00 PM" style string, else null. */
-function closingHour(h?: string): number | null {
-  if (!h) return null;
-  if (/24\s*hours|open\s*24/i.test(h)) return 24;
-  const times = [...h.matchAll(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/gi)];
-  if (!times.length) return null;
-  const m = times[times.length - 1];
-  let hr = Number(m[1]) % 12;
-  if (/pm/i.test(m[3])) hr += 12;
-  return hr + (m[2] ? Number(m[2]) / 60 : 0);
 }
 
 const fmtHour = (h: number) => {
@@ -108,7 +99,23 @@ export function deriveInsights(
       const b = budgetByDay.get(g);
 
       if (dayItems.length >= 5) {
-        out.push({ id: `busy-${g}`, kind: "busy", text: `Day ${g} has ${dayItems.length} stops — a little packed for a good day.`, actionLabel: "Ease it up", message: `Make day ${g} less busy`, brief: `day ${g} is pretty packed (${dayItems.length} stops)` });
+        // Find a genuinely lighter day in the same destination to move a stop to → instant "Lighten".
+        const dk = cityKey(ds.city);
+        let toDay = -1, toCount = Infinity;
+        for (let j = 0; j < ds.nights; j++) {
+          if (j === d) continue;
+          const c = lenByDay.get(`${dk}#${j}`) ?? 0;
+          if (c < toCount) { toCount = c; toDay = j; }
+        }
+        const canLighten = toDay >= 0 && toCount <= dayItems.length - 2;
+        out.push({
+          id: `busy-${g}`, kind: "busy",
+          text: `Day ${g} has ${dayItems.length} stops — a little packed for a good day.`,
+          actionLabel: canLighten ? "Lighten it" : "Ease it up",
+          message: `Make day ${g} less busy`,
+          brief: `day ${g} is pretty packed (${dayItems.length} stops)`,
+          ...(canLighten ? { apply: { type: "lightenDay" as const, destId: ds.city, day: d, toDay, globalDay: g, toGlobalDay: ds.globalStart + toDay + 1 } } : {}),
+        });
       }
 
       // Opening-hours conflict: an evening stop that closes before evening.
@@ -116,7 +123,7 @@ export function deriveInsights(
       const clash = ordered.find((it) => it.slot === "evening" && (() => { const c = closingHour(it.place.hours); return c != null && c <= 17.5; })());
       if (clash) {
         const c = closingHour(clash.place.hours)!;
-        out.push({ id: `hours-${g}`, kind: "hours", text: `Day ${g}: ${clash.place.name} is set for the evening but closes around ${fmtHour(c)}. Move it earlier?`, actionLabel: "Fix timing", message: `On day ${g}, ${clash.place.name} closes before evening — move it to the morning or afternoon`, brief: `${clash.place.name} on day ${g} closes before its evening slot` });
+        out.push({ id: `hours-${g}`, kind: "hours", text: `Day ${g}: ${clash.place.name} is set for the evening but closes around ${fmtHour(c)}. Move it earlier?`, actionLabel: "Fix timing", message: `On day ${g}, ${clash.place.name} closes before evening — move it to the morning or afternoon`, brief: `${clash.place.name} on day ${g} closes before its evening slot`, apply: { type: "fixTiming", destId: ds.city, day: d, globalDay: g } });
       }
 
       // Route backtracking: how much walking the day wastes vs an efficient order.
