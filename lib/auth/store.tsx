@@ -19,6 +19,19 @@ interface AuthState {
 const REMEMBER_KEY = "wf_remember";
 const ACTIVE_KEY = "wf_active";
 
+/**
+ * Is this getUser() error a *definitive* invalid session (deleted user, revoked
+ * token) rather than a transient network hiccup? Only then do we sign out — a
+ * flaky network must never bounce a valid user to the login screen.
+ */
+function sessionInvalid(err: { status?: number; code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  if (err.status === 401 || err.status === 403) return true;
+  const code = (err.code || "").toLowerCase();
+  if (code.includes("user_not_found") || code.includes("session_not_found") || code.includes("bad_jwt")) return true;
+  return /does not exist|user from sub|invalid (jwt|token|claim|session)/.test((err.message || "").toLowerCase());
+}
+
 function useProvideAuth() {
   const sb = getSupabase();
   const [state, setState] = useState<AuthState>({ ready: false, session: null, user: null, profile: null, preferences: null, profileLoaded: false, recovery: false });
@@ -68,7 +81,7 @@ function useProvideAuth() {
     sb.auth
       .getSession()
       .then(async ({ data }) => {
-        const session = data.session;
+        let session = data.session;
         // "Remember me": if the user opted out, end the session when the tab/browser was closed.
         if (session && typeof window !== "undefined") {
           const remember = window.localStorage.getItem(REMEMBER_KEY);
@@ -79,6 +92,16 @@ function useProvideAuth() {
             return;
           }
           window.sessionStorage.setItem(ACTIVE_KEY, "1");
+        }
+        // Validate the cached token against the server. A token for a deleted or
+        // revoked user must NOT present as "logged in" — otherwise every AI/data
+        // call fails and surfaces as a misleading "AI is currently busy". Only a
+        // definitive auth failure signs out; a network blip keeps the session.
+        if (session) {
+          try {
+            const { error } = await sb.auth.getUser();
+            if (sessionInvalid(error)) { await sb.auth.signOut().catch(() => {}); session = null; }
+          } catch { /* network — keep the session */ }
         }
         if (!active) return;
         setState((s) => ({ ...s, ready: true, session, user: session?.user ?? null }));
