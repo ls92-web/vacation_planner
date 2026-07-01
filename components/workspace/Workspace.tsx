@@ -394,8 +394,9 @@ export function Workspace() {
   return (
     <MapsApiProvider>
     <div className="imm-bg h-screen w-full flex flex-col lg:flex-row overflow-hidden font-body text-white screen-stage">
-      {/* ============ Chat (primary) ============ */}
-      <section className="flex flex-col lg:w-[40%] lg:max-w-[520px] h-[52vh] lg:h-full border-b lg:border-b-0 lg:border-r border-white/10" style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(10px)" }}>
+      {/* ============ Left: chat, with the schedule beneath it ============ */}
+      <div className="flex flex-col lg:w-[42%] lg:max-w-[540px] h-[66vh] lg:h-full min-h-0 lg:border-r border-white/10">
+      <section className="flex flex-col min-h-0 flex-[3] border-b border-white/10" style={{ background: "rgba(255,255,255,.04)", backdropFilter: "blur(10px)" }}>
         <header className="flex items-center gap-2.5 px-4 h-[58px] border-b border-white/10 shrink-0">
           <button ref={headerLogoRef} onClick={actions.goWelcome} title="New journey" className="flex items-center gap-2 cursor-pointer">
             <Logo size={26} variant="plain" animated={sending} />
@@ -407,7 +408,7 @@ export function Workspace() {
           <ImmersiveMenu />
         </header>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto imm-scroll px-4 py-4 flex flex-col gap-3">
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto imm-scroll px-4 py-4 flex flex-col gap-3">
           {messages.map((m, i) => (
             <div key={i} className={`max-w-[88%] ${m.role === "user" ? "self-end" : "self-start"}`}>
               <div
@@ -524,14 +525,24 @@ export function Workspace() {
         </div>
       </section>
 
-      {/* ============ Live journey ============ */}
+      {/* schedule — immediately under the chat */}
+      <div className="flex-[2] min-h-0 overflow-y-auto imm-scroll" style={{ background: "rgba(255,255,255,.02)" }}>
+        {saved.length > 0 && (
+          <div className="px-4 pb-6">
+            <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} budgetLevel={state.budgetLevel} />
+          </div>
+        )}
+      </div>
+      </div>
+
+      {/* ============ Right: companion analysis + map + overview ============ */}
       <section className="flex-1 overflow-y-auto imm-scroll">
         {needsContext && (
           <div className="max-w-[760px] mx-auto px-[clamp(16px,3vw,28px)] pt-6">
             <TripContextCard preferences={state.preferences} budgetLevel={state.budgetLevel} onApply={applyContext} onSkip={skipContext} />
           </div>
         )}
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} insights={activeInsights} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) applyFix(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} itinerary={itinerary} transports={state.transports} insights={activeInsights} onInsightAction={(it) => { setDismissed((prev) => new Set(prev).add(it.id)); if (it.apply) applyFix(it.apply); else send(it.message); }} onInsightDismiss={(id) => setDismissed((prev) => new Set(prev).add(id))} />
       </section>
 
       {/* particle bursts flowing toward the companion */}
@@ -549,13 +560,10 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports, insights, onInsightAction, onInsightDismiss }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, itinerary, transports, insights, onInsightAction, onInsightDismiss }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   itinerary: ItineraryItem[];
-  onRemoveStop: (placeId: string) => void;
-  weatherByDay: Map<number, DaySignal>;
-  budgetByDay: Map<number, BudgetDaySignal>;
   transports: Record<string, string>;
   insights: Insight[];
   onInsightAction: (insight: Insight) => void;
@@ -649,9 +657,6 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, it
           );
         })}
       </div>
-
-      {/* living itinerary */}
-      <ScheduleView saved={saved} itinerary={itinerary} onRemoveStop={onRemoveStop} weatherByDay={weatherByDay} budgetByDay={budgetByDay} budgetLevel={budgetLevel} />
 
       {/* actions */}
       <div className="mt-6 flex flex-wrap gap-2.5">
