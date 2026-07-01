@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Download, X } from "lucide-react";
-import { usePlanner } from "@/lib/planner/store";
 import type { ItineraryItem } from "@/lib/places";
 import type { LatLng } from "@/lib/maps";
 import type { TransportMode } from "@/lib/planner/travel";
@@ -29,23 +28,6 @@ function TemplateCard({ t, city, days, onPick }: { t: BookTemplate; city: string
         <div className="text-[11.5px] text-muted leading-snug mt-0.5">{t.blurb}</div>
       </div>
     </button>
-  );
-}
-
-/** Thin wrapper for the Explore/planner flow: pulls schedule data from the PlannerProvider. */
-export function ExportButton({ label = "Export", className, disabled = false }: { label?: string; className?: string; disabled?: boolean } = {}) {
-  const { state } = usePlanner();
-  return (
-    <ExportControl
-      label={label}
-      className={className}
-      disabled={disabled}
-      itinerary={state.itinerary}
-      destination={state.destination}
-      center={state.center}
-      transportMode={state.transportMode}
-      units={state.units}
-    />
   );
 }
 

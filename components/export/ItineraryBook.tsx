@@ -7,7 +7,6 @@ import { EX_THUMBS, fmtMonthDay, MODE_TEMPLATES, nightsBetween, recommend } from
 import { formatDurationMin, formatKm, type ItineraryItem } from "@/lib/places";
 import { computeTimeline, fmtClock, orderedItems as orderItems, type TransportMode } from "@/lib/planner/travel";
 import { analyzeDay } from "@/lib/planner/dayAnalysis";
-import { usePlanner } from "@/lib/planner/store";
 import { useTrip } from "@/lib/store";
 import { useAuth } from "@/lib/auth/store";
 import { computeBudget, convertCostText, formatMoney } from "@/lib/budget/estimate";
@@ -36,25 +35,9 @@ function fmtTime(t?: string): string {
   return `${hr}:${(mRaw ?? "00").padStart(2, "0")} ${ap}`;
 }
 
-/** Thin wrapper for the Explore/planner flow: pulls schedule data from the PlannerProvider. */
-export function ItineraryBook({ template, onClose }: { template: BookTemplate; onClose: () => void }) {
-  const { state } = usePlanner();
-  return (
-    <ItineraryBookView
-      template={template}
-      onClose={onClose}
-      itinerary={state.itinerary}
-      center={state.center}
-      transportMode={state.transportMode}
-      units={state.units}
-    />
-  );
-}
-
 /**
- * The rendered guide. Takes schedule data as props so it works both inside the
- * PlannerProvider (Explore) and in the conversational workspace (which holds its
- * own live itinerary). Trip/account/currency come from their always-present providers.
+ * The rendered guide. Takes schedule data as props (used by the export control in
+ * the conversational workspace). Trip/account/currency come from their always-present providers.
  */
 export function ItineraryBookView({
   template: t,
