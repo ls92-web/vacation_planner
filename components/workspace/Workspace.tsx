@@ -12,6 +12,7 @@ import { lookupPlace } from "@/lib/places/lookup";
 import { buildWeatherContext, type DaySignal } from "@/lib/weather/signal";
 import { describeWeather } from "@/lib/weather/codes";
 import { buildBudgetContext, type BudgetDaySignal } from "@/lib/budget/signal";
+import { buildTransportContext } from "@/lib/planner/transportSignal";
 import { withSave } from "@/lib/ui/saveStatus";
 import { useTrip } from "@/lib/store";
 import { useTrips } from "@/lib/trips/store";
@@ -20,7 +21,7 @@ import type { ComposedTrip } from "@/lib/ai-client";
 import { applyTrip } from "@/lib/trips/applyTrip";
 import { loadChat, saveChat, type ChatTurn } from "@/lib/destinations/repository";
 import { fmtMonthDay, MODE_TEMPLATES, nightsBetween, recommend } from "@/lib/data";
-import { addBreakdowns, computeBudget, EMPTY_BREAKDOWN, formatMoney } from "@/lib/budget/estimate";
+import { addBreakdowns, computeBudget, convertCostText, EMPTY_BREAKDOWN, formatMoney } from "@/lib/budget/estimate";
 import { useCurrency } from "@/lib/budget/useCurrency";
 import { summarizePreferences } from "@/lib/trips/preferences";
 import { GoogleMap, MapsApiProvider, DestinationMarkers } from "@/components/maps";
@@ -61,6 +62,12 @@ export function Workspace() {
   );
   const budgetTextRef = useRef("");
   budgetTextRef.current = budget.text;
+  // Transport signal: inter-city legs (mode/duration/cost/travel day).
+  const transportTextRef = useRef("");
+  transportTextRef.current = useMemo(
+    () => buildTransportContext(state.destinations, state.transports, currency).text,
+    [state.destinations, state.transports, currency]
+  );
 
   const saved = useMemo(() => state.destinations.filter((d) => d.saved && d.name.trim()), [state.destinations]);
   const travelers = state.adults + state.kids;
@@ -170,7 +177,7 @@ export function Workspace() {
     try {
       // Serialize the live schedule so the companion can edit existing stops by ref.
       const { text: scheduleText, refMap } = serializeSchedule(state.destinations, itineraryRef.current);
-      const res = await planTrip(struct, scheduleText, weatherTextRef.current, budgetTextRef.current, Object.keys(refMap), history, text);
+      const res = await planTrip(struct, scheduleText, weatherTextRef.current, budgetTextRef.current, transportTextRef.current, Object.keys(refMap), history, text);
       if (res) {
         // (1) Structural change → rebuild destinations + rehydrate the store.
         if (res.trip && sigOf(res.trip) !== sigOf(struct)) {
@@ -316,7 +323,7 @@ export function Workspace() {
 
       {/* ============ Live journey ============ */}
       <section className="flex-1 overflow-y-auto vp-scroll">
-        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} actions={actions} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} />
+        <JourneyPanel saved={saved} travelers={travelers} currency={currency} budgetLevel={state.budgetLevel} preferences={summarizePreferences(state.preferences, state.budgetLevel)} actions={actions} itinerary={itinerary} onRemoveStop={removeStop} weatherByDay={weatherByDay} budgetByDay={budget.byDay} transports={state.transports} />
       </section>
 
       <style dangerouslySetInnerHTML={{ __html: `@keyframes vpw_pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.3)}}` }} />
@@ -325,7 +332,7 @@ export function Workspace() {
   );
 }
 
-function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, actions, itinerary, onRemoveStop, weatherByDay, budgetByDay }: {
+function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, actions, itinerary, onRemoveStop, weatherByDay, budgetByDay, transports }: {
   saved: ReturnType<typeof useTrip>["state"]["destinations"];
   travelers: number; currency: ReturnType<typeof useCurrency>; budgetLevel: "budget" | "standard" | "luxury"; preferences: string;
   actions: ReturnType<typeof useTrip>["actions"];
@@ -333,6 +340,7 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
   onRemoveStop: (placeId: string) => void;
   weatherByDay: Map<number, DaySignal>;
   budgetByDay: Map<number, BudgetDaySignal>;
+  transports: Record<string, string>;
 }) {
   const markers: MapMarker[] = saved
     .filter((d) => typeof d.lat === "number" && typeof d.lng === "number" && !(d.lat === 0 && d.lng === 0))
@@ -402,12 +410,13 @@ function JourneyPanel({ saved, travelers, currency, budgetLevel, preferences, ac
               </div>
               {next && (() => {
                 const rec = recommend(d, next);
-                const tpl = MODE_TEMPLATES[rec.recMode];
+                const mode = (transports[rec.key] || rec.recMode) as typeof rec.recMode;
+                const tpl = rec.override && rec.override.mode === mode ? rec.override : MODE_TEMPLATES[mode];
                 return (
                   <div className="flex items-center gap-2 py-2 pl-[52px] text-[11.5px] text-muted">
                     <span className="w-px h-4" style={{ background: "var(--line)" }} />
-                    <span className="capitalize font-semibold text-ink">{rec.recMode}</span>
-                    <span>· {tpl.duration} → {next.name}</span>
+                    <span className="font-semibold text-ink">{mode}</span>
+                    <span>· {tpl.duration} · {convertCostText(tpl.cost, currency)} → {next.name}</span>
                   </div>
                 );
               })()}

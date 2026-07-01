@@ -51,11 +51,12 @@ export async function planTrip(
   scheduleText: string,
   weatherText: string,
   budgetText: string,
+  transportText: string,
   refKeys: string[],
   history: AIMessage[],
   message: string
 ): Promise<PlanResult | null> {
-  const data = await callFn<PlanResult>("ai", { action: "plan", trip, scheduleText, weatherText, budgetText, refKeys, messages: history, message });
+  const data = await callFn<PlanResult>("ai", { action: "plan", trip, scheduleText, weatherText, budgetText, transportText, refKeys, messages: history, message });
   return data && typeof data.reply === "string" ? data : null;
 }
 
